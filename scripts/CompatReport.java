@@ -168,7 +168,7 @@ public class CompatReport {
         PATCHES.put("Hide stories and notes", List.of("stories"));
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
-        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip"));
+        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
@@ -221,7 +221,10 @@ public class CompatReport {
      */
     static final Map<String, Set<String>> FIELD_CONTROLS = new LinkedHashMap<>();
     static {
-        FIELD_CONTROLS.put("pluginSentinel", PLUGIN_GATE_ANCHORS.keySet());
+        // The @ suggestion hook checks its sections' disabled marker against the same sentinel.
+        var sentinelControls = new LinkedHashSet<>(PLUGIN_GATE_ANCHORS.keySet());
+        sentinelControls.add("ai_mentions");
+        FIELD_CONTROLS.put("pluginSentinel", sentinelControls);
         FIELD_CONTROLS.put("preferenceGetter", Set.of("browser", "people_jewel"));
         FIELD_CONTROLS.put("peopleKey", Set.of("people_jewel"));
         FIELD_CONTROLS.put("peopleFlagCheck", Set.of("people_jewel"));
@@ -2374,6 +2377,50 @@ public class CompatReport {
         return watchers.size() == 1 ? watchers : List.of();
     }
 
+    static final Set<String> AI_MENTION_PLUGINS = Set.of(
+        "messaging.aibot.core.mentionai.MentionAiRowSupplier", "messaging.aibot.core.imagine.ImagineRowSupplier");
+
+    /**
+     * ai_mentions: the @ suggestion row dispatchers, non-static (query, ImmutableList.Builder)V methods traced as
+     * MentionRowSupplierSpec that run a Meta AI or imagine section. Mirrors AiMentions.kt.
+     */
+    static List<Method> aiMentionDispatchers(List<ClassDef> classes) {
+        var dispatchers = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || !"V".equals(method.getReturnType()) ||
+                AccessFlags.STATIC.isSet(method.getAccessFlags()) || method.getParameterTypes().size() != 2 ||
+                !"Lcom/google/common/collect/ImmutableList$Builder;".equals(method.getParameterTypes().get(1).toString())) continue;
+            var strings = new HashSet<String>();
+            for (var i : method.getImplementation().getInstructions())
+                if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
+            if (strings.contains("messaging.mentions.composer.MentionRowSupplierSpec") &&
+                strings.stream().anyMatch(AI_MENTION_PLUGINS::contains)) dispatchers.add(method);
+        }
+        return dispatchers;
+    }
+
+    /**
+     * ai_commands: the static (controller, ThreadKey)List that turns the open chat's AiPageCustomCommands into
+     * suggestions. Counted only when exactly one method looks like it. Mirrors AiMentions.kt.
+     */
+    static List<Method> aiCommandLists(List<ClassDef> classes) {
+        var lists = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || !AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !"Ljava/util/List;".equals(method.getReturnType())) continue;
+            var params = new ArrayList<String>();
+            for (var t : method.getParameterTypes()) params.add(t.toString());
+            if (!params.equals(List.of(cls.getType(), "Lcom/facebook/messaging/model/threadkey/ThreadKey;"))) continue;
+            for (var i : method.getImplementation().getInstructions())
+                if (i.getOpcode() == Opcode.CHECK_CAST && ((ReferenceInstruction) i).getReference() instanceof TypeReference tr &&
+                    "Lcom/facebook/messaging/aibot/page/customcommand/AiPageCustomCommand;".equals(tr.getType())) {
+                    lists.add(method);
+                    break;
+                }
+        }
+        return lists.size() == 1 ? lists : List.of();
+    }
+
     static final String OVERSCROLL_BEHAVIOR = "Lcom/facebook/messaging/threadview/overscroll/ui/OverScrollActionBehavior;";
 
     /**
@@ -2464,6 +2511,8 @@ public class CompatReport {
         if (community != null) found.get("community_inbox").add(community.render());
         found.get("emoji_drawer").addAll(emojiDrawerReaders(classes));
         found.get("emoji_search").addAll(emojiSearchWatchers(classes));
+        found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
+        found.get("ai_commands").addAll(aiCommandLists(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));

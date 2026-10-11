@@ -160,6 +160,20 @@ public final class Settings {
     public static boolean hideFacebook() { return enabled("facebook"); }
     public static boolean hideMetaAi() { return enabled("meta_ai"); }
 
+    /**
+     * The @ suggestion list asks a cached plugin state before it adds the Meta AI or imagine row, and skips the row when
+     * that state is Messenger's own disabled marker. With the switch on the state reads as that marker. The cache itself
+     * isn't written, so Off, Pause and safe mode bring the rows back on the next keystroke.
+     */
+    public static Object hideMetaAiRow(Object state, Object disabled) {
+        try {
+            return hideMetaAi() ? disabled : state;
+        } catch (RuntimeException error) {
+            hookFailed("meta_ai", "Can't hide Meta AI in @ suggestions", error);
+            return state;
+        }
+    }
+
     /** First answer this process gave for the Meta AI tab, or null before the bottom bar asked. */
     static volatile Boolean metaAiTab;
 

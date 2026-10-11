@@ -6,7 +6,10 @@ hook ad_context_banner LX/HEa;->A00()Z
 hook ad_events LX/27T;->Dgl(LX/0Co;Z)V
 hook ad_events LX/6Lz;->A00(LX/6Ez;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 hook ads LX/2I1;->D5H(LX/1jo;Lcom/google/common/collect/ImmutableList;Ljava/lang/String;)Lcom/google/common/collect/ImmutableList;
+hook ai_commands LX/7Pl;->A06(LX/7Pl;Lcom/facebook/messaging/model/threadkey/ThreadKey;)Ljava/util/List;
 hook ai_fab LX/6rJ;->render(LX/2Cf;)LX/1GT;
+hook ai_mentions LX/7Pw;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList$Builder;)V
+hook ai_mentions LX/7Pz;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList$Builder;)V
 hook ai_menu LX/HEJ;->A00()Z
 hook ai_menu LX/HEJ;->A01()Z
 hook ai_menu LX/HPh;->A00()Z

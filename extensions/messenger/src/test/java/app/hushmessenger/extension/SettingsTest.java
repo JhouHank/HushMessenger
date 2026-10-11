@@ -39,6 +39,18 @@ public class SettingsTest {
         assertTrue(Settings.hideMetaAiTab());
     }
 
+    @Test public void metaAiMentionRowsReadAsDisabledOnlyWhileTheSwitchIsOn() {
+        Object enabled = new Object();
+        Object disabled = new Object();
+        assertSame(enabled, Settings.hideMetaAiRow(enabled, disabled));
+        assertNull(Settings.hideMetaAiRow(null, disabled));
+        Settings.preferences.edit().putBoolean("meta_ai", true).commit();
+        assertSame(disabled, Settings.hideMetaAiRow(enabled, disabled));
+        assertSame(disabled, Settings.hideMetaAiRow(null, disabled));
+        Settings.preferences.edit().putBoolean("paused", true).commit();
+        assertSame(enabled, Settings.hideMetaAiRow(enabled, disabled));
+    }
+
     @Test public void allControlsPreserveStockUntilEnabled() {
         assertFalse(Settings.hideStories());
         assertFalse(Settings.hideFacebook());

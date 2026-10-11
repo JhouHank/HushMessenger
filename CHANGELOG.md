@@ -27,6 +27,7 @@
 - TalkBack can now reach the message log's **View log** and **Clear log** buttons. Buttons that can't be used right now look grayed out.
 - Restoring choices from a file that can't be read now says "Couldn't read that file" instead of calling it an invalid backup. Canceling a restore partway says your choices didn't change.
 - Several lines in HushMessenger settings read more clearly, like the restart hint, the empty search result, the export and import help, and error lines, which now point to **Copy setup** for details. A switch used more than two days ago shows days ("Used 3d ago"). **Chat heads** is written the same way everywhere.
+- **Hide Meta AI** now also covers the list that opens when you type @ in a chat. Meta AI and its imagine entries drop out of it, AI commands too, while the people in the chat still show. Turning the switch off brings them back on the next letter you type.
 - **Use system emoji** tries adding Messenger's emoji font behind the phone's up to three times when it fails, since a font that's still being written can fail once.
 - HushMessenger publishes its app shortcuts in the background now, so they don't hold up Messenger's startup on a Root Mount install.
 - More of the checks that find the code each patch changes now refuse a spot the patch's code couldn't work in, like a register its call can't reach, a field Messenger's code isn't allowed to read, or a static method where it needs an instance, before anything is changed. The patch descriptions also say that the Meta AI tab goes after a restart.
