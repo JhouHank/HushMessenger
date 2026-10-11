@@ -54,7 +54,7 @@ private fun Method.code() = implementation!!.instructions.toList()
 private fun assertHintHook(before: List<Instruction>, after: List<Instruction>, result: Int, label: String) {
     val held = (before[result] as OneRegisterInstruction).registerA
     assertEquals(before.size + 2, after.size, label)
-    assertEquals(before, after.filterIndexed { i, _ -> i != result + 1 && i != result + 2 }, label)
+    assertStockKept(before, after.filterIndexed { i, _ -> i != result + 1 && i != result + 2 }, label)
     val helper = after[result + 1] as RegisterRangeInstruction
     assertEquals(Opcode.INVOKE_STATIC_RANGE, helper.opcode, label)
     assertEquals(AI_SEARCH_HINT_HELPER, (helper as ReferenceInstruction).reference.toString(), label)

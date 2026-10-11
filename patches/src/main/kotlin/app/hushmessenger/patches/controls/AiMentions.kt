@@ -30,7 +30,6 @@ internal val AI_MENTION_PLUGINS = setOf(
 )
 
 internal const val AI_PAGE_COMMAND = "Lcom/facebook/messaging/aibot/page/customcommand/AiPageCustomCommand;"
-internal const val THREAD_KEY = "Lcom/facebook/messaging/model/threadkey/ThreadKey;"
 internal const val MENTION_LIST_BUILDER = "Lcom/google/common/collect/ImmutableList\$Builder;"
 internal const val AI_MENTION_HELPER = "$SETTINGS->hideMetaAiRow(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
 private const val SECTION_COUNTER = "Ljava/util/concurrent/atomic/AtomicInteger;->getAndIncrement()I"
@@ -129,7 +128,7 @@ internal fun MutableMethod.injectAiMentions() {
  */
 internal fun Method.isAiCommandList(): Boolean {
     if (!AccessFlags.STATIC.isSet(accessFlags) || returnType != "Ljava/util/List;" ||
-        parameterTypes.map { it.toString() } != listOf(definingClass, THREAD_KEY)) return false
+        parameterTypes.map { it.toString() } != listOf(definingClass, THREAD_KEY_TYPE)) return false
     return implementation?.instructions?.any {
         it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as? TypeReference)?.type == AI_PAGE_COMMAND
     } == true

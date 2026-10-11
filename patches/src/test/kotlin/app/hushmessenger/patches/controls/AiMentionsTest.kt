@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 internal const val SYNTHETIC_MENTION_AI = "LX/7Ok;->A73(LX/Sxa;$MENTION_LIST_BUILDER)V"
 internal const val SYNTHETIC_IMAGINE = "LX/7On;->A73(LX/Sxa;$MENTION_LIST_BUILDER)V"
-internal const val SYNTHETIC_AI_COMMANDS = "LX/7Ob;->A06(LX/7Ob;$THREAD_KEY)Ljava/util/List;"
+internal const val SYNTHETIC_AI_COMMANDS = "LX/7Ob;->A06(LX/7Ob;$THREAD_KEY_TYPE)Ljava/util/List;"
 
 private const val SENTINEL = "LX/1dj;->A03:Ljava/lang/Object;"
 private const val COUNTER = "invoke-virtual {v7}, Ljava/util/concurrent/atomic/AtomicInteger;->getAndIncrement()I"
@@ -112,12 +112,24 @@ internal fun aiMentionsFixture() = listOf(
 
 private fun Method.code() = implementation!!.instructions.toList()
 
+/**
+ * The stock instructions are the same objects after an insertion, except a goto whose span the insertion pushed
+ * past 127 code units, which dexlib2 widens to goto/16 (7R6 and 287 on 582 have such gotos around their sites).
+ */
+internal fun assertStockKept(before: List<Instruction>, after: List<Instruction>, label: String) {
+    assertEquals(before.size, after.size, label)
+    before.zip(after).forEachIndexed { i, (old, new) ->
+        val widened = old.opcode == Opcode.GOTO && new.opcode == Opcode.GOTO_16
+        assertTrue(old === new || widened, "$label: stock instruction $i went from ${old.opcode.name} to ${new.opcode.name}")
+    }
+}
+
 /** The helper pair sits between the section's read and its skip, and nothing stock moves or changes. */
 private fun assertGate(before: List<Instruction>, after: List<Instruction>, read: Int, label: String) {
     val state = (before[read] as TwoRegisterInstruction).registerA
     val disabled = (before[read + 1] as TwoRegisterInstruction).registerB
     assertEquals(before.size + 2, after.size, label)
-    assertEquals(before, after.filterIndexed { i, _ -> i != read + 1 && i != read + 2 }, label)
+    assertStockKept(before, after.filterIndexed { i, _ -> i != read + 1 && i != read + 2 }, label)
     val helper = after[read + 1] as FiveRegisterInstruction
     assertEquals(Opcode.INVOKE_STATIC, helper.opcode, label)
     assertEquals(AI_MENTION_HELPER, (helper as ReferenceInstruction).reference.toString(), label)
@@ -155,7 +167,7 @@ class AiMentionsTest {
         assertEquals("$SETTINGS->hideMetaAi()Z", (after[0] as ReferenceInstruction).reference.toString())
         assertEquals(listOf(Opcode.MOVE_RESULT, Opcode.IF_EQZ, Opcode.CONST_4, Opcode.RETURN_OBJECT), after.subList(1, 5).map { it.opcode })
         // Two lists that look alike are ambiguous, so neither is hooked.
-        val twin = fixtureClass("LX/7Oc;", listOf(commandList("LX/7Oc;->A06(LX/7Oc;$THREAD_KEY)Ljava/util/List;")))
+        val twin = fixtureClass("LX/7Oc;", listOf(commandList("LX/7Oc;->A06(LX/7Oc;$THREAD_KEY_TYPE)Ljava/util/List;")))
         assertTrue(findAiCommands(aiMentionsFixture() + twin).isEmpty())
     }
 

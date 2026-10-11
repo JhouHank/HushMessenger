@@ -19,7 +19,6 @@ internal const val AI_SEARCH_HINT = "ai_search_hint"
 internal const val SEARCH_BAR_TAG = "search_bar"
 
 internal const val AI_SEARCH_HINT_HELPER = "$SETTINGS->metaAiSearchHint(Z)Z"
-private const val FB_USER_SESSION = "Lcom/facebook/auth/usersession/FbUserSession;"
 private const val GET_STRING = "Landroid/content/res/Resources;->getString(I)Ljava/lang/String;"
 
 private fun hintChanged(detail: String): Nothing =
