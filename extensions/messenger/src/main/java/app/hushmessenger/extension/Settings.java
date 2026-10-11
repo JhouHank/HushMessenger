@@ -174,6 +174,20 @@ public final class Settings {
         }
     }
 
+    /**
+     * The inbox search bar reads "Ask Meta AI or search" when Messenger's Meta AI search check is true. With the switch on
+     * the check reads false, the answer accounts without Meta AI in search get, so the bar shows the plain hint.
+     */
+    public static boolean metaAiSearchHint(boolean original) {
+        if (!original) return false;
+        try {
+            return !hideMetaAi();
+        } catch (RuntimeException error) {
+            hookFailed("meta_ai", "Can't change the search hint", error);
+            return true;
+        }
+    }
+
     /** First answer this process gave for the Meta AI tab, or null before the bottom bar asked. */
     static volatile Boolean metaAiTab;
 

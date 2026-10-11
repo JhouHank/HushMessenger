@@ -17,6 +17,7 @@ hook ai_menu LX/HPh;->A01()Z
 hook ai_search LX/5Uq;->A0A(LX/5Uq;)Z
 hook ai_search LX/5Uq;->A0B(LX/5Uq;)Z
 hook ai_search_chip LX/DGV;->render(LX/2Cf;)LX/1GT;
+hook ai_search_hint LX/286;->A00(LX/1SM;LX/1vl;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Z)LX/1GT;
 hook ai_sticker_cell LX/EyW;->render(LX/2Cf;)LX/1GT;
 hook ai_stickers LX/Uzq;->A03(LX/Uzq;)Z
 hook ai_stickers LX/V0Y;->A07(LX/V0Y;)Z

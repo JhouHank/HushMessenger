@@ -80,6 +80,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     EMOJI_SEARCH to setOf("LX/7TX;->A8Y(Landroid/text/Editable;Z)V"),
     AI_MENTIONS to setOf(SYNTHETIC_MENTION_AI, SYNTHETIC_IMAGINE),
     AI_COMMANDS to setOf(SYNTHETIC_AI_COMMANDS),
+    AI_SEARCH_HINT to setOf(SYNTHETIC_SEARCH_BAR),
     DISAPPEARING_SWIPE to setOf(OVERSCROLL_START),
     EMOJI_DRAWER to setOf(DRAWER_RENDERER, DRAWER_EFFECT),
     "original_photo" to setOf(TRANSCODE_IMAGE, TRANSCODE_IMAGE_ASYNC),

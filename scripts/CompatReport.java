@@ -168,7 +168,7 @@ public class CompatReport {
         PATCHES.put("Hide stories and notes", List.of("stories"));
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
-        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands"));
+        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
@@ -2421,6 +2421,41 @@ public class CompatReport {
         return lists.size() == 1 ? lists : List.of();
     }
 
+    /**
+     * ai_search_hint: the inbox search bar builder, which names "search_bar" and picks its hint between two constants on a
+     * (FbUserSession)Z check right before Resources.getString. Counted only when exactly one method looks like it.
+     * Mirrors AiSearchHint.kt.
+     */
+    static List<Method> searchBarBuilders(List<ClassDef> classes) {
+        var builders = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            var code = instructions(method);
+            if (code.stream().noneMatch(i -> i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr &&
+                "search_bar".equals(sr.getString()))) continue;
+            for (int pick = 7; pick < code.size(); pick++) {
+                if (code.get(pick).getOpcode() != Opcode.INVOKE_VIRTUAL ||
+                    !"Landroid/content/res/Resources;->getString(I)Ljava/lang/String;".equals(ref(code.get(pick)))) continue;
+                var get = (FiveRegisterInstruction) code.get(pick);
+                if (!(code.get(pick - 7) instanceof ReferenceInstruction ci && ci.getReference() instanceof MethodReference check) ||
+                    code.get(pick - 7).getOpcode() != Opcode.INVOKE_VIRTUAL || !"Z".equals(check.getReturnType()) ||
+                    check.getParameterTypes().size() != 1 ||
+                    !"Lcom/facebook/auth/usersession/FbUserSession;".equals(check.getParameterTypes().get(0).toString())) continue;
+                int held = register(code.get(pick - 6));
+                if (code.get(pick - 6).getOpcode() != Opcode.MOVE_RESULT ||
+                    !(code.get(pick - 5) instanceof ReferenceInstruction rr && rr.getReference() instanceof MethodReference resources) ||
+                    !"Landroid/content/res/Resources;".equals(resources.getReturnType()) ||
+                    code.get(pick - 4).getOpcode() != Opcode.MOVE_RESULT_OBJECT || register(code.get(pick - 4)) != get.getRegisterC() ||
+                    code.get(pick - 3).getOpcode() != Opcode.CONST || register(code.get(pick - 3)) != get.getRegisterD() ||
+                    code.get(pick - 1).getOpcode() != Opcode.CONST || register(code.get(pick - 1)) != get.getRegisterD() ||
+                    code.get(pick - 2).getOpcode() != Opcode.IF_EQZ || register(code.get(pick - 2)) != held ||
+                    !jumpsTo(code, pick - 2, pick)) continue;
+                builders.add(method);
+                break;
+            }
+        }
+        return builders.size() == 1 ? builders : List.of();
+    }
+
     static final String OVERSCROLL_BEHAVIOR = "Lcom/facebook/messaging/threadview/overscroll/ui/OverScrollActionBehavior;";
 
     /**
@@ -2513,6 +2548,7 @@ public class CompatReport {
         found.get("emoji_search").addAll(emojiSearchWatchers(classes));
         found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
         found.get("ai_commands").addAll(aiCommandLists(classes));
+        found.get("ai_search_hint").addAll(searchBarBuilders(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));

@@ -51,6 +51,16 @@ public class SettingsTest {
         assertSame(enabled, Settings.hideMetaAiRow(enabled, disabled));
     }
 
+    @Test public void theSearchHintDropsMetaAiOnlyWhileTheSwitchIsOn() {
+        assertTrue(Settings.metaAiSearchHint(true));
+        assertFalse(Settings.metaAiSearchHint(false));
+        Settings.preferences.edit().putBoolean("meta_ai", true).commit();
+        assertFalse(Settings.metaAiSearchHint(true));
+        assertFalse(Settings.metaAiSearchHint(false));
+        Settings.preferences.edit().putBoolean("paused", true).commit();
+        assertTrue(Settings.metaAiSearchHint(true));
+    }
+
     @Test public void allControlsPreserveStockUntilEnabled() {
         assertFalse(Settings.hideStories());
         assertFalse(Settings.hideFacebook());
