@@ -1400,6 +1400,47 @@ public class CompatReport {
         return null;
     }
 
+    /**
+     * FBNS's package check (RestoreTrustPatch.kt's FbnsPackageCheckFingerprint): a void method that reads
+     * PackageInfo.signatures once and logs "PackageInfoUtil" and "Failed to create SHA-256 hash". The read's
+     * two registers must be distinct and at most v15, as routeFbnsSigners requires.
+     */
+    static List<String> fbnsCheckProblems(List<ClassDef> classes) {
+        var problems = new ArrayList<String>();
+        var checks = new ArrayList<Method>();
+        for (var cls : classes) {
+            for (var method : cls.getMethods()) {
+                if (!"V".equals(method.getReturnType()) || method.getImplementation() == null) continue;
+                var strings = new HashSet<String>();
+                boolean reads = false;
+                for (var insn : method.getImplementation().getInstructions()) {
+                    if (!(insn instanceof ReferenceInstruction ref)) continue;
+                    if (ref.getReference() instanceof StringReference s) strings.add(s.getString());
+                    if (ref.getReference() instanceof FieldReference f && "Landroid/content/pm/PackageInfo;".equals(f.getDefiningClass())
+                        && "signatures".equals(f.getName())) reads = true;
+                }
+                if (reads && strings.contains("PackageInfoUtil") && strings.contains("Failed to create SHA-256 hash")) checks.add(method);
+            }
+        }
+        if (checks.size() != 1) {
+            problems.add("expected one FBNS package check, found " + checks.size());
+            return problems;
+        }
+        var reads = new ArrayList<TwoRegisterInstruction>();
+        for (var insn : checks.get(0).getImplementation().getInstructions()) {
+            if (insn.getOpcode() == Opcode.IGET_OBJECT && ((ReferenceInstruction) insn).getReference() instanceof FieldReference f
+                && "Landroid/content/pm/PackageInfo;".equals(f.getDefiningClass()) && "signatures".equals(f.getName())) {
+                reads.add((TwoRegisterInstruction) insn);
+            }
+        }
+        if (reads.size() != 1) problems.add("expected one PackageInfo.signatures read in " + hookId(checks.get(0)) + ", found " + reads.size());
+        else if (reads.get(0).getRegisterA() == reads.get(0).getRegisterB() || reads.get(0).getRegisterA() > 15 || reads.get(0).getRegisterB() > 15) {
+            problems.add("FBNS package check " + hookId(checks.get(0)) + " reads signatures into v" + reads.get(0).getRegisterA()
+                + " from v" + reads.get(0).getRegisterB() + ", which the call can't name");
+        }
+        return problems;
+    }
+
     static final String EPHEMERAL_VIEWER = "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;";
     static final String QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;";
     static final String WINDOW = "Landroid/view/Window;";
@@ -3653,11 +3694,13 @@ public class CompatReport {
         // Check Restore screens on re-signed builds (signer lookup fingerprint)
         {
             Method signerMethod = findSignerMethod(classes);
-            if (signerMethod != null) {
+            var fbns = fbnsCheckProblems(classes);
+            if (signerMethod != null && fbns.isEmpty()) {
                 System.out.println("[PASS] Restore screens on re-signed builds (" + hookId(signerMethod) + ")");
             } else {
                 System.out.println("[FAIL] Restore screens on re-signed builds");
-                System.out.println("       No method found matching the signer lookup pattern");
+                if (signerMethod == null) System.out.println("       No method found matching the signer lookup pattern");
+                for (var f : fbns) System.out.println("       " + f);
                 blockers.add("Restore screens on re-signed builds");
                 anyFail = true;
             }

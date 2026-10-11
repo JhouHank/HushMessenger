@@ -5,22 +5,32 @@
 package app.hushmessenger.patches.coexist
 
 import app.hushmessenger.patches.MessengerTarget
+import app.hushmessenger.patches.controls.jumpTargets
 import app.hushmessenger.patches.controls.settingsExtension
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.string
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 
 private const val PACKAGE_INFO = "Landroid/content/pm/PackageInfo;"
 
 private const val ORIGINAL_SIGNERS = "Lapp/hushmessenger/extension/MessengerSignature;->" +
     "originalSigners(Landroid/content/pm/PackageInfo;)Ljava/util/List;"
+
+internal const val FBNS_SIGNERS = "Lapp/hushmessenger/extension/MessengerSignature;->" +
+    "fbnsSigners(Landroid/content/pm/PackageInfo;[Landroid/content/pm/Signature;)[Landroid/content/pm/Signature;"
 
 /**
  * Messenger's trust checks read the signers of a package through a method that prefers the
@@ -43,6 +53,23 @@ internal object PackageSignersFingerprint : Fingerprint(
             definingClass = "Landroid/content/pm/PackageInfo;",
             name = "signatures",
         ),
+    ),
+)
+
+/**
+ * FBNS's check of a package it may hand pushes to: the SHA-256 of the package's one signer, looked
+ * up in Meta's certificates. It reads `PackageInfo.signatures` itself and logs as PackageInfoUtil.
+ * Its class and its name are Redex names.
+ */
+internal object FbnsPackageCheckFingerprint : Fingerprint(
+    returnType = "V",
+    filters = listOf(
+        fieldAccess(
+            definingClass = "Landroid/content/pm/PackageInfo;",
+            name = "signatures",
+        ),
+        string("PackageInfoUtil"),
+        string("Failed to create SHA-256 hash"),
     ),
 )
 
@@ -75,6 +102,7 @@ val restoreTrustPatch = bytecodePatch(
         check(constructor != null) { "$signers has no (List, boolean, boolean) constructor" }
 
         method.answerOriginalSigners(packageInfo, signers)
+        FbnsPackageCheckFingerprint.method.routeFbnsSigners()
     }
 }
 
@@ -113,5 +141,42 @@ internal fun MutableMethod.answerOriginalSigners(packageInfo: String, signers: S
             return-object v0
         """,
         ExternalLabel("original", getInstruction(0)),
+    )
+}
+
+/**
+ * FBNS, the push service Meta's apps share, checks each package it may hand pushes to against
+ * Meta's certificates, reading `PackageInfo.signatures` itself. On a re-signed build Messenger
+ * fails its own check. The array that read gives goes through the extension, which answers the
+ * original certificate for this build and the system's answer for any other package.
+ *
+ * The call goes straight after the read and names its two registers. `invoke-static` takes 4-bit
+ * registers, so both must be v15 or lower, and the read must not overwrite the package it read
+ * from, which the call still needs. A jump landing straight after the read would skip the call.
+ */
+internal fun MutableMethod.routeFbnsSigners() {
+    val code = implementation!!.instructions.toList()
+    val reads = code.withIndex().filter { (_, instruction) ->
+        instruction.opcode == Opcode.IGET_OBJECT &&
+            ((instruction as ReferenceInstruction).reference as FieldReference).let {
+                it.definingClass == PACKAGE_INFO && it.name == "signatures"
+            }
+    }
+    val (index, read) = reads.singleOrNull()
+        ?: throw PatchException("Restore screens on re-signed builds: expected one read of PackageInfo.signatures in FBNS's package check, found ${reads.size}")
+    val signatures = (read as TwoRegisterInstruction).registerA
+    val info = read.registerB
+    if (signatures == info || signatures > 15 || info > 15) throw PatchException(
+        "Restore screens on re-signed builds: FBNS's package check reads signatures into v$signatures from v$info, which the call can't name"
+    )
+    if (index + 1 in jumpTargets()) throw PatchException(
+        "Restore screens on re-signed builds: FBNS's package check jumps past its signatures read"
+    )
+    addInstructions(
+        index + 1,
+        """
+            invoke-static { v$info, v$signatures }, $FBNS_SIGNERS
+            move-result-object v$signatures
+        """,
     )
 }
