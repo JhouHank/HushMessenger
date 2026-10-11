@@ -305,6 +305,12 @@ public final class Settings {
 
     /** The notification hook hands the message here; the log stores it off this thread and swallows its own failures. */
     public static void recordReceivedMessage(String text, String thread) { MessageLog.record(text, thread); }
+
+    /** The same notification hook asks this for an auto reply: on, not paused, and with at least one reply written. */
+    public static boolean autoReplyWanted() { return AutoReply.wanted(); }
+
+    /** Hands an incoming message to the auto reply, which answers it off this thread. */
+    public static void autoReplyTo(String text, String thread) { AutoReply.received(text, thread); }
     /**
      * The chat camera button's intent, right before Messenger starts it. With the switch on it opens the capture screen,
      * which uses the phone's camera app. Off, Pause, safe mode and an install without the capture screen get Messenger's.

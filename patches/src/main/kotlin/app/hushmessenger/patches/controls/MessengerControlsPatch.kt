@@ -148,7 +148,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ANALYTICS_UPLOADS -> method.validateAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.validateAttributionUpload()
             AD_EVENTS -> method.validateAdEvent()
-            MESSAGE_LOG -> method.validateMessageLog()
+            MESSAGE_LOG, AUTO_REPLY -> method.validateMessageLog()
             "original_photo" -> method.validateOriginalPhoto()
             ORIGINAL_VIDEO -> method.validateOriginalVideo()
             SYSTEM_CAMERA -> method.validateSystemCamera()
@@ -200,6 +200,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
             AD_EVENTS -> method.injectAdEvent()
             MESSAGE_LOG -> method.injectMessageLog()
+            AUTO_REPLY -> method.injectAutoReply()
             "original_photo" -> method.injectOriginalPhoto()
             ORIGINAL_VIDEO -> method.injectOriginalVideo()
             SYSTEM_CAMERA -> method.injectSystemCamera()
@@ -362,6 +363,9 @@ val disappearingSwipePatch = controlPatch("disappearing_swipe", "Turn off the sw
 @Suppress("unused")
 val keepMessageLogPatch = controlPatch("message_log", "Keep a message log",
     "Saves each message when its notification arrives, so you can still read it if it's unsent. Works in end-to-end encrypted chats too. Stays on your phone.", "Privacy")
+@Suppress("unused")
+val autoReplyPatch = controlPatch("auto_reply", "Auto reply",
+    "Answers messages with replies you write in HushMessenger settings, when they have words you pick or any message at all. Replies go out through Messenger's own notification reply, encrypted chats too, at most once every five minutes per chat.", "Conversations")
 @Suppress("unused")
 val systemCameraPatch = controlPatch("system_camera", "Use the phone's camera app",
     "The camera button in a chat opens your phone's own camera app. The photo then opens in Messenger's editor, ready to send. Photos only.", "Conversations",

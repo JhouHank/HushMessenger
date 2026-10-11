@@ -129,6 +129,7 @@ public final class SettingsActivity extends Activity {
         {"original_video", "Send videos without re-encoding", "Sends a video as the original file when Messenger allows it, instead of a recompressed copy. Videos over 25 MB and edited videos are still compressed.", "conversations"},
         {"xhe_audio", "Fix shared videos with xHE-AAC sound", "A video you share into Messenger from another app whose only sound is xHE-AAC, which Messenger can't send, gets that sound converted to regular AAC first. The picture isn't touched.", "conversations"},
         {"disappearing_swipe", "Turn off the swipe up for disappearing messages", "Swiping up at the bottom of a chat no longer turns on disappearing messages. Scrolling works as usual, and you can still set them in the chat's settings.", "conversations"},
+        {"auto_reply", "Auto reply", "Answers a message with a reply you write below when it has words you pick, or any message if you leave the words empty. Replies go out through Messenger's own notification reply, encrypted chats too, at most once every five minutes per chat. One-to-one chats only unless you allow groups.", "conversations"},
         {"system_camera", "Use the phone's camera app", "The camera button in a chat opens your phone's camera app. The photo opens in Messenger's editor, ready to send. Photos only.", "conversations"},
         {"external_browser", "Open web links externally", "Opens web links (http and https) in your default browser. Other link types work as before.", "links_bubbles"},
         {"bubbles", "Allow chat bubbles", "Choose Stock, Chat heads or Native Bubbles below. Native Bubbles needs Android 11 or newer, a supported account and notification permission. Restart Messenger after changing.", "links_bubbles"},
@@ -508,12 +509,13 @@ public final class SettingsActivity extends Activity {
                 groups.add(group);
             }
             LinearLayout row = controlRow(spec[0], text.control(spec, 1), text.control(spec, 2), true);
-            if ("bubbles".equals(spec[0]) || OwnFont.KEY.equals(spec[0]) || MessageLog.KEY.equals(spec[0])) {
+            if ("bubbles".equals(spec[0]) || OwnFont.KEY.equals(spec[0]) || MessageLog.KEY.equals(spec[0]) || AutoReply.KEY.equals(spec[0])) {
                 // Below the row, where TalkBack reaches them: the row's label column hides its descendants.
                 LinearLayout wrapper = ui.column();
                 ui.add(wrapper, row, 0);
                 if ("bubbles".equals(spec[0])) addBubbleModes(wrapper);
                 else if (OwnFont.KEY.equals(spec[0])) addFontFile(wrapper);
+                else if (AutoReply.KEY.equals(spec[0])) addAutoReplyActions(wrapper);
                 else addMessageLogActions(wrapper);
                 row = wrapper;
             }
@@ -1395,6 +1397,123 @@ public final class SettingsActivity extends Activity {
         params.topMargin = ui.dp(8);
         card.setLayoutParams(params);
         return card;
+    }
+
+    /** One button under the auto reply switch that opens the replies. */
+    private void addAutoReplyActions(LinearLayout content) {
+        LinearLayout actions = ui.row();
+        Button edit = ui.button(text.get("auto_reply_edit"));
+        edit.setTag("auto_reply_edit");
+        edit.setOnClickListener(clicked -> showAutoReplies());
+        actions.addView(edit);
+        ui.add(content, actions, 8);
+    }
+
+    /** Each reply is a words field and a reply field. Save keeps the ones with a reply and closes; Close drops edits. */
+    private void showAutoReplies() {
+        SharedPreferences prefs = Settings.preferences;
+        if (prefs == null) return;
+        Dialog dialog = new Dialog(this);
+        LinearLayout frame = ui.column();
+        frame.setBackgroundColor(ui.background);
+        frame.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(16));
+        frame.setLayoutDirection(text.layoutDirection());
+        frame.setAccessibilityPaneTitle(text.get("auto_reply_title"));
+        frame.addView(ui.text(text.get("auto_reply_title"), 20, ui.text, true));
+        ui.add(frame, ui.text(text.get("auto_reply_hint"), 13, ui.muted, false), 4);
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = ui.column();
+        list.setPadding(0, ui.dp(4), 0, ui.dp(8));
+        scroll.addView(list);
+        for (AutoReply.Rule rule : AutoReply.rules(prefs)) list.addView(autoReplyCard(list, rule));
+        if (list.getChildCount() == 0) list.addView(autoReplyCard(list, new AutoReply.Rule("", "")));
+        frame.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        android.widget.CheckBox groups = new android.widget.CheckBox(this);
+        groups.setTag("auto_reply_groups");
+        groups.setText(text.get("auto_reply_groups"));
+        groups.setTextColor(ui.text);
+        groups.setMinHeight(ui.dp(48));
+        groups.setChecked(prefs.getBoolean(AutoReply.GROUPS, false));
+        ui.add(frame, groups, 4);
+        LinearLayout buttons = ui.row();
+        buttons.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
+        Button add = ui.button(text.get("auto_reply_add"));
+        add.setTag("auto_reply_add");
+        add.setOnClickListener(clicked -> {
+            if (list.getChildCount() >= AutoReply.MAX_RULES) {
+                feedback(text.get("auto_reply_full", AutoReply.MAX_RULES), Toast.LENGTH_SHORT);
+                return;
+            }
+            View card = autoReplyCard(list, new AutoReply.Rule("", ""));
+            list.addView(card);
+            card.findViewWithTag("auto_reply_when").requestFocus();
+        });
+        buttons.addView(add);
+        Button save = ui.button(text.get("auto_reply_save"));
+        save.setTag("auto_reply_save");
+        save.setOnClickListener(clicked -> {
+            List<AutoReply.Rule> rules = new ArrayList<>();
+            for (int i = 0; i < list.getChildCount(); i++) {
+                View card = list.getChildAt(i);
+                rules.add(new AutoReply.Rule(((EditText) card.findViewWithTag("auto_reply_when")).getText().toString(),
+                    ((EditText) card.findViewWithTag("auto_reply_reply")).getText().toString()));
+            }
+            int kept = AutoReply.save(prefs, rules, groups.isChecked());
+            feedback(kept == 0 ? text.get("auto_reply_saved_none") : text.get("auto_reply_saved", kept), Toast.LENGTH_SHORT);
+            dialog.dismiss();
+        });
+        LinearLayout.LayoutParams spaced = new LinearLayout.LayoutParams(-2, -2);
+        spaced.setMarginStart(ui.dp(8));
+        buttons.addView(save, spaced);
+        Button close = ui.button(text.get("message_log_close"));
+        close.setOnClickListener(clicked -> dialog.dismiss());
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, -2);
+        closeParams.setMarginStart(ui.dp(8));
+        buttons.addView(close, closeParams);
+        ui.add(frame, buttons, 8);
+        dialog.setContentView(frame);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(ui.background));
+            dialog.getWindow().setLayout(-1, -1);
+        }
+        dialog.show();
+    }
+
+    private View autoReplyCard(LinearLayout list, AutoReply.Rule rule) {
+        LinearLayout card = ui.column();
+        card.setBackground(ui.shape(ui.surface, ui.line, 8));
+        card.setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(6));
+        card.addView(replyField("auto_reply_when", text.get("auto_reply_when"), rule.when, AutoReply.MAX_WHEN_CHARS, true));
+        ui.add(card, replyField("auto_reply_reply", text.get("auto_reply_reply"), rule.reply, AutoReply.MAX_REPLY_CHARS, false), 8);
+        LinearLayout row = ui.row();
+        row.setGravity(android.view.Gravity.END);
+        Button remove = ui.button(text.get("auto_reply_remove"));
+        remove.setOnClickListener(clicked -> list.removeView(card));
+        row.addView(remove);
+        ui.add(card, row, 4);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = ui.dp(8);
+        card.setLayoutParams(params);
+        return card;
+    }
+
+    private EditText replyField(String tag, String hint, String value, int max, boolean singleLine) {
+        EditText field = new EditText(this);
+        field.setTag(tag);
+        // The hint labels the field; a content description would make TalkBack skip what was typed.
+        field.setHint(hint);
+        field.setText(value);
+        field.setTextSize(15);
+        field.setSingleLine(singleLine);
+        field.setFilters(new InputFilter[] {new InputFilter.LengthFilter(max)});
+        field.setHighlightColor((ui.accent & 0x00ffffff) | 0x55000000);
+        tintTextHandles(field);
+        field.setTextColor(ui.text);
+        field.setHintTextColor(ui.muted);
+        field.setMinHeight(ui.dp(48));
+        field.setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(8));
+        field.setBackground(ui.interactive(ui.surface, ui.outline, 8));
+        return field;
     }
 
     private void clearMessageLog() {

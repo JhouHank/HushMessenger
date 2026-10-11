@@ -18,6 +18,7 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 internal const val MESSAGE_LOG = "message_log"
+internal const val AUTO_REPLY = "auto_reply"
 
 internal const val NEW_MESSAGE_NOTIFICATION = "Lcom/facebook/messaging/notify/type/NewMessageNotification;"
 internal const val MESSENGER_ACCOUNT_TYPE = "Lcom/facebook/messaging/accountswitch/model/MessengerAccountType;"
@@ -142,11 +143,19 @@ internal fun MutableMethod.validateMessageLog() {
  * parameter object (never the one being built), and hands them to the extension off Messenger's own thread. Off, Pause
  * and safe mode read nothing: the extension's gate is checked first, so the text is never even loaded.
  */
-internal fun MutableMethod.injectMessageLog() {
+internal fun MutableMethod.injectMessageLog() = injectIncomingMessage("logReceivedMessages", "recordReceivedMessage")
+
+/**
+ * Auto reply reads the same message at the same constructor, behind its own gate, so either control works without the
+ * other. When both are in, each block runs its own gate and reads the fields itself.
+ */
+internal fun MutableMethod.injectAutoReply() = injectIncomingMessage("autoReplyWanted", "autoReplyTo")
+
+private fun MutableMethod.injectIncomingMessage(gate: String, sink: String) {
     validateMessageLog()
     val contract = messageLogContract!!
     addInstructionsWithLabels(0, """
-        invoke-static {}, $SETTINGS->logReceivedMessages()Z
+        invoke-static {}, $SETTINGS->$gate()Z
         move-result v0
         if-eqz v0, :stock_behavior
         move-object/from16 v0, p2
@@ -155,13 +164,13 @@ internal fun MutableMethod.injectMessageLog() {
         if-eqz v1, :stock_behavior
         iget-object v1, v1, ${contract.secretField}
         iget-object v0, v0, ${contract.threadKeyField}
-        if-eqz v0, :message_log_no_thread
+        if-eqz v0, :incoming_no_thread
         invoke-virtual {v0}, $THREAD_KEY_TYPE->toString()Ljava/lang/String;
         move-result-object v0
-        goto :message_log_store
-        :message_log_no_thread
+        goto :incoming_hand_over
+        :incoming_no_thread
         const/4 v0, 0x0
-        :message_log_store
-        invoke-static {v1, v0}, $SETTINGS->recordReceivedMessage(Ljava/lang/String;Ljava/lang/String;)V
+        :incoming_hand_over
+        invoke-static {v1, v0}, $SETTINGS->$sink(Ljava/lang/String;Ljava/lang/String;)V
     """.trimIndent(), ExternalLabel("stock_behavior", getInstruction(0)))
 }

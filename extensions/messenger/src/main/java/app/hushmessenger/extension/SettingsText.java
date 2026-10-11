@@ -248,6 +248,18 @@ final class SettingsText {
         ENGLISH.put("message_log_cleared", "Message log cleared");
         ENGLISH.put("message_log_now", "Just now");
         ENGLISH.put("message_log_ago", "%s ago");
+        ENGLISH.put("auto_reply_edit", "Edit replies");
+        ENGLISH.put("auto_reply_title", "Auto replies");
+        ENGLISH.put("auto_reply_hint", "Put words or short phrases in the first box, split by commas, and what to send back in the second. A message with any of those words gets that reply. Leave the first box empty to answer every message. The first match wins.");
+        ENGLISH.put("auto_reply_when", "When a message has these words");
+        ENGLISH.put("auto_reply_reply", "Reply with");
+        ENGLISH.put("auto_reply_remove", "Remove");
+        ENGLISH.put("auto_reply_add", "Add a reply");
+        ENGLISH.put("auto_reply_save", "Save");
+        ENGLISH.put("auto_reply_groups", "Answer in group chats too");
+        ENGLISH.put("auto_reply_full", "That's the most replies it keeps (%s)");
+        ENGLISH.put("auto_reply_saved", "Replies saved: %s");
+        ENGLISH.put("auto_reply_saved_none", "No replies saved, so nothing gets answered");
         ENGLISH.put("font_file_choose", "Choose a font file");
         ENGLISH.put("font_phone", "Use your phone's font");
         ENGLISH.put("font_file_help", "With a file picked, a few of Messenger's screens still use your phone's font.");

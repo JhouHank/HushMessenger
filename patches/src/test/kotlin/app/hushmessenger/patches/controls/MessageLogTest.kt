@@ -120,6 +120,31 @@ class MessageLogTest {
         assertEquals(before, code.drop(stock))
     }
 
+    @Test fun autoReplyReadsTheSameMessageBehindItsOwnGate() {
+        val classes = messageLogFixture()
+        val found = findControls(classes)
+        assertEquals(found.getValue(MESSAGE_LOG).map { it.hookId() }, found.getValue(AUTO_REPLY).map { it.hookId() })
+        assertEquals(activeProfile.hooks.getValue(AUTO_REPLY).toList(), found.getValue(AUTO_REPLY).map { it.hookId() })
+        validateControls(found, setOf(AUTO_REPLY))
+        val ctor = ctorOf(classes)
+        val before = ctor.code()
+        injectControl(MESSAGE_LOG, mapOf(MESSAGE_LOG to listOf(ctor)))
+        val logged = ctor.code()
+        injectControl(AUTO_REPLY, mapOf(AUTO_REPLY to listOf(ctor)))
+        val code = ctor.code()
+        val block = code.size - logged.size
+        assertEquals(logged.size - before.size, block)
+        assertEquals("$SETTINGS->autoReplyWanted()Z", reference(0, code))
+        assertEquals(BODY_FIELD, reference(5, code))
+        assertEquals("$SETTINGS->autoReplyTo(Ljava/lang/String;Ljava/lang/String;)V", reference(14, code))
+        // Each skip in the auto reply block lands on the message log block, which still checks its own gate.
+        assertEquals(block, code.branchTarget(2))
+        assertEquals(block, code.branchTarget(4))
+        assertEquals(block, code.branchTarget(6))
+        assertEquals("$SETTINGS->logReceivedMessages()Z", reference(block, code))
+        assertEquals(before, code.drop(2 * block))
+    }
+
     @Test fun aMissingTextGetterRefusesTheSwitchBeforeAnyEdit() {
         val classes = messageLogFixture(bodyGetter = "const-string v0, \"snippet\"\niget-object v0, v1, $BODY_FIELD\nreturn-object v0")
         findControls(classes)
