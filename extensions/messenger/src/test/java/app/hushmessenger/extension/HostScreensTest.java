@@ -203,6 +203,14 @@ public class HostScreensTest {
         return ids;
     }
 
+    /** Copy setup can say how long the late start held up the first hook, since Root Mount has no provider to do it. */
+    @Test public void theLateStartRecordsItsTimeAndThread() {
+        HostScreens.lateStart = null;
+        startWithoutProvider(RuntimeEnvironment.getApplication());
+        assertTrue(HostScreens.lateStart, HostScreens.lateStart.matches("\\d+ ms on .+"));
+        HostScreens.lateStart = null;
+    }
+
     /** #27: Android reads static shortcuts only when a package is installed or updated, so a Root Mount install had none. */
     @Test public void aRootMountInstallGetsPatchControlsAndRestartAsDynamicShortcuts() {
         mount();

@@ -93,10 +93,19 @@ public final class HostScreens {
         if (started || failed) return;
         Application app = application;
         if (app == null || app.getBaseContext() == null || !app.getPackageName().equals(Application.getProcessName())) return;
+        long began = android.os.SystemClock.elapsedRealtime();
         start(app);
+        boolean publish = started && hosted(app);
+        if (lateStart == null) lateStart = (android.os.SystemClock.elapsedRealtime() - began) + " ms on " + Thread.currentThread().getName();
         // The first hook to ask runs this, often on the UI thread, and the shortcut calls are three trips to Android.
-        if (started && hosted(app)) shortcutWork.execute(() -> publishShortcuts(app));
+        if (publish) shortcutWork.execute(() -> publishShortcuts(app));
     }
+
+    /**
+     * How long the late start held up the hook that asked first, and on which thread, for Copy setup. Null when
+     * SettingsProvider started settings, which is every install but Root Mount.
+     */
+    static volatile String lateStart;
 
     /** Where the Root Mount shortcuts get published. Tests run it in place. */
     static java.util.concurrent.Executor shortcutWork = work -> {

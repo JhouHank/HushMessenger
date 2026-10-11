@@ -1077,6 +1077,8 @@ public final class SettingsActivity extends Activity {
                     .append(", scope=").append(text.control(spec, 2))
                     .append('\n');
             }
+            String lateStart = HostScreens.lateStart;
+            summary.append("Late start: ").append(lateStart == null ? "not needed" : lateStart).append('\n');
             String dataDir = getApplicationInfo().dataDir;
             summary.append("Analytics stores: ").append(dataDir == null ? "unreadable" : analyticsStores(new java.io.File(dataDir))).append('\n');
             summary.append("Facebook caller checks: ").append(MessengerSignature.callerSummary()).append('\n');

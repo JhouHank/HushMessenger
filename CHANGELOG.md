@@ -33,6 +33,7 @@
 - **Restore screens on re-signed builds** now also answers the certificate check in Messenger's own push service, which reads the signature by itself instead of asking the method the patch already covered. That service matters most on phones without Google Play services.
 - **Use system emoji** tries adding Messenger's emoji font behind the phone's up to three times when it fails, since a font that's still being written can fail once.
 - HushMessenger publishes its app shortcuts in the background now, so they don't hold up Messenger's startup on a Root Mount install.
+- On a Root Mount install, **Copy setup** now says how long HushMessenger took to start when Messenger first needed it, and on which thread. That shows whether it's slowing Messenger's startup down.
 - More of the checks that find the code each patch changes now refuse a spot the patch's code couldn't work in, like a register its call can't reach, a field Messenger's code isn't allowed to read, or a static method where it needs an instance, before anything is changed. The patch descriptions also say that the Meta AI tab goes after a restart.
 - The release and install check scripts now report a damaged profile record or a signer line without a key with a clear error instead of crashing. Nothing changes in the patches.
 - HushMessenger settings has a **Support HushMessenger** row at the end of the App tab. It opens my Ko-fi page in your browser, if you'd like to buy me a coffee.
