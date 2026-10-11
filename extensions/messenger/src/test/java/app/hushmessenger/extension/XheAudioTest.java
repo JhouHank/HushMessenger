@@ -61,6 +61,7 @@ public class XheAudioTest {
         Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
         fromCopyThread(copy);
         assertTrue("the switch was asked", Settings.lastActive(XheAudio.KEY) > 0);
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
         assertArrayEquals(bytes, Files.readAllBytes(copy.toPath()));
         assertEquals(Arrays.asList("orca_share_media123.mp4"), Arrays.asList(folder.getRoot().list()));
     }

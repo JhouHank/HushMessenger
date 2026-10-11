@@ -85,11 +85,18 @@ public final class XheAudio {
         }
     }
 
-    /** Whether [file] has a picture, at least one sound track, and only xHE-AAC sound. */
-    static boolean needsFix(File file) throws IOException {
+    /**
+     * Whether [file] has a picture, at least one sound track, and only xHE-AAC sound. A copy the platform can't parse
+     * is none of those, so it stays as it is without counting as a hook failure.
+     */
+    static boolean needsFix(File file) {
         MediaExtractor source = new MediaExtractor();
         try {
-            source.setDataSource(file.getPath());
+            try {
+                source.setDataSource(file.getPath());
+            } catch (IOException unreadable) {
+                return false;
+            }
             boolean picture = false;
             int sounds = 0;
             for (int i = 0; i < source.getTrackCount(); i++) {
