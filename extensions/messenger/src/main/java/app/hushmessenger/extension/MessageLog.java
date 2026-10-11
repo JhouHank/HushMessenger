@@ -53,6 +53,9 @@ public final class MessageLog {
     static final long MAX_FILE_BYTES = 8L * 1024 * 1024;
     static final long EXPIRY_DELAY_MS = 30_000;
     static final long EXPIRY_PERIOD_MS = 6L * 60 * 60 * 1000;
+    /** How long a capture waits for its notification before it's written. */
+    static final long NAME_DELAY_MS = 2_000;
+    static final int MAX_NAME_CHARS = 200;
     /** A clock moved back can leave entries in the future, which would never expire; they count from now instead. */
     private static final long FUTURE_SLACK_MS = 24L * 60 * 60 * 1000;
     private static final int IV_BYTES = 12;
@@ -70,15 +73,25 @@ public final class MessageLog {
     private static final ArrayDeque<Entry> PENDING = new ArrayDeque<>();
     private static boolean drainScheduled;
 
-    /** One stored message. The thread is whatever the notification carried, which may be a raw key or nothing. */
+    /**
+     * One stored message. The thread is Messenger's key for the chat, used only to group and match entries. The sender
+     * and the group's name come from the notification that showed the message, and are empty when it named nobody.
+     */
     public static final class Entry {
         public final long time;
         public final String thread;
         public final String text;
+        public final String sender;
+        public final String chat;
         Entry(long time, String thread, String text) {
+            this(time, thread, text, "", "");
+        }
+        Entry(long time, String thread, String text, String sender, String chat) {
             this.time = time;
             this.thread = thread;
             this.text = text;
+            this.sender = sender == null ? "" : sender;
+            this.chat = chat == null ? "" : chat;
         }
     }
 
@@ -111,7 +124,8 @@ public final class MessageLog {
      * one write on the log's own thread takes everything queued, so a burst of notifications costs one rewrite.
      */
     static void record(String text, String thread) {
-        if (queue(text, thread)) WRITER.execute(MessageLog::drain);
+        // The write waits a moment so Messenger has posted the notification the sender's name is read from.
+        if (queue(text, thread)) WRITER.schedule(MessageLog::drain, NAME_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
     /** Queues and writes on the calling thread. Tests use it to skip the background thread. */
@@ -151,7 +165,7 @@ public final class MessageLog {
             if (context == null) return;
             try {
                 List<Entry> entries = load(context);
-                entries.addAll(batch);
+                for (Entry entry : batch) entries.add(named(context, entry));
                 prune(entries, System.currentTimeMillis());
                 save(context, entries);
                 Settings.activeAt.put(KEY, System.currentTimeMillis());
@@ -163,6 +177,25 @@ public final class MessageLog {
                 }
                 Settings.hookFailedPrivately(KEY, "Can't keep the message log", failure);
             }
+        }
+    }
+
+    /**
+     * The entry with who sent it and the group's name, from the notification Messenger put up for that chat. Unchanged
+     * when there's no notification (the chat was open, say) or it can't be read.
+     */
+    static Entry named(Context context, Entry entry) {
+        if (!entry.sender.isEmpty()) return entry;
+        try {
+            android.service.notification.StatusBarNotification shown = ChatNotifications.find(context, entry.thread);
+            if (shown == null) return entry;
+            String sender = ChatNotifications.sender(shown.getNotification(), entry.text);
+            String chat = ChatNotifications.conversation(shown.getNotification());
+            if (sender == null && chat == null) return entry;
+            return new Entry(entry.time, entry.thread, entry.text, clip(sender == null ? "" : sender, MAX_NAME_CHARS),
+                clip(chat == null || chat.equals(sender) ? "" : chat, MAX_NAME_CHARS));
+        } catch (RuntimeException unreadable) {
+            return entry;
         }
     }
 
@@ -312,7 +345,8 @@ public final class MessageLog {
         long latest = System.currentTimeMillis() + FUTURE_SLACK_MS;
         for (String line : plain.split("\n", -1)) {
             if (line.isEmpty()) continue;
-            String[] parts = line.split("\t", 3);
+            // Logs written before names were kept have three columns.
+            String[] parts = line.split("\t", -1);
             if (parts.length < 3) continue;
             long time;
             try {
@@ -324,7 +358,9 @@ public final class MessageLog {
                 time = System.currentTimeMillis();
                 repairedOnRead = true;
             }
-            entries.add(new Entry(time, clip(unescape(parts[1]), MAX_THREAD_CHARS), clip(unescape(parts[2]), MAX_TEXT_CHARS)));
+            entries.add(new Entry(time, clip(unescape(parts[1]), MAX_THREAD_CHARS), clip(unescape(parts[2]), MAX_TEXT_CHARS),
+                parts.length > 3 ? clip(unescape(parts[3]), MAX_NAME_CHARS) : "",
+                parts.length > 4 ? clip(unescape(parts[4]), MAX_NAME_CHARS) : ""));
         }
         return entries;
     }
@@ -363,7 +399,8 @@ public final class MessageLog {
     }
 
     private static String line(Entry entry) {
-        return entry.time + "\t" + escape(entry.thread) + "\t" + escape(entry.text) + "\n";
+        if (entry.sender.isEmpty() && entry.chat.isEmpty()) return entry.time + "\t" + escape(entry.thread) + "\t" + escape(entry.text) + "\n";
+        return entry.time + "\t" + escape(entry.thread) + "\t" + escape(entry.text) + "\t" + escape(entry.sender) + "\t" + escape(entry.chat) + "\n";
     }
 
     /** Cuts long text, never between the two halves of an emoji, and marks the cut. */

@@ -243,6 +243,7 @@ final class SettingsText {
         ENGLISH.put("message_log_loading", "Loading...");
         ENGLISH.put("message_log_empty", "No messages kept yet.");
         ENGLISH.put("message_log_unknown_thread", "Unknown chat");
+        ENGLISH.put("message_log_in_group", "%s in %s");
         ENGLISH.put("message_log_no_text", "(no text)");
         ENGLISH.put("message_log_cleared", "Message log cleared");
         ENGLISH.put("message_log_now", "Just now");

@@ -1386,7 +1386,9 @@ public final class SettingsActivity extends Activity {
         LinearLayout card = ui.column();
         card.setBackground(ui.shape(ui.surface, ui.line, 8));
         card.setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(10));
-        String who = entry.thread == null || entry.thread.isEmpty() ? text.get("message_log_unknown_thread") : entry.thread;
+        // Messenger's chat key means nothing to a reader, so an entry without a name reads as an unknown chat.
+        String who = entry.sender.isEmpty() ? (entry.chat.isEmpty() ? text.get("message_log_unknown_thread") : entry.chat)
+            : entry.chat.isEmpty() ? entry.sender : text.get("message_log_in_group", entry.sender, entry.chat);
         card.addView(ui.text(who + "  ·  " + formatSince(entry.time, "message_log_now", "message_log_ago"), 12, ui.muted, false));
         ui.add(card, ui.text(entry.text == null || entry.text.isEmpty() ? text.get("message_log_no_text") : entry.text, 15, ui.text, false), 4);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);

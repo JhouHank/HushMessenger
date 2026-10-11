@@ -73,6 +73,59 @@ public class MessageLogTest {
         assertEquals("line one\nline\ttwo\\end", MessageLog.entries().get(0).text);
     }
 
+    @Test public void takesTheSenderAndTheGroupFromTheChatsNotification() throws Exception {
+        Context context = Settings.appContext;
+        android.app.NotificationManager manager = context.getSystemService(android.app.NotificationManager.class);
+        android.app.Notification.MessagingStyle style = new android.app.Notification.MessagingStyle(new android.app.Person.Builder().setName("Me").build())
+            .setConversationTitle("Climbing").setGroupConversation(true)
+            .addMessage("earlier", 1, new android.app.Person.Builder().setName("Bo").build())
+            .addMessage("see you at six", 2, new android.app.Person.Builder().setName("Ana").build());
+        manager.notify("GROUP:77", 1, new android.app.Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setStyle(style).build());
+        try {
+            MessageLog.storeNow("see you at six", "GROUP:77");
+            MessageLog.storeNow("no notification for this one", "ONE_TO_ONE:5:6");
+            List<MessageLog.Entry> entries = MessageLog.entries();
+            assertEquals("", entries.get(0).sender);
+            assertEquals("", entries.get(0).chat);
+            assertEquals("Ana", entries.get(1).sender);
+            assertEquals("Climbing", entries.get(1).chat);
+            assertEquals("GROUP:77", entries.get(1).thread);
+        } finally {
+            manager.cancelAll();
+        }
+    }
+
+    @Test public void aOneToOneNotificationGivesTheSenderAndNoGroup() throws Exception {
+        Context context = Settings.appContext;
+        android.app.NotificationManager manager = context.getSystemService(android.app.NotificationManager.class);
+        android.app.Notification.MessagingStyle style = new android.app.Notification.MessagingStyle(new android.app.Person.Builder().setName("Me").build())
+            .addMessage("hi\tthere", 1, new android.app.Person.Builder().setName("Ana\tB").build());
+        manager.notify("ADVANCED_CRYPTO_ONE_TO_ONE:9", 1, new android.app.Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana\tB").setStyle(style).build());
+        try {
+            MessageLog.storeNow("hi\tthere", "ADVANCED_CRYPTO_ONE_TO_ONE:9");
+            MessageLog.Entry entry = MessageLog.entries().get(0);
+            // Tabs in a name or the text survive the five-column line.
+            assertEquals("Ana\tB", entry.sender);
+            assertEquals("", entry.chat);
+            assertEquals("hi\tthere", entry.text);
+        } finally {
+            manager.cancelAll();
+        }
+    }
+
+    @Test public void readsALogWrittenBeforeNamesWereKept() throws Exception {
+        long now = System.currentTimeMillis();
+        byte[] plain = (now + "\tONE_TO_ONE:1:2\told format\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Files.write(logFile().toPath(), MessageLog.vault().seal(plain));
+        MessageLog.Entry entry = MessageLog.entries().get(0);
+        assertEquals("old format", entry.text);
+        assertEquals("ONE_TO_ONE:1:2", entry.thread);
+        assertEquals("", entry.sender);
+        assertEquals("", entry.chat);
+    }
+
     @Test public void listsNewestFirst() throws Exception {
         MessageLog.storeNow("first", "t");
         MessageLog.storeNow("second", "t");
