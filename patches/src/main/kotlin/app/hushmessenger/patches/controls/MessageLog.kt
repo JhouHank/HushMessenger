@@ -15,6 +15,7 @@ import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 internal const val MESSAGE_LOG = "message_log"
@@ -26,6 +27,10 @@ internal const val MESSAGE = "Lcom/facebook/messaging/model/messages/Message;"
 internal const val THREAD_SUMMARY = "Lcom/facebook/messaging/model/threads/ThreadSummary;"
 internal const val THREAD_KEY_TYPE = "Lcom/facebook/messaging/model/threadkey/ThreadKey;"
 internal const val SECRET_STRING = "Lcom/facebook/secure/secrettypes/SecretString;"
+internal const val MESSAGES_NOTIFICATION_MANAGER = "Lcom/facebook/messaging/notify/client/MessagesNotificationManager;"
+
+/** Messenger's own spelling. Its notification manager logs this when an unsend takes a chat's notification back. */
+internal const val UNSEND_RETRACTION = "messenger_android_unsend_notificaiton_retraction"
 
 /**
  * The new-message notification constructor's hook id for a build. Only its fourth and fifth parameter types are
@@ -47,6 +52,12 @@ internal class MessageLogContract(
     val secretField: String,
     /** Message's ThreadKey field, the one the notification constructor itself reads. */
     val threadKeyField: String,
+    /**
+     * Messenger's static check that a message was unsent (its unsent time isn't 0). An unsend reaches the constructor
+     * as a notification of its own, with a stand-in text like "Ana sent a message.", and the notification manager runs
+     * this check on it before taking the chat's notification back.
+     */
+    val unsentCheck: String,
 )
 
 internal var messageLogContract: MessageLogContract? = null
@@ -99,7 +110,38 @@ internal fun resolveMessageLogContract(classes: Iterable<ClassDef>): MessageLogC
     val threadKeys = ctor.fieldReads(MESSAGE, THREAD_KEY_TYPE).map { fieldId(it) }.distinct()
     val threadKeyField = threadKeys.singleOrNull() ?: return null
 
-    return MessageLogContract(body, secretField, threadKeyField)
+    val unsentCheck = findUnsentChecks(classes).singleOrNull() ?: return null
+
+    return MessageLogContract(body, secretField, threadKeyField, unsentCheck)
+}
+
+/** Static, public, (Message)Z, and all it reads is one long field of the message, compared with 0. */
+private fun Method.isUnsentCheck(): Boolean {
+    if (!AccessFlags.STATIC.isSet(accessFlags) || !AccessFlags.PUBLIC.isSet(accessFlags) || returnType != "Z" ||
+        parameterTypes.map { it.toString() } != listOf(MESSAGE)) return false
+    val code = implementation?.instructions?.toList().orEmpty()
+    val reads = code.filter { it.opcode.name.startsWith("IGET") || it.opcode.name.startsWith("SGET") }
+    val field = reads.singleOrNull()?.takeIf { it.opcode == Opcode.IGET_WIDE }
+        ?.let { (it as ReferenceInstruction).reference as? FieldReference }
+    return field != null && field.definingClass == MESSAGE && field.type == "J" && code.count { it.opcode == Opcode.CMP_LONG } == 1
+}
+
+/**
+ * The (Message)Z checks the notification manager calls in the method that logs [UNSEND_RETRACTION], cut down to the
+ * one shaped like an unsent check, in a public class the notification can call into.
+ */
+internal fun findUnsentChecks(classes: Iterable<ClassDef>): List<String> {
+    val manager = classes.firstOrNull { it.type == MESSAGES_NOTIFICATION_MANAGER } ?: return emptyList()
+    val called = manager.methods.filter { UNSEND_RETRACTION in it.stringRefs() }.flatMap { method ->
+        method.implementation?.instructions?.toList().orEmpty()
+            .filter { it.opcode == Opcode.INVOKE_STATIC || it.opcode == Opcode.INVOKE_STATIC_RANGE }
+            .mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+            .filter { it.returnType == "Z" && it.parameterTypes.map { type -> type.toString() } == listOf(MESSAGE) }
+            .map { it.toString() }
+    }.toSet()
+    val owners = called.map { it.substringBefore("->") }.toSet()
+    return classes.filter { it.type in owners && AccessFlags.PUBLIC.isSet(it.accessFlags) }
+        .flatMap { it.methods }.filter { it.hookId() in called && it.isUnsentCheck() }.map { it.hookId() }.distinct()
 }
 
 /** Whether the class declares [fieldId] as a field code in [reader] may read: public, or non-private in its package. */
@@ -141,7 +183,8 @@ internal fun MutableMethod.validateMessageLog() {
 /**
  * At the constructor's start, before the super call, the hook reads the incoming message's text and thread from the
  * parameter object (never the one being built), and hands them to the extension off Messenger's own thread. Off, Pause
- * and safe mode read nothing: the extension's gate is checked first, so the text is never even loaded.
+ * and safe mode read nothing: the extension's gate is checked first, so the text is never even loaded. An unsent
+ * message is skipped, since its text is only Messenger's stand-in.
  */
 internal fun MutableMethod.injectMessageLog() = injectIncomingMessage("logReceivedMessages", "recordReceivedMessage")
 
@@ -160,6 +203,9 @@ private fun MutableMethod.injectIncomingMessage(gate: String, sink: String) {
         if-eqz v0, :stock_behavior
         move-object/from16 v0, p2
         if-eqz v0, :stock_behavior
+        invoke-static {v0}, ${contract.unsentCheck}
+        move-result v1
+        if-nez v1, :stock_behavior
         iget-object v1, v0, ${contract.bodyField}
         if-eqz v1, :stock_behavior
         iget-object v1, v1, ${contract.secretField}
