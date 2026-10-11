@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.23.0 (2026-10-11)
 
 This release moves HushMessenger to Messenger 582.0.0.61.92 and adds seven switches, Auto reply and Use your own font among them.
 

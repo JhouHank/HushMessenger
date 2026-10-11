@@ -1,10 +1,10 @@
 {
     "NOTE": "Generated locally from the built MPP with :patches:generatePatchCatalog. Do not edit by hand.",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "patches": [
         {
             "name": "Allow chat bubbles",
-            "description": "Lets you pick Stock, Chat Heads or Native Bubbles for floating chats. Needs Android 11 or newer. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Lets you pick Stock, Chat heads or Native Bubbles for floating chats. Needs Android 11 or newer. Chat heads also needs Messenger's own Chat heads switch, and Native Bubbles needs Messenger's bubbles allowed in Android's notification settings. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Links and bubbles",
             "dependencies": [
@@ -48,18 +48,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -112,18 +105,68 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Auto reply",
+            "description": "Answers messages with replies you write in HushMessenger settings, when they have words you pick or any message at all. Replies go out through Messenger's own notification reply, encrypted chats too, at most once every five minutes per chat. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Conversations",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
                         {
-                            "version": "581.0.0.49.91",
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: auto_reply",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -139,7 +182,7 @@
                 {
                     "type": "BytecodePatch",
                     "name": "Install beside Meta apps",
-                    "description": "Renames two shared permissions so a re-signed Messenger can install beside Meta apps. Checked 580 builds only. Earlier clean installs stopped at a blank first-run screen.",
+                    "description": "Lets your patched Messenger install next to Facebook and other Meta apps. Without it, the apps can clash over shared permissions and the install can stop at a blank screen. Works as soon as you patch it in, with no switch.",
                     "dependencies": [
                         {
                             "type": "ResourcePatch",
@@ -176,18 +219,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -232,18 +268,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -259,6 +288,63 @@
                     "values": {}
                 }
             ]
+        },
+        {
+            "name": "Fix shared videos with xHE-AAC sound",
+            "description": "Messenger can't send a video whose only sound is xHE-AAC, which Facebook and Instagram now use. When you share one into Messenger from another app, its sound is converted to regular AAC first, so it sends. The picture isn't touched. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Conversations",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: xhe_audio",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
         },
         {
             "name": "Hide AI sticker tools",
@@ -306,18 +392,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -370,18 +449,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -434,18 +506,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -454,7 +519,7 @@
         },
         {
             "name": "Hide Meta AI",
-            "description": "Hides the Meta AI floating button, toolbar button, tab, menu entries and AI in search. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Hides the Meta AI floating button, toolbar button, tab and menu entries, plus AI in search and in @ suggestions. Restart Messenger to see the tab go. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Navigation",
             "dependencies": [
@@ -498,18 +563,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -562,18 +620,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -626,18 +677,68 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Hide ad banners in business chats",
+            "description": "In a chat you started from a business's ad, hides the banner that shows that ad. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Conversations",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
                         {
-                            "version": "581.0.0.49.91",
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: ad_context_banner",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -690,18 +791,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -754,18 +848,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -818,18 +905,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -882,18 +962,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -946,18 +1019,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1010,18 +1076,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1074,18 +1133,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1138,18 +1190,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1202,18 +1247,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1266,18 +1304,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1330,18 +1361,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1350,7 +1374,7 @@
         },
         {
             "name": "Hide read receipts",
-            "description": "Stops Messenger from telling people you read their message. Encrypted chats you open can stay unread on this phone. Replying or switching this off may notify the sender. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Opening a chat no longer tells people you read their message, and the chat stays unread on this phone. Marking it read yourself or replying in it marks it read and shows Seen, like Messenger does. Group chats aren't tested. Messenger's own Read receipts setting under Privacy & safety marks chats read without showing Seen. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Privacy",
             "dependencies": [
@@ -1394,18 +1418,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1458,18 +1475,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1522,18 +1532,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1573,18 +1576,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1637,18 +1633,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1701,18 +1690,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1765,18 +1747,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1829,18 +1804,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1893,18 +1861,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -1957,18 +1918,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2021,18 +1975,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2072,18 +2019,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2136,18 +2076,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2200,18 +2133,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2264,18 +2190,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2328,18 +2247,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2365,18 +2277,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2385,13 +2290,70 @@
                 {
                     "key": "versionCode",
                     "title": "Version number",
-                    "description": "A whole number from 1 to 2147483647. Pick one higher than Messenger's version in the Play Store, or it will keep offering updates. The default is the highest Android allows.",
+                    "description": "A whole number up to 2147483647, no lower than the Messenger you're patching. Pick one higher than Messenger's version in the Play Store, or it will keep offering updates. The default is the highest Android allows.",
                     "required": true,
                     "type": "kotlin.Int",
                     "default": 2147483647,
                     "values": {}
                 }
             ]
+        },
+        {
+            "name": "Stop ad attribution uploads",
+            "description": "Stops the job that reads your phone's advertising ID and sends it to Meta with your ad tracking setting. The ID itself doesn't change. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Privacy",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: attribution_uploads",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
         },
         {
             "name": "Stop analytics uploads",
@@ -2439,18 +2401,125 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Stop inbox and ad link logging",
+            "description": "Stops two reports Messenger logs. One says which part of your chat list was on screen, which Messenger files under inbox ads. The other says which ad brought you in when a link from an ad opens a chat. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Privacy",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
                         {
-                            "version": "581.0.0.49.91",
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: ad_events",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Turn off the swipe up for disappearing messages",
+            "description": "Swiping up at the bottom of a chat no longer turns on disappearing messages, so a scroll can't set the timer by accident. You can still change it in the chat's settings. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Conversations",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: disappearing_swipe",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2503,18 +2572,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2567,18 +2629,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2631,18 +2686,68 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Use your own font",
+            "description": "Shows Messenger's text in your phone's font instead of Meta's, or in a .ttf or .otf file you pick in HushMessenger settings. Emoji don't change. Restart Messenger after changing it. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Theme",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
                         {
-                            "version": "581.0.0.49.91",
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: custom_font",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
@@ -2695,18 +2800,11 @@
                     ],
                     "targets": [
                         {
-                            "version": "580.0.0.49.91",
+                            "version": "582.0.0.61.92",
                             "versionCodes": null,
                             "isExperimental": false,
                             "minSdk": 28,
-                            "description": "Arm64 builds 346013387, 346013440, 346013442, 346013354, 346013370, 346013394, 346013423, 346013355, 346013356, 346013357, 346013358, 346013359, 346013372, 346013374, 346013375, 346013391, 346013427, 346013441, 346013443, 346013444 and 346013445; checked again during patching"
-                        },
-                        {
-                            "version": "581.0.0.49.91",
-                            "versionCodes": null,
-                            "isExperimental": false,
-                            "minSdk": 28,
-                            "description": "Arm64 builds 346213494, 346213498, 346213510, 346213514, 346213528, 346213531, 346213532, 346213564, 346213567, 346213568, 346213580, 346213581, 346213582, 346213583, 346213584 and 346213585; checked again during patching"
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
                         }
                     ]
                 }
