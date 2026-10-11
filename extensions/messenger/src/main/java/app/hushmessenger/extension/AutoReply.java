@@ -90,6 +90,8 @@ public final class AutoReply {
             }
             // Taken before the send, so a second message in the same moment can't get its own reply.
             lastReply.put(thread, now);
+            // The reply takes the notification down, so the message log gets its names now.
+            MessageLog.noteNames(thread, text, shown.getNotification());
             if (!ChatNotifications.reply(context, shown.getNotification(), rule.reply)) {
                 lastReply.remove(thread, now);
                 android.util.Log.w("HushMessenger", "auto_reply: the chat's notification has no Reply action");

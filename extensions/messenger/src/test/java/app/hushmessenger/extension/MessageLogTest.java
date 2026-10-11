@@ -36,6 +36,7 @@ public class MessageLogTest {
         CrashGuard.onProcessStart(RuntimeEnvironment.getApplication());
         // With the switch still off, this drops anything an earlier test left queued.
         MessageLog.drain();
+        MessageLog.forgetCaptures();
         Settings.hookErrors.clear();
         softwareVault = new SoftwareVault();
         MessageLog.vault = softwareVault;
@@ -113,6 +114,52 @@ public class MessageLogTest {
         } finally {
             manager.cancelAll();
         }
+    }
+
+    @Test public void aMessageWhoseNotificationIsBuiltTwiceIsKeptOnce() throws Exception {
+        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2");
+        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2");
+        MessageLog.storeNow("same words", "ONE_TO_ONE:3:4");
+        MessageLog.storeNow("other words", "ONE_TO_ONE:1:2");
+        List<MessageLog.Entry> entries = MessageLog.entries();
+        assertEquals(3, entries.size());
+        assertEquals("other words", entries.get(0).text);
+        assertEquals("ONE_TO_ONE:3:4", entries.get(1).thread);
+        assertEquals("ONE_TO_ONE:1:2", entries.get(2).thread);
+    }
+
+    @Test public void theSameWordsAfterTheWindowAreANewMessage() {
+        long start = 1_000;
+        assertFalse(MessageLog.repeated("t", "ok", start));
+        assertTrue(MessageLog.repeated("t", "ok", start + MessageLog.DUPLICATE_WINDOW_MS));
+        assertFalse(MessageLog.repeated("t", "ok", start + MessageLog.DUPLICATE_WINDOW_MS + 1));
+        // A clock moved back doesn't hide the next message behind a capture from the future.
+        assertFalse(MessageLog.repeated("t", "later", 50_000));
+        assertFalse(MessageLog.repeated("t", "later", 40_000));
+    }
+
+    @Test public void namesAutoReplyNotedOutliveTheNotificationItAnswered() throws Exception {
+        android.app.Notification.MessagingStyle style = new android.app.Notification.MessagingStyle(new android.app.Person.Builder().setName("Me").build())
+            .addMessage("ping test", 1, new android.app.Person.Builder().setName("Ana").build());
+        android.app.Notification answered = new android.app.Notification.Builder(Settings.appContext, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").setStyle(style).build();
+        // Auto reply read it, and the reply took it down before the log got to it, so it's never posted here.
+        MessageLog.noteNames("ADVANCED_CRYPTO_ONE_TO_ONE:9", "ping test", answered);
+        MessageLog.storeNow("ping test", "ADVANCED_CRYPTO_ONE_TO_ONE:9");
+        assertEquals("Ana", MessageLog.entries().get(0).sender);
+        // Used once: a later capture of other words in that chat isn't named from it.
+        MessageLog.storeNow("ping again", "ADVANCED_CRYPTO_ONE_TO_ONE:9");
+        assertEquals("", MessageLog.entries().get(0).sender);
+    }
+
+    @Test public void namesAreNotNotedWhileTheLogIsOff() throws Exception {
+        Settings.preferences.edit().putBoolean("message_log", false).commit();
+        android.app.Notification answered = new android.app.Notification.Builder(Settings.appContext, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").build();
+        MessageLog.noteNames("ONE_TO_ONE:1:2", "hello", answered);
+        Settings.preferences.edit().putBoolean("message_log", true).commit();
+        MessageLog.storeNow("hello", "ONE_TO_ONE:1:2");
+        assertEquals("", MessageLog.entries().get(0).sender);
     }
 
     @Test public void readsALogWrittenBeforeNamesWereKept() throws Exception {

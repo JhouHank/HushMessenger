@@ -13,7 +13,10 @@ import java.nio.file.StandardCopyOption;
 import java.security.KeyStore;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +59,13 @@ public final class MessageLog {
     /** How long a capture waits for its notification before it's written. */
     static final long NAME_DELAY_MS = 2_000;
     static final int MAX_NAME_CHARS = 200;
+    /**
+     * Messenger can build one message's notification twice, from the push and again from the sync, so the same text in
+     * the same chat this soon after is that message again.
+     */
+    static final long DUPLICATE_WINDOW_MS = 60_000;
+    /** Names auto reply read off a notification, kept for this many captures at most. */
+    private static final int MAX_NOTED = 50;
     /** A clock moved back can leave entries in the future, which would never expire; they count from now instead. */
     private static final long FUTURE_SLACK_MS = 24L * 60 * 60 * 1000;
     private static final int IV_BYTES = 12;
@@ -72,6 +82,10 @@ public final class MessageLog {
     /** Messages captured but not yet written, oldest first. Guarded by itself. */
     private static final ArrayDeque<Entry> PENDING = new ArrayDeque<>();
     private static boolean drainScheduled;
+    /** When each recent capture came in, by chat and text, oldest first. Guarded by PENDING. */
+    private static final LinkedHashMap<String, Long> RECENT = new LinkedHashMap<>();
+    /** Sender and group name auto reply read before answering, by chat and text. Guarded by itself. */
+    private static final LinkedHashMap<String, String[]> NOTED = new LinkedHashMap<>();
 
     /**
      * One stored message. The thread is Messenger's key for the chat, used only to group and match entries. The sender
@@ -137,14 +151,66 @@ public final class MessageLog {
     /** Returns true when no write is scheduled for the queue yet. */
     static boolean queue(String text, String thread) {
         if (text == null) return false;
-        Entry entry = new Entry(System.currentTimeMillis(), clip(thread == null ? "" : thread, MAX_THREAD_CHARS),
-            clip(text, MAX_TEXT_CHARS));
+        long now = System.currentTimeMillis();
+        Entry entry = new Entry(now, clip(thread == null ? "" : thread, MAX_THREAD_CHARS), clip(text, MAX_TEXT_CHARS));
         synchronized (PENDING) {
+            if (repeated(entry.thread, entry.text, now)) return false;
             if (PENDING.size() >= MAX_ENTRIES) PENDING.removeFirst();
             PENDING.addLast(entry);
             if (drainScheduled) return false;
             drainScheduled = true;
             return true;
+        }
+    }
+
+    /**
+     * Whether this chat had the same text captured within DUPLICATE_WINDOW_MS, which means it's the second notification
+     * Messenger built for one message. Otherwise remembers this capture and returns false. Keeps its record across Clear,
+     * so the second half of a message that came in before a Clear can't land after it.
+     */
+    static boolean repeated(String thread, String text, long now) {
+        synchronized (PENDING) {
+            // A clock moved back leaves times in the future, and those can't vouch for anything either.
+            RECENT.values().removeIf(at -> now - at > DUPLICATE_WINDOW_MS || at > now);
+            String key = thread + '\u0000' + text;
+            if (RECENT.containsKey(key)) return true;
+            RECENT.put(key, now);
+            while (RECENT.size() > MAX_ENTRIES) {
+                Iterator<String> oldest = RECENT.keySet().iterator();
+                oldest.next();
+                oldest.remove();
+            }
+            return false;
+        }
+    }
+
+    /** Forgets recent captures and noted names. Tests start each case from a clean record with it. */
+    static void forgetCaptures() {
+        synchronized (PENDING) {
+            RECENT.clear();
+        }
+        synchronized (NOTED) {
+            NOTED.clear();
+        }
+    }
+
+    /**
+     * Auto reply answers through the chat's notification, and Messenger takes that notification down once the reply goes,
+     * often before the log reads the sender's name off it. Auto reply hands the names over just before it answers.
+     */
+    static void noteNames(String thread, String text, android.app.Notification notification) {
+        if (thread == null || text == null || notification == null || !Settings.wouldUse(KEY)) return;
+        String sender = ChatNotifications.sender(notification, text);
+        String chat = ChatNotifications.conversation(notification);
+        if (sender == null && chat == null) return;
+        String key = clip(thread, MAX_THREAD_CHARS) + '\u0000' + clip(text, MAX_TEXT_CHARS);
+        synchronized (NOTED) {
+            NOTED.put(key, new String[] {sender, chat});
+            while (NOTED.size() > MAX_NOTED) {
+                Iterator<Map.Entry<String, String[]>> oldest = NOTED.entrySet().iterator();
+                oldest.next();
+                oldest.remove();
+            }
         }
     }
 
@@ -181,16 +247,28 @@ public final class MessageLog {
     }
 
     /**
-     * The entry with who sent it and the group's name, from the notification Messenger put up for that chat. Unchanged
-     * when there's no notification (the chat was open, say) or it can't be read.
+     * The entry with who sent it and the group's name, from the names auto reply noted before answering, else from the
+     * notification Messenger put up for that chat. Unchanged when there's neither (the chat was open, say) or the
+     * notification can't be read.
      */
     static Entry named(Context context, Entry entry) {
         if (!entry.sender.isEmpty()) return entry;
+        String[] noted;
+        synchronized (NOTED) {
+            noted = NOTED.remove(entry.thread + '\u0000' + entry.text);
+        }
         try {
-            android.service.notification.StatusBarNotification shown = ChatNotifications.find(context, entry.thread);
-            if (shown == null) return entry;
-            String sender = ChatNotifications.sender(shown.getNotification(), entry.text);
-            String chat = ChatNotifications.conversation(shown.getNotification());
+            String sender;
+            String chat;
+            if (noted != null) {
+                sender = noted[0];
+                chat = noted[1];
+            } else {
+                android.service.notification.StatusBarNotification shown = ChatNotifications.find(context, entry.thread);
+                if (shown == null) return entry;
+                sender = ChatNotifications.sender(shown.getNotification(), entry.text);
+                chat = ChatNotifications.conversation(shown.getNotification());
+            }
             if (sender == null && chat == null) return entry;
             return new Entry(entry.time, entry.thread, entry.text, clip(sender == null ? "" : sender, MAX_NAME_CHARS),
                 clip(chat == null || chat.equals(sender) ? "" : chat, MAX_NAME_CHARS));

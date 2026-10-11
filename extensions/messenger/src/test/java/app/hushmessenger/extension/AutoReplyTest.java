@@ -123,6 +123,16 @@ public class AutoReplyTest {
         assertTrue(Settings.lastActive(AutoReply.KEY) > 0);
     }
 
+    @Test public void handsTheMessageLogTheSenderBeforeTheReplyTakesTheNotificationDown() {
+        Settings.preferences.edit().putBoolean(MessageLog.KEY, true).commit();
+        MessageLog.forgetCaptures();
+        replies(false, "", "Away");
+        notification(CHAT);
+        assertTrue(AutoReply.answer("are you there?", CHAT, false));
+        manager.cancelAll();
+        assertEquals("Ana", MessageLog.named(context, new MessageLog.Entry(1, CHAT, "are you there?")).sender);
+    }
+
     @Test public void answersEachChatAtMostOnceEveryFiveMinutes() {
         replies(false, "", "Away");
         notification(CHAT);
