@@ -163,13 +163,34 @@ class RestoreTrustShapesTest {
         }
     }
 
-    /** Mirrors [FbnsPackageCheckFingerprint]: a void method reading PackageInfo.signatures that logs both PackageInfoUtil strings. */
+    @Test
+    fun `the fbns mirror wants the read before both strings`() {
+        assertEquals(true, fbnsCheck().isFbnsPackageCheck())
+        val tagFirst = fixtureMethod(
+            "LX/09z;->A01(Landroid/content/pm/PackageInfo;)V",
+            """
+                const-string v1, "PackageInfoUtil"
+                iget-object v0, p0, $SIGNATURES
+                const-string v1, "Failed to create SHA-256 hash"
+                return-void
+            """.trimIndent(),
+            registers = 3,
+            flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value,
+        )
+        assertEquals(false, tagFirst.isFbnsPackageCheck())
+    }
+
+    /**
+     * Mirrors [FbnsPackageCheckFingerprint], whose filters match in order: a void method that reads
+     * PackageInfo.signatures, then names "PackageInfoUtil", then "Failed to create SHA-256 hash".
+     */
     private fun Method.isFbnsPackageCheck(): Boolean {
         if (returnType != "V") return false
         val code = implementation?.instructions?.toList() ?: return false
-        val strings = code.mapNotNull { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string }.toSet()
-        return code.any { it.isSignaturesRead() } &&
-            "PackageInfoUtil" in strings && "Failed to create SHA-256 hash" in strings
+        fun at(index: Int) = ((code[index] as? ReferenceInstruction)?.reference as? StringReference)?.string
+        val read = code.indexOfFirst { it.isSignaturesRead() }.takeIf { it >= 0 } ?: return false
+        val tag = (read + 1 until code.size).firstOrNull { at(it) == "PackageInfoUtil" } ?: return false
+        return (tag + 1 until code.size).any { at(it) == "Failed to create SHA-256 hash" }
     }
 
     @Test

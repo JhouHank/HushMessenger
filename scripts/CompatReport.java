@@ -1412,15 +1412,17 @@ public class CompatReport {
         for (var cls : classes) {
             for (var method : cls.getMethods()) {
                 if (!"V".equals(method.getReturnType()) || method.getImplementation() == null) continue;
-                var strings = new HashSet<String>();
-                boolean reads = false;
+                // The fingerprint's filters match in order: the read, then the tag after it, then the hash failure.
+                int step = 0;
                 for (var insn : method.getImplementation().getInstructions()) {
                     if (!(insn instanceof ReferenceInstruction ref)) continue;
-                    if (ref.getReference() instanceof StringReference s) strings.add(s.getString());
-                    if (ref.getReference() instanceof FieldReference f && "Landroid/content/pm/PackageInfo;".equals(f.getDefiningClass())
-                        && "signatures".equals(f.getName())) reads = true;
+                    if (step == 0 && ref.getReference() instanceof FieldReference f
+                        && "Landroid/content/pm/PackageInfo;".equals(f.getDefiningClass()) && "signatures".equals(f.getName())) step = 1;
+                    else if (step == 1 && ref.getReference() instanceof StringReference s && "PackageInfoUtil".equals(s.getString())) step = 2;
+                    else if (step == 2 && ref.getReference() instanceof StringReference s
+                        && "Failed to create SHA-256 hash".equals(s.getString())) step = 3;
                 }
-                if (reads && strings.contains("PackageInfoUtil") && strings.contains("Failed to create SHA-256 hash")) checks.add(method);
+                if (step == 3) checks.add(method);
             }
         }
         if (checks.size() != 1) {
