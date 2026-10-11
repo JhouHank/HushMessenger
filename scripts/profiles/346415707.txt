@@ -150,6 +150,7 @@ hook system_camera LX/7Fd;->DaT(Lcom/facebook/messaging/montage/composer/model/M
 hook typing LX/AnS;->run()V
 hook typing_mailbox LX/4fd;->A0J(Ljava/lang/String;Z)LX/33J;
 hook unsent_indicator LX/WFd;->BYY(I)Ljava/lang/String;
+hook xhe_audio LX/MuR;->call()Ljava/lang/Object;
 pluginSentinel LX/1fk;->A03:Ljava/lang/Object;
 preferenceGetter Lcom/facebook/prefs/shared/FbSharedPreferences;->Ahz(LX/2ve;Z)Z
 peopleKey LX/J6T;->A01:LX/2vf;

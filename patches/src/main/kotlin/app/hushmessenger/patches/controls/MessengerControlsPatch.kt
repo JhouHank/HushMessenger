@@ -143,6 +143,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             AI_MENTIONS -> method.validateAiMentions()
             AI_COMMANDS -> method.validateAiCommands()
             AI_SEARCH_HINT -> method.validateAiSearchHint()
+            XHE_AUDIO -> method.validateXheAudio()
             DISAPPEARING_SWIPE -> method.validateDisappearingSwipe()
             ANALYTICS_UPLOADS -> method.validateAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.validateAttributionUpload()
@@ -193,6 +194,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             AI_MENTIONS -> method.injectAiMentions()
             AI_COMMANDS -> method.injectAiCommands()
             AI_SEARCH_HINT -> method.injectAiSearchHint()
+            XHE_AUDIO -> method.injectXheAudio()
             DISAPPEARING_SWIPE -> method.injectDisappearingSwipe()
             ANALYTICS_UPLOADS -> method.injectAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
@@ -351,6 +353,9 @@ val originalPhotoPatch = controlPatch("original_photo", "Send photos at original
 @Suppress("unused")
 val originalVideoPatch = controlPatch("original_video", "Send videos without re-encoding",
     "Sends a video as the original file instead of a recompressed copy, when Messenger allows it. Videos over 25 MB, edited videos and some formats are still compressed.", "Conversations")
+@Suppress("unused")
+val xheAudioPatch = controlPatch("xhe_audio", "Fix shared videos with xHE-AAC sound",
+    "Messenger can't send a video whose only sound is xHE-AAC, which Facebook and Instagram now use. When you share one into Messenger from another app, its sound is converted to regular AAC first, so it sends. The picture isn't touched.", "Conversations")
 @Suppress("unused")
 val disappearingSwipePatch = controlPatch("disappearing_swipe", "Turn off the swipe up for disappearing messages",
     "Swiping up at the bottom of a chat no longer turns on disappearing messages, so a scroll can't set the timer by accident. You can still change it in the chat's settings.", "Conversations")

@@ -186,6 +186,7 @@ public class CompatReport {
         PATCHES.put("Use system emoji", List.of("emoji_typeface"));
         PATCHES.put("Send photos at original quality", List.of("original_photo"));
         PATCHES.put("Send videos without re-encoding", List.of("original_video"));
+        PATCHES.put("Fix shared videos with xHE-AAC sound", List.of("xhe_audio"));
         PATCHES.put("Turn off the swipe up for disappearing messages", List.of("disappearing_swipe"));
         PATCHES.put("Use the phone's camera app", List.of("system_camera"));
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));
@@ -2497,6 +2498,36 @@ public class CompatReport {
         return builders.size() == 1 ? builders : List.of();
     }
 
+    /**
+     * xhe_audio: the no-argument call() that names its copies "orca_share_media" and ends one copy with
+     * new FileOutputStream(File, Z), a static (InputStream, OutputStream)V copy, OutputStream.close() and Uri.fromFile on
+     * the same File. Counted only when exactly one method looks like it. Mirrors XheAudio.kt.
+     */
+    static List<Method> shareCopies(List<ClassDef> classes) {
+        var copies = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (!"call".equals(method.getName()) || !method.getParameterTypes().isEmpty() || !"Ljava/lang/Object;".equals(method.getReturnType())) continue;
+            var code = instructions(method);
+            if (code.stream().noneMatch(i -> i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr &&
+                "orca_share_media".equals(sr.getString()))) continue;
+            int sites = 0;
+            for (int at = 3; at < code.size(); at++) {
+                if (!(code.get(at) instanceof FiveRegisterInstruction point) || code.get(at).getOpcode() != Opcode.INVOKE_STATIC ||
+                    !"Landroid/net/Uri;->fromFile(Ljava/io/File;)Landroid/net/Uri;".equals(ref(code.get(at)))) continue;
+                if (!(code.get(at - 1) instanceof FiveRegisterInstruction close) || close.getOpcode() != Opcode.INVOKE_VIRTUAL ||
+                    !"Ljava/io/OutputStream;->close()V".equals(ref(close))) continue;
+                if (!(code.get(at - 2) instanceof FiveRegisterInstruction copy) || copy.getOpcode() != Opcode.INVOKE_STATIC ||
+                    !(((ReferenceInstruction) copy).getReference() instanceof MethodReference copier) || !"V".equals(copier.getReturnType()) ||
+                    !copier.getParameterTypes().stream().map(Object::toString).toList().equals(List.of("Ljava/io/InputStream;", "Ljava/io/OutputStream;"))) continue;
+                if (!(code.get(at - 3) instanceof FiveRegisterInstruction open) || open.getOpcode() != Opcode.INVOKE_DIRECT ||
+                    !"Ljava/io/FileOutputStream;-><init>(Ljava/io/File;Z)V".equals(ref(open))) continue;
+                if (open.getRegisterD() == point.getRegisterC() && open.getRegisterC() == close.getRegisterC() && copy.getRegisterD() == close.getRegisterC()) sites++;
+            }
+            if (sites == 1) copies.add(method);
+        }
+        return copies.size() == 1 ? copies : List.of();
+    }
+
     static final String OVERSCROLL_BEHAVIOR = "Lcom/facebook/messaging/threadview/overscroll/ui/OverScrollActionBehavior;";
 
     /**
@@ -2590,6 +2621,7 @@ public class CompatReport {
         found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
         found.get("ai_commands").addAll(aiCommandLists(classes));
         found.get("ai_search_hint").addAll(searchBarBuilders(classes));
+        found.get("xhe_audio").addAll(shareCopies(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));
