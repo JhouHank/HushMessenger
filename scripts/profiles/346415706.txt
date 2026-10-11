@@ -109,7 +109,7 @@ hook growth LX/1z9;->A0A()Z
 hook growth LX/27q;->A0A(LX/27q;)Z
 hook growth_notes Lcom/facebook/presence/note/ui/nux/controller/NotesNuxController;->A01(Landroidx/fragment/app/Fragment;LX/OQO;Ljava/util/List;LX/5T8;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
 hook growth_story_card Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A11(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)Z
-hook hide_read_receipts LX/Aih;->run()V
+hook hide_read_receipts LX/4li;->A00(Lcom/facebook/auth/usersession/FbUserSession;LX/4li;Ljava/lang/String;)V
 hook inbox_promotions LX/264;->A0J()Z
 hook inbox_promotions LX/264;->A0K()Z
 hook keep_unsent LX/MDj;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V
@@ -133,8 +133,8 @@ hook people_list_end LX/2I1;->A02()Z
 hook people_search LX/ChB;->DOF(LX/EFG;Ljava/lang/Object;)LX/EHA;
 hook people_story Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V
 hook people_tab LX/HQU;->A01(LX/HQU;)V
-hook read_mailbox LX/9xg;->A00(Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
 hook reels_badge LX/4Bi;->A09(LX/4Bi;)Z
+hook reply_read Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5WM;LX/B0G;Ljava/lang/String;Ljava/lang/String;Z)V
 hook save_stories LX/NCw;->onClick(Landroid/view/View;)V
 hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;
 hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->onResume()V

@@ -130,7 +130,7 @@ internal val BASE_PROFILE = ControlProfile(
         "growth" to setOf("LX/1zA;->A0A()Z", "LX/27r;->A0A(LX/27r;)Z"),
         "growth_notes" to setOf("Lcom/facebook/presence/note/ui/nux/controller/NotesNuxController;->A01(Landroidx/fragment/app/Fragment;LX/Fsv;Ljava/util/List;LX/5Ug;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;"),
         "growth_story_card" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0z(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)Z"),
-        "hide_read_receipts" to setOf("LX/Ak0;->run()V"),
+        "hide_read_receipts" to setOf("LX/4nG;->A00(Lcom/facebook/auth/usersession/FbUserSession;LX/4nG;Ljava/lang/String;)V"),
         "inbox_promotions" to setOf("LX/265;->A0J()Z", "LX/265;->A0K()Z"),
         "keep_unsent" to setOf("LX/S5c;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V"),
         "menu_settings" to setOf(
@@ -151,8 +151,8 @@ internal val BASE_PROFILE = ControlProfile(
         "people_search" to setOf("LX/ElA;->DOR(LX/GUn;Ljava/lang/Object;)LX/GXn;"),
         "people_story" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0Z(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V"),
         "people_tab" to setOf("LX/EtE;->A01(LX/EtE;)V"),
-        "read_mailbox" to setOf("LX/9yz;->A00(Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V"),
         "reels_badge" to setOf("LX/4DG;->A09(LX/4DG;)Z"),
+        "reply_read" to setOf("Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5Xu;LX/B1Y;Ljava/lang/String;Ljava/lang/String;Z)V"),
         "save_stories" to setOf("LX/KQq;->onClick(Landroid/view/View;)V"),
         "screenshot_viewers" to setOf(
             "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1D(Landroid/os/Bundle;)Landroid/app/Dialog;",
@@ -289,7 +289,7 @@ internal val PROFILE_346415706 = ControlProfile(
         "growth" to setOf("LX/1z9;->A0A()Z", "LX/27q;->A0A(LX/27q;)Z"),
         "growth_notes" to setOf("Lcom/facebook/presence/note/ui/nux/controller/NotesNuxController;->A01(Landroidx/fragment/app/Fragment;LX/OQO;Ljava/util/List;LX/5T8;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;"),
         "growth_story_card" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A11(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)Z"),
-        "hide_read_receipts" to setOf("LX/Aih;->run()V"),
+        "hide_read_receipts" to setOf("LX/4li;->A00(Lcom/facebook/auth/usersession/FbUserSession;LX/4li;Ljava/lang/String;)V"),
         "inbox_promotions" to setOf("LX/264;->A0J()Z", "LX/264;->A0K()Z"),
         "keep_unsent" to setOf("LX/MDj;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V"),
         "menu_settings" to setOf(
@@ -310,8 +310,8 @@ internal val PROFILE_346415706 = ControlProfile(
         "people_search" to setOf("LX/ChB;->DOF(LX/EFG;Ljava/lang/Object;)LX/EHA;"),
         "people_story" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V"),
         "people_tab" to setOf("LX/HQU;->A01(LX/HQU;)V"),
-        "read_mailbox" to setOf("LX/9xg;->A00(Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V"),
         "reels_badge" to setOf("LX/4Bi;->A09(LX/4Bi;)Z"),
+        "reply_read" to setOf("Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5WM;LX/B0G;Ljava/lang/String;Ljava/lang/String;Z)V"),
         "save_stories" to setOf("LX/NCw;->onClick(Landroid/view/View;)V"),
         "screenshot_viewers" to setOf(
             "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;",

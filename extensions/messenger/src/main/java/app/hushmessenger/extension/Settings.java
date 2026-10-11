@@ -411,7 +411,23 @@ public final class Settings {
     public static void setScreenshotFlags(Window window, int flags, int mask) {
         window.setFlags(allowScreenshot() ? flags & ~WindowManager.LayoutParams.FLAG_SECURE : flags, mask);
     }
-    public static boolean hideReadReceipts() { return enabled("hide_read_receipts"); }
+    /** How long after you send something the open chat may mark itself read, which shows Seen as stock Messenger does. */
+    static final long REPLY_READ_MS = 5_000;
+    static volatile long lastSentAt;
+
+    /**
+     * Hide read receipts: whether the open chat skips the job that marks it read and sends Seen. Right after you send
+     * something from it, the job runs, since a reply shows you read the chat anyway.
+     */
+    public static boolean hideChatSeen() {
+        if (!wouldUse("hide_read_receipts")) return false;
+        long since = System.currentTimeMillis() - lastSentAt;
+        if (since >= 0 && since < REPLY_READ_MS) return false;
+        return enabled("hide_read_receipts");
+    }
+
+    /** The composer's send event, built each time you send from a chat. */
+    public static void noteMessageSent() { lastSentAt = System.currentTimeMillis(); }
     public static boolean keepUnsent() { return wouldUse("keep_unsent"); }
     public static boolean viewStoriesAnonymously() { return enabled("anonymous_stories"); }
     public static boolean saveAnyStory() { return enabled("save_stories"); }

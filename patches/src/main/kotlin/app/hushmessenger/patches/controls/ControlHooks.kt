@@ -79,7 +79,6 @@ internal const val CHAT_ANIMATION = "Lapp/hushmessenger/extension/ChatAnimation;
 internal const val CHAT_ANIMATION_CREATE = "$CHAT_ANIMATION->create(Ljava/lang/Object;IZI)$ANIMATION"
 private const val IMMUTABLE_LIST_OF = "$IMMUTABLE_LIST->of(Ljava/lang/Object;)$IMMUTABLE_LIST"
 internal const val TYPING_MAILBOX_CALL = "setTypingIndicatorForThreadWithThreadIdentifier"
-internal const val READ_MAILBOX_CALL = "markAsReadThreadWithThreadIdentifier"
 internal const val SCREEN_CAPTURE_CALLBACK = "Landroid/app/Activity\$ScreenCaptureCallback;"
 /** Encrypted chats hand every photo to this transcoder; its two image entry points keep their names in every build. */
 internal const val MEDIA_TRANSCODER = "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;"
@@ -229,7 +228,6 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 if (original == "InboxSubtabsItemSupplierImplementation\$onSubscribe\$1") add("subtabs")
                 if (original == "ConversationTypingContext\$sendActiveStateRunnable\$1") add("typing")
                 if (original == "SecureWindowUtils\$1") add("allow_screenshot")
-                if (original == "ReadThreadManager\$1") add("hide_read_receipts")
             }
             if (gate && refs.any { it.toString() == "Landroid/os/Build\$VERSION;->SDK_INT:I" } &&
                 refs.any { it.toString() == "Landroid/app/ActivityManager;->isLowRamDevice()Z" }) add("bubbles")
@@ -299,8 +297,9 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
             if (method.name == "render" && SEARCH_CLEAR_TAG in strings) searchFieldRender = method
             // Encrypted chats send typing through this msys mailbox call (thread id, typing).
             if (method.parameterTypes == listOf("Ljava/lang/String;", "Z") && TYPING_MAILBOX_CALL in strings) add("typing_mailbox")
-            // Encrypted chats mark a thread read, which also sends the receipt, through this msys call.
-            if (method.returnType == "V" && READ_MAILBOX_CALL in strings) add("read_mailbox")
+            // An open chat marks itself read, which also sends Seen, only through the job its seen handler schedules here.
+            if (method.isChatSeenBroadcast()) add(HIDE_READ_RECEIPTS)
+            if (method.isSendMessageEvent()) add(REPLY_READ)
             // Opening a story card sends its seen state through the handler Messenger tags with this name.
             if (method.returnType == "V" && method.parameterTypes == listOf(MONTAGE_CARD, "Z") &&
                 !AccessFlags.STATIC.isSet(method.accessFlags) && STORY_MARK_READ_TAG in strings) add("anonymous_stories")

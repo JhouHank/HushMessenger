@@ -195,7 +195,7 @@ public class CompatReport {
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
-        PATCHES.put("Hide read receipts", List.of("hide_read_receipts", "read_mailbox"));
+        PATCHES.put("Hide read receipts", List.of("hide_read_receipts", "reply_read"));
         PATCHES.put("Keep unsent messages", List.of("keep_unsent", "unsent_indicator", "delta_unsent"));
         PATCHES.put("Unlock app icons", List.of("app_icons"));
         PATCHES.put("Use your own font", List.of("font_layout", "font_repository", "font_roboto", "font_by_name", "font_input"));
@@ -2560,6 +2560,40 @@ public class CompatReport {
         return starts;
     }
 
+    static final String SEND_MESSAGE_EVENT = "Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;";
+
+    /**
+     * hide_read_receipts: the open chat's seen handler, a static (FbUserSession, own class, String)V that names
+     * MARK_THREAD_AS_SEEN_JOB and broadcast_message_seen_internal. reply_read: SendMessageEvent's five-argument
+     * constructor. Mirrors ReadReceipts.kt.
+     */
+    static List<Method> chatSeenBroadcasts(List<ClassDef> classes) {
+        var seen = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || !AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !"V".equals(method.getReturnType())) continue;
+            var params = new ArrayList<String>();
+            for (var t : method.getParameterTypes()) params.add(t.toString());
+            if (!params.equals(List.of("Lcom/facebook/auth/usersession/FbUserSession;", cls.getType(), "Ljava/lang/String;"))) continue;
+            var strings = new HashSet<String>();
+            for (var i : method.getImplementation().getInstructions())
+                if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
+            if (strings.contains("MARK_THREAD_AS_SEEN_JOB") && strings.contains("broadcast_message_seen_internal")) seen.add(method);
+        }
+        return seen;
+    }
+
+    static List<Method> sendMessageEvents(List<ClassDef> classes) {
+        var events = new ArrayList<Method>();
+        for (var cls : classes) {
+            if (!SEND_MESSAGE_EVENT.equals(cls.getType())) continue;
+            for (var method : cls.getMethods())
+                if ("<init>".equals(method.getName()) && "V".equals(method.getReturnType()) && method.getParameterTypes().size() == 5)
+                    events.add(method);
+        }
+        return events;
+    }
+
     static final String LAT_STATUS_JOB = "Lcom/facebook/attribution/LatStatusJob;";
 
     /**
@@ -2627,6 +2661,8 @@ public class CompatReport {
         found.get("ai_search_hint").addAll(searchBarBuilders(classes));
         found.get("xhe_audio").addAll(shareCopies(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
+        found.get("hide_read_receipts").addAll(chatSeenBroadcasts(classes));
+        found.get("reply_read").addAll(sendMessageEvents(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));
         found.get("analytics_uploads").addAll(xanalyticsUploadTimers(classes));
@@ -2870,7 +2906,6 @@ public class CompatReport {
                         case "InboxSubtabsItemSupplierImplementation$onSubscribe$1" -> found.get("subtabs").add(method);
                         case "ConversationTypingContext$sendActiveStateRunnable$1" -> found.get("typing").add(method);
                         case "SecureWindowUtils$1" -> found.get("allow_screenshot").add(method);
-                        case "ReadThreadManager$1" -> found.get("hide_read_receipts").add(method);
                     }
                 }
 
@@ -3011,11 +3046,6 @@ public class CompatReport {
                 if (paramTypes.equals(List.of("Ljava/lang/String;", "Z")) &&
                     strings.contains("setTypingIndicatorForThreadWithThreadIdentifier")) {
                     found.get("typing_mailbox").add(method);
-                }
-
-                // read_mailbox: the msys call that marks a thread read (and sends the receipt) in encrypted chats
-                if ("V".equals(method.getReturnType()) && strings.contains("markAsReadThreadWithThreadIdentifier")) {
-                    found.get("read_mailbox").add(method);
                 }
 
                 // anonymous_stories: the story mark-read handler that reports a viewed card
