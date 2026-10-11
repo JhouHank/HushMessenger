@@ -20,10 +20,12 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 internal const val SYNTHETIC_MENTION_AI = "LX/7Ok;->A73(LX/Sxa;$MENTION_LIST_BUILDER)V"
 internal const val SYNTHETIC_IMAGINE = "LX/7On;->A73(LX/Sxa;$MENTION_LIST_BUILDER)V"
+internal const val SYNTHETIC_COMMUNITY_AI = "LX/7Om;->A73(LX/Sxa;$MENTION_LIST_BUILDER)V"
 internal const val SYNTHETIC_AI_COMMANDS = "LX/7Ob;->A06(LX/7Ob;$THREAD_KEY_TYPE)Ljava/util/List;"
 
 private const val SENTINEL = "LX/1dj;->A03:Ljava/lang/Object;"
@@ -90,6 +92,37 @@ private fun imagine() = fixtureMethod(SYNTHETIC_IMAGINE, """
     return-void
 """.trimIndent(), registers = 12)
 
+/**
+ * The community chat dispatcher as 582 runs it: its section reads the cache, loads the marker right there, moves two
+ * unrelated registers and only then compares.
+ */
+private fun communityAi(
+    marker: String = "sget-object v4, $SENTINEL",
+    move: String = "move-object/from16 v19, p1",
+) = fixtureMethod(SYNTHETIC_COMMUNITY_AI, """
+    invoke-static {}, LX/17Q;->A17()Ljava/util/concurrent/atomic/AtomicInteger;
+    move-result-object v7
+    move-object/from16 v3, p0
+    move-object/from16 v6, p2
+    const-string v5, "$MENTION_ROW_SPEC"
+    iget-object v0, v3, LX/7Om;->A01:Ljava/lang/Object;
+    if-nez v0, :read
+    sget-object v0, $SENTINEL
+    iput-object v0, v3, LX/7Om;->A01:Ljava/lang/Object;
+    :read
+    iget-object v0, v3, LX/7Om;->A01:Ljava/lang/Object;
+    $marker
+    $move
+    move-object/from16 v24, p2
+    if-eq v0, v4, :done
+    $COUNTER
+    const-string v0, "messaging.communitymessaging.ai.mentionrowsupplier.CommunityAiRowSupplier"
+    const-string v1, "@Community AI"
+    invoke-virtual {v6, v1}, $ADD_ROW
+    :done
+    return-void
+""".trimIndent(), registers = 28)
+
 /** The chat's AI commands, turned into suggestion rows. Null means the chat has none. */
 private fun commandList(id: String = SYNTHETIC_AI_COMMANDS) = fixtureMethod(id, """
     const/4 v0, 0x0
@@ -107,6 +140,7 @@ private fun commandList(id: String = SYNTHETIC_AI_COMMANDS) = fixtureMethod(id, 
 internal fun aiMentionsFixture() = listOf(
     fixtureClass("LX/7Ok;", listOf(mentionAi())),
     fixtureClass("LX/7On;", listOf(imagine())),
+    fixtureClass("LX/7Om;", listOf(communityAi())),
     fixtureClass("LX/7Ob;", listOf(commandList())),
 )
 
@@ -124,19 +158,20 @@ internal fun assertStockKept(before: List<Instruction>, after: List<Instruction>
     }
 }
 
-/** The helper pair sits between the section's read and its skip, and nothing stock moves or changes. */
-private fun assertGate(before: List<Instruction>, after: List<Instruction>, read: Int, label: String) {
-    val state = (before[read] as TwoRegisterInstruction).registerA
-    val disabled = (before[read + 1] as TwoRegisterInstruction).registerB
+/** The helper pair sits right before the section's skip, and nothing stock moves or changes. */
+private fun assertGate(before: List<Instruction>, after: List<Instruction>, skip: Int, label: String) {
+    val state = (before[skip] as TwoRegisterInstruction).registerA
+    val disabled = (before[skip] as TwoRegisterInstruction).registerB
+    assertEquals(Opcode.IF_EQ, before[skip].opcode, label)
     assertEquals(before.size + 2, after.size, label)
-    assertStockKept(before, after.filterIndexed { i, _ -> i != read + 1 && i != read + 2 }, label)
-    val helper = after[read + 1] as FiveRegisterInstruction
+    assertStockKept(before, after.filterIndexed { i, _ -> i != skip && i != skip + 1 }, label)
+    val helper = after[skip] as FiveRegisterInstruction
     assertEquals(Opcode.INVOKE_STATIC, helper.opcode, label)
     assertEquals(AI_MENTION_HELPER, (helper as ReferenceInstruction).reference.toString(), label)
     assertEquals(listOf(2, state, disabled), listOf(helper.registerCount, helper.registerC, helper.registerD), label)
-    assertEquals(Opcode.MOVE_RESULT_OBJECT, after[read + 2].opcode, label)
-    assertEquals(state, (after[read + 2] as OneRegisterInstruction).registerA, label)
-    assertEquals(Opcode.IF_EQ, after[read + 3].opcode, label)
+    assertEquals(Opcode.MOVE_RESULT_OBJECT, after[skip + 1].opcode, label)
+    assertEquals(state, (after[skip + 1] as OneRegisterInstruction).registerA, label)
+    assertSame(before[skip], after[skip + 2], label)
 }
 
 class AiMentionsTest {
@@ -145,15 +180,15 @@ class AiMentionsTest {
     @Test fun eachMetaAiSectionReadsItsStateThroughTheExtension() {
         val classes = aiMentionsFixture()
         val found = findControls(classes)
-        assertEquals(setOf(SYNTHETIC_MENTION_AI, SYNTHETIC_IMAGINE), found.getValue(AI_MENTIONS).map { it.hookId() }.toSet())
+        assertEquals(setOf(SYNTHETIC_MENTION_AI, SYNTHETIC_IMAGINE, SYNTHETIC_COMMUNITY_AI), found.getValue(AI_MENTIONS).map { it.hookId() }.toSet())
         validateControls(found, setOf(AI_MENTIONS, AI_COMMANDS))
-        for (method in listOf(mentionAi(), imagine())) {
+        for (method in listOf(mentionAi(), imagine(), communityAi())) {
             val before = method.code()
-            val reads = method.aiMentionGates()
-            assertEquals(1, reads.size, method.hookId())
+            val skips = method.aiMentionGates()
+            assertEquals(1, skips.size, method.hookId())
             injectControl(AI_MENTIONS, mapOf(AI_MENTIONS to listOf(method)))
             // Every stock instruction stays, so the @everyone section before imagine keeps its own read and skip.
-            assertGate(before, method.code(), reads.single(), method.hookId())
+            assertGate(before, method.code(), skips.single(), method.hookId())
         }
     }
 
@@ -179,6 +214,9 @@ class AiMentionsTest {
             "marker isn't the sentinel" to mentionAi(marker = "sget-object v3, LX/1dj;->A02:Ljava/lang/Object;"),
             "marker never reaches the cache" to mentionAi(store = "iput-object v1, v2, LX/7Ok;->A00:Ljava/lang/Object;"),
             "a jump lands on the skip" to mentionAi(jump = "if-eqz v1, :skip"),
+            "community marker in another register" to communityAi(marker = "sget-object v5, $SENTINEL"),
+            "community move overwrites the state" to communityAi(move = "move-object/from16 v0, p1"),
+            "community move overwrites the marker" to communityAi(move = "move-object/from16 v4, p1"),
         )
         for ((case, bad) in shapes) {
             val good = imagine()
@@ -209,10 +247,10 @@ class AiMentionsTest {
             for (dispatcher in dispatchers) {
                 val method = MutableMethod(dispatcher)
                 val before = method.code()
-                val reads = method.aiMentionGates()
-                assertEquals(1, reads.size, code)
+                val skips = method.aiMentionGates()
+                assertEquals(1, skips.size, code)
                 method.injectAiMentions()
-                assertGate(before, method.code(), reads.single(), code)
+                assertGate(before, method.code(), skips.single(), code)
             }
             MutableMethod(commands.single()).injectAiCommands()
         }

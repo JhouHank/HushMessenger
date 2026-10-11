@@ -15,7 +15,7 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 
-/** The @ suggestion list's Meta AI and imagine rows. */
+/** The @ suggestion list's Meta AI, imagine and community AI rows. */
 internal const val AI_MENTIONS = "ai_mentions"
 
 /** The AI command list the same suggestions read for the open chat. */
@@ -27,6 +27,7 @@ internal const val MENTION_ROW_SPEC = "messaging.mentions.composer.MentionRowSup
 internal val AI_MENTION_PLUGINS = setOf(
     "messaging.aibot.core.mentionai.MentionAiRowSupplier",
     "messaging.aibot.core.imagine.ImagineRowSupplier",
+    "messaging.communitymessaging.ai.mentionrowsupplier.CommunityAiRowSupplier",
 )
 
 internal const val AI_PAGE_COMMAND = "Lcom/facebook/messaging/aibot/page/customcommand/AiPageCustomCommand;"
@@ -59,15 +60,17 @@ internal fun findAiMentions(classes: Iterable<ClassDef>): List<Method> =
     classes.flatMap { it.methods }.filter { it.isAiMentionDispatcher() }
 
 /**
- * Index of each Meta AI section's state read. A section starts where its plugin trace begins:
+ * Index of each Meta AI section's skip. A section starts where its plugin trace begins:
  *
  *     iget-object vS, this, <cache>:Object      <- the state Messenger computed (or cached) for this plugin
- *     if-eq vS, vD, :next_section             vD holds the disabled marker
+ *     sget-object vD, <sentinel>                 only in the community section; the others load vD earlier
+ *     move-object/from16 vX, vY                  zero or more, touching neither vS nor vD
+ *     if-eq vS, vD, :next_section              <- the skip; vD holds the disabled marker
  *     invoke-virtual {vN}, AtomicInteger->getAndIncrement()I
- *     const-string vX, "messaging.aibot.core.<plugin>"
+ *     const-string vX, "messaging.<plugin>"
  *
- * vD has to be the marker: it's loaded from the profile's sentinel and stored in the same cache when the check fails.
- * Nothing else may jump to the if-eq, or a path could skip the extension.
+ * vD has to be the marker, loaded from the profile's sentinel, and the cache has to be stored from a register the
+ * sentinel was loaded into when the check fails. Nothing else may jump to the skip, or a path could miss the extension.
  */
 internal fun Method.aiMentionGates(): List<Int> {
     val code = implementation?.instructions?.toList() ?: mentionsChanged("no code")
@@ -75,30 +78,38 @@ internal fun Method.aiMentionGates(): List<Int> {
     if (sections.isEmpty()) mentionsChanged("no Meta AI section")
     if (sections.map { code[it].string() }.toSet().size != sections.size) mentionsChanged("a section repeats")
     val jumps = jumpTargets()
+    val sentinels = code.filter { it.opcode == Opcode.SGET_OBJECT && it.reference() == activeProfile.pluginSentinel }
+        .map { (it as OneRegisterInstruction).registerA }.toSet()
     return sections.map { at ->
-        val read = code.getOrNull(at - 3)
         val skip = code.getOrNull(at - 2) as? TwoRegisterInstruction
+        if (skip == null || skip.opcode != Opcode.IF_EQ) mentionsChanged("skip check")
+        val state = skip.registerA
+        val disabled = skip.registerB
+        var back = at - 3
+        while (code.getOrNull(back)?.opcode in MOVE_OBJECTS && (code[back] as TwoRegisterInstruction).registerA !in setOf(state, disabled)) back--
+        val localMarker = code.getOrNull(back)?.let {
+            it.opcode == Opcode.SGET_OBJECT && it.reference() == activeProfile.pluginSentinel && (it as OneRegisterInstruction).registerA == disabled
+        } == true
+        if (localMarker) back--
+        val read = code.getOrNull(back)
         val field = (read as? ReferenceInstruction)?.reference as? FieldReference
         if (read?.opcode != Opcode.IGET_OBJECT || field == null || field.definingClass != definingClass || field.type != "Ljava/lang/Object;") {
             mentionsChanged("state read")
         }
-        val state = (read as TwoRegisterInstruction).registerA
-        if (skip == null || skip.opcode != Opcode.IF_EQ || skip.registerA != state) mentionsChanged("skip check")
-        val disabled = skip.registerB
+        if ((read as TwoRegisterInstruction).registerA != state) mentionsChanged("skip check")
         if (code[at - 1].opcode !in setOf(Opcode.INVOKE_VIRTUAL, Opcode.INVOKE_VIRTUAL_RANGE)) mentionsChanged("section counter")
-        val marker = code.any {
-            it.opcode == Opcode.SGET_OBJECT && it.reference() == activeProfile.pluginSentinel && (it as OneRegisterInstruction).registerA == disabled
-        }
         val stored = code.any {
-            it.opcode == Opcode.IPUT_OBJECT && it.reference() == field.toString() && (it as TwoRegisterInstruction).registerA == disabled
+            it.opcode == Opcode.IPUT_OBJECT && it.reference() == field.toString() && (it as TwoRegisterInstruction).registerA in sentinels
         }
-        if (!marker || !stored) mentionsChanged("disabled marker")
+        if (!(localMarker || disabled in sentinels) || !stored) mentionsChanged("disabled marker")
         if ((at - 2) in jumps) mentionsChanged("a jump past the state read")
         // The helper is a plain invoke, which reaches v15 at most.
         if (state > 15 || disabled > 15) mentionsChanged("register out of range")
-        at - 3
+        at - 2
     }
 }
+
+private val MOVE_OBJECTS = setOf(Opcode.MOVE_OBJECT, Opcode.MOVE_OBJECT_FROM16, Opcode.MOVE_OBJECT_16)
 
 internal fun MutableMethod.validateAiMentions(): List<Int> {
     if (!isAiMentionDispatcher()) mentionsChanged("unexpected dispatcher ${hookId()}")
@@ -106,16 +117,17 @@ internal fun MutableMethod.validateAiMentions(): List<Int> {
 }
 
 /**
- * Passes each Meta AI section's state through the extension right after Messenger reads it. With the switch on it reads
- * as the disabled marker, so the section's own check skips the row. People, @everyone and the other rows don't change.
+ * Passes each Meta AI section's state through the extension right before its skip compares it. With the switch on it
+ * reads as the disabled marker, so the section's own check skips the row. People, @everyone and the other rows don't
+ * change.
  */
 internal fun MutableMethod.injectAiMentions() {
     val gates = validateAiMentions()
     val code = implementation!!.instructions.toList()
-    for (read in gates.reversed()) {
-        val state = (code[read] as TwoRegisterInstruction).registerA
-        val disabled = (code[read + 1] as TwoRegisterInstruction).registerB
-        addInstructions(read + 1, """
+    for (skip in gates.reversed()) {
+        val state = (code[skip] as TwoRegisterInstruction).registerA
+        val disabled = (code[skip] as TwoRegisterInstruction).registerB
+        addInstructions(skip, """
             invoke-static {v$state, v$disabled}, $AI_MENTION_HELPER
             move-result-object v$state
         """.trimIndent())

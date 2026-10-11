@@ -2420,11 +2420,12 @@ public class CompatReport {
     }
 
     static final Set<String> AI_MENTION_PLUGINS = Set.of(
-        "messaging.aibot.core.mentionai.MentionAiRowSupplier", "messaging.aibot.core.imagine.ImagineRowSupplier");
+        "messaging.aibot.core.mentionai.MentionAiRowSupplier", "messaging.aibot.core.imagine.ImagineRowSupplier",
+        "messaging.communitymessaging.ai.mentionrowsupplier.CommunityAiRowSupplier");
 
     /**
      * ai_mentions: the @ suggestion row dispatchers, non-static (query, ImmutableList.Builder)V methods traced as
-     * MentionRowSupplierSpec that run a Meta AI or imagine section. Mirrors AiMentions.kt.
+     * MentionRowSupplierSpec that run a Meta AI, imagine or community AI section. Mirrors AiMentions.kt.
      */
     static List<Method> aiMentionDispatchers(List<ClassDef> classes) {
         var dispatchers = new ArrayList<Method>();

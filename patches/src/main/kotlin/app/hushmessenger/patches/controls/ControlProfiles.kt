@@ -47,6 +47,7 @@ internal val BASE_PROFILE = ControlProfile(
         "ai_fab" to setOf("LX/6sQ;->render(LX/2Cg;)LX/1GU;"),
         "ai_mentions" to setOf(
             "LX/7R3;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList\$Builder;)V",
+            "LX/7R5;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList\$Builder;)V",
             "LX/7R6;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList\$Builder;)V",
         ),
         "ai_menu" to setOf("LX/WRi;->A00()Z", "LX/WRi;->A01()Z", "LX/WWJ;->A00()Z", "LX/WWJ;->A01()Z"),
@@ -203,6 +204,7 @@ internal val PROFILE_346415706 = ControlProfile(
         "ai_fab" to setOf("LX/6rJ;->render(LX/2Cf;)LX/1GT;"),
         "ai_mentions" to setOf(
             "LX/7Pw;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList\$Builder;)V",
+            "LX/7Py;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList\$Builder;)V",
             "LX/7Pz;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList\$Builder;)V",
         ),
         "ai_menu" to setOf("LX/HEJ;->A00()Z", "LX/HEJ;->A01()Z", "LX/HPh;->A00()Z", "LX/HPh;->A01()Z"),
