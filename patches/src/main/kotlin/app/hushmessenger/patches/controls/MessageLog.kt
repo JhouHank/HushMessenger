@@ -120,9 +120,10 @@ private fun Method.isUnsentCheck(): Boolean {
     if (!AccessFlags.STATIC.isSet(accessFlags) || !AccessFlags.PUBLIC.isSet(accessFlags) || returnType != "Z" ||
         parameterTypes.map { it.toString() } != listOf(MESSAGE)) return false
     val code = implementation?.instructions?.toList().orEmpty()
-    val reads = code.filter { it.opcode.name.startsWith("IGET") || it.opcode.name.startsWith("SGET") }
-    val field = reads.singleOrNull()?.takeIf { it.opcode == Opcode.IGET_WIDE }
-        ?.let { (it as ReferenceInstruction).reference as? FieldReference }
+    // Opcode.name is the smali spelling, so match on the reference: the one field the check touches.
+    val touches = code.filter { (it as? ReferenceInstruction)?.reference is FieldReference }
+    val field = touches.singleOrNull()?.takeIf { it.opcode == Opcode.IGET_WIDE }
+        ?.let { (it as ReferenceInstruction).reference as FieldReference }
     return field != null && field.definingClass == MESSAGE && field.type == "J" && code.count { it.opcode == Opcode.CMP_LONG } == 1
 }
 
