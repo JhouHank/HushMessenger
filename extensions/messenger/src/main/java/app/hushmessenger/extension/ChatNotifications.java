@@ -33,28 +33,44 @@ final class ChatNotifications {
     }
 
     /**
-     * Who sent [text]: the sender of the newest message in the notification's conversation with that text, else of its
-     * newest message, else the notification's title. Null when the notification names nobody.
+     * Who sent [text] in [thread]: the sender of the notification's lines with that text, when they all name the same
+     * person. Two people sending the same words leaves it unknown. So does a group chat whose notification doesn't show
+     * the text, since its newest sender could be someone else. A one-to-one chat has only one other person, so there the
+     * lines' only sender, else the title, stands in. Null when that leaves nobody.
      */
-    static String sender(Notification notification, String text) {
+    static String sender(Notification notification, String text, String thread) {
         Bundle extras = notification.extras;
         if (extras == null) return null;
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
-        String newest = null;
+        String matched = null;
+        String only = null;
+        boolean several = false;
         if (messages != null) {
-            for (int i = messages.length - 1; i >= 0; i--) {
-                if (!(messages[i] instanceof Bundle)) continue;
-                Bundle message = (Bundle) messages[i];
+            for (Parcelable item : messages) {
+                if (!(item instanceof Bundle)) continue;
+                Bundle message = (Bundle) item;
                 String name = senderOf(message);
                 if (name == null) continue;
                 CharSequence body = message.getCharSequence("text");
-                if (text != null && body != null && text.contentEquals(body)) return name;
-                if (newest == null) newest = name;
+                if (text != null && body != null && text.contentEquals(body)) {
+                    if (matched != null && !matched.equals(name)) return null;
+                    matched = name;
+                }
+                if (only == null) only = name;
+                else if (!only.equals(name)) several = true;
             }
         }
-        if (newest != null) return newest;
+        if (matched != null) return matched;
+        if (thread == null || !oneToOne(thread)) return null;
+        if (only != null && !several) return only;
         CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
         return title == null || title.length() == 0 ? null : title.toString();
+    }
+
+    /** One-to-one chats, encrypted or not. Messenger's key names the chat type first. */
+    static boolean oneToOne(String thread) {
+        int colon = thread.indexOf(':');
+        return (colon < 0 ? thread : thread.substring(0, colon)).contains("ONE_TO_ONE");
     }
 
     /** The group's name for a group chat's notification, null for a one-to-one chat. */

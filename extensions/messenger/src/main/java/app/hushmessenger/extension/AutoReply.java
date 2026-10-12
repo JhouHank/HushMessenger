@@ -64,13 +64,13 @@ public final class AutoReply {
     }
 
     /** The hook hands each incoming message here and returns at once; the answer runs on its own thread. */
-    static void received(String text, String thread) {
+    static void received(String text, String thread, String id) {
         if (text == null || thread == null || thread.isEmpty()) return;
-        WORKER.schedule(() -> answer(text, thread, true), WAIT_MS, TimeUnit.MILLISECONDS);
+        WORKER.schedule(() -> answer(text, thread, id, true), WAIT_MS, TimeUnit.MILLISECONDS);
     }
 
     /** Matches, checks the cooldown and sends. Returns whether a reply went out. Tests call it directly. */
-    static boolean answer(String text, String thread, boolean retry) {
+    static boolean answer(String text, String thread, String id, boolean retry) {
         try {
             SharedPreferences prefs = Settings.preferences;
             Context context = Settings.appContext;
@@ -85,13 +85,13 @@ public final class AutoReply {
             if (last != null && now - last < COOLDOWN_MS) return false;
             StatusBarNotification shown = ChatNotifications.find(context, thread);
             if (shown == null) {
-                if (retry) WORKER.schedule(() -> answer(text, thread, false), RETRY_MS, TimeUnit.MILLISECONDS);
+                if (retry) WORKER.schedule(() -> answer(text, thread, id, false), RETRY_MS, TimeUnit.MILLISECONDS);
                 return false;
             }
             // Taken before the send, so a second message in the same moment can't get its own reply.
             lastReply.put(thread, now);
             // The reply takes the notification down, so the message log gets its names now.
-            MessageLog.noteNames(thread, text, shown.getNotification());
+            MessageLog.noteNames(thread, id, text, shown.getNotification());
             if (!ChatNotifications.reply(context, shown.getNotification(), rule.reply)) {
                 lastReply.remove(thread, now);
                 android.util.Log.w("HushMessenger", "auto_reply: the chat's notification has no Reply action");
@@ -105,10 +105,9 @@ public final class AutoReply {
         }
     }
 
-    /** One-to-one chats only, unless group chats are allowed. Messenger's key names the chat type first. */
+    /** One-to-one chats only, unless group chats are allowed. */
     static boolean oneToOne(String thread) {
-        int colon = thread.indexOf(':');
-        return (colon < 0 ? thread : thread.substring(0, colon)).contains("ONE_TO_ONE");
+        return ChatNotifications.oneToOne(thread);
     }
 
     /** The first reply whose words appear in [text] as whole words, ignoring case, or that answers anything. */

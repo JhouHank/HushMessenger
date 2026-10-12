@@ -168,16 +168,20 @@ public class MessageLogTest {
             assertEquals("Ana\tB", entry.sender);
             assertEquals("", entry.chat);
             assertEquals("hi\tthere", entry.text);
+            // A one-to-one chat has only one other person, so words the notification doesn't show are still theirs.
+            MessageLog.storeNow("a photo", "ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.2");
+            assertEquals("Ana\tB", MessageLog.entries().get(0).sender);
         } finally {
             manager.cancelAll();
         }
     }
 
     @Test public void aMessageWhoseNotificationIsBuiltTwiceIsKeptOnce() throws Exception {
-        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2");
-        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2");
-        MessageLog.storeNow("same words", "ONE_TO_ONE:3:4");
-        MessageLog.storeNow("other words", "ONE_TO_ONE:1:2");
+        // The push and the sync copy of one message carry the same id.
+        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2", "mid.1");
+        MessageLog.storeNow("same words", "ONE_TO_ONE:1:2", "mid.1");
+        MessageLog.storeNow("same words", "ONE_TO_ONE:3:4", "mid.2");
+        MessageLog.storeNow("other words", "ONE_TO_ONE:1:2", "mid.3");
         List<MessageLog.Entry> entries = MessageLog.entries();
         assertEquals(3, entries.size());
         assertEquals("other words", entries.get(0).text);
@@ -185,14 +189,74 @@ public class MessageLogTest {
         assertEquals("ONE_TO_ONE:1:2", entries.get(2).thread);
     }
 
-    @Test public void theSameWordsAfterTheWindowAreANewMessage() {
+    /** Two messages that say the same thing are two messages. Only the id says a notification is the same one again. */
+    @Test public void differentMessagesWithTheSameWordsAreAllKept() throws Exception {
+        MessageLog.storeNow("ok", "GROUP:7", "mid.1");
+        MessageLog.storeNow("ok", "GROUP:7", "mid.2");
+        // Without an id there's nothing to tell them apart by, so both stay rather than one being guessed away.
+        MessageLog.storeNow("ok", "GROUP:7");
+        MessageLog.storeNow("ok", "GROUP:7");
+        // Long messages that only differ past the part the log keeps.
+        String start = "x".repeat(MessageLog.MAX_TEXT_CHARS);
+        MessageLog.storeNow(start + "one", "GROUP:7", "mid.3");
+        MessageLog.storeNow(start + "two", "GROUP:7", "mid.4");
+        assertEquals(6, MessageLog.entries().size());
+    }
+
+    @Test public void theSameIdAfterTheWindowIsANewCapture() {
         long start = 1_000;
-        assertFalse(MessageLog.repeated("t", "ok", start));
-        assertTrue(MessageLog.repeated("t", "ok", start + MessageLog.DUPLICATE_WINDOW_MS));
-        assertFalse(MessageLog.repeated("t", "ok", start + MessageLog.DUPLICATE_WINDOW_MS + 1));
+        assertFalse(MessageLog.repeated("t", "mid.1", start));
+        assertTrue(MessageLog.repeated("t", "mid.1", start + MessageLog.DUPLICATE_WINDOW_MS));
+        assertFalse(MessageLog.repeated("t", "mid.1", start + MessageLog.DUPLICATE_WINDOW_MS + 1));
         // A clock moved back doesn't hide the next message behind a capture from the future.
-        assertFalse(MessageLog.repeated("t", "later", 50_000));
-        assertFalse(MessageLog.repeated("t", "later", 40_000));
+        assertFalse(MessageLog.repeated("t", "mid.2", 50_000));
+        assertFalse(MessageLog.repeated("t", "mid.2", 40_000));
+        // A capture with no id is never a repeat.
+        assertFalse(MessageLog.repeated("t", "", 40_000));
+        assertFalse(MessageLog.repeated("t", "", 40_000));
+        assertFalse(MessageLog.repeated("t", null, 40_000));
+    }
+
+    /** The hook hands each id over just before its message, and the sink takes it, so the next message can't reuse it. */
+    @Test public void eachHandedOverIdIsTakenOnceOnItsOwnThread() throws Exception {
+        Settings.incomingMessageId("mid.1");
+        assertEquals("mid.1", Settings.takeIncomingMessageId());
+        assertNull(Settings.takeIncomingMessageId());
+        Settings.incomingMessageId("mid.2");
+        String[] other = {"unset"};
+        Thread elsewhere = new Thread(() -> other[0] = Settings.takeIncomingMessageId());
+        elsewhere.start();
+        elsewhere.join();
+        assertNull(other[0]);
+        assertEquals("mid.2", Settings.takeIncomingMessageId());
+    }
+
+    /**
+     * Two people send the same words in a group. The notification can't say whose line is whose, so neither capture is
+     * named, and a capture whose words it no longer shows isn't given its newest sender either.
+     */
+    @Test public void aGroupSenderTheNotificationCantPlaceStaysUnknown() throws Exception {
+        Context context = Settings.appContext;
+        android.app.NotificationManager manager = context.getSystemService(android.app.NotificationManager.class);
+        android.app.Notification.MessagingStyle style = new android.app.Notification.MessagingStyle(new android.app.Person.Builder().setName("Me").build())
+            .setConversationTitle("Climbing").setGroupConversation(true)
+            .addMessage("on my way", 1, new android.app.Person.Builder().setName("Ana").build())
+            .addMessage("on my way", 2, new android.app.Person.Builder().setName("Bo").build());
+        manager.notify("GROUP:77", 1, new android.app.Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Bo").setStyle(style).build());
+        try {
+            MessageLog.storeNow("on my way", "GROUP:77", "mid.1");
+            MessageLog.storeNow("on my way", "GROUP:77", "mid.2");
+            MessageLog.storeNow("an older message", "GROUP:77", "mid.3");
+            List<MessageLog.Entry> entries = MessageLog.entries();
+            assertEquals(3, entries.size());
+            for (MessageLog.Entry entry : entries) {
+                assertEquals("", entry.sender);
+                assertEquals("Climbing", entry.chat);
+            }
+        } finally {
+            manager.cancelAll();
+        }
     }
 
     @Test public void namesAutoReplyNotedOutliveTheNotificationItAnswered() throws Exception {
@@ -201,11 +265,23 @@ public class MessageLogTest {
         android.app.Notification answered = new android.app.Notification.Builder(Settings.appContext, "chats")
             .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").setStyle(style).build();
         // Auto reply read it, and the reply took it down before the log got to it, so it's never posted here.
-        MessageLog.noteNames("ADVANCED_CRYPTO_ONE_TO_ONE:9", "ping test", answered);
-        MessageLog.storeNow("ping test", "ADVANCED_CRYPTO_ONE_TO_ONE:9");
+        MessageLog.noteNames("ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.1", "ping test", answered);
+        MessageLog.storeNow("ping test", "ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.1");
         assertEquals("Ana", MessageLog.entries().get(0).sender);
-        // Used once: a later capture of other words in that chat isn't named from it.
-        MessageLog.storeNow("ping again", "ADVANCED_CRYPTO_ONE_TO_ONE:9");
+        // Kept for that message only: another message with the same words isn't named from it.
+        MessageLog.noteNames("ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.2", "ping test", answered);
+        MessageLog.storeNow("ping test", "ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.3");
+        assertEquals("", MessageLog.entries().get(0).sender);
+        MessageLog.storeNow("ping test", "ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.2");
+        assertEquals("Ana", MessageLog.entries().get(0).sender);
+    }
+
+    @Test public void namesAreNotNotedForAMessageWithoutAnId() throws Exception {
+        android.app.Notification answered = new android.app.Notification.Builder(Settings.appContext, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").build();
+        MessageLog.noteNames("ONE_TO_ONE:1:2", null, "hello", answered);
+        MessageLog.noteNames("ONE_TO_ONE:1:2", "", "hello", answered);
+        MessageLog.storeNow("hello", "ONE_TO_ONE:1:2");
         assertEquals("", MessageLog.entries().get(0).sender);
     }
 
@@ -213,9 +289,9 @@ public class MessageLogTest {
         Settings.preferences.edit().putBoolean("message_log", false).commit();
         android.app.Notification answered = new android.app.Notification.Builder(Settings.appContext, "chats")
             .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").build();
-        MessageLog.noteNames("ONE_TO_ONE:1:2", "hello", answered);
+        MessageLog.noteNames("ONE_TO_ONE:1:2", "mid.1", "hello", answered);
         Settings.preferences.edit().putBoolean("message_log", true).commit();
-        MessageLog.storeNow("hello", "ONE_TO_ONE:1:2");
+        MessageLog.storeNow("hello", "ONE_TO_ONE:1:2", "mid.1");
         assertEquals("", MessageLog.entries().get(0).sender);
     }
 
@@ -474,10 +550,10 @@ public class MessageLogTest {
             @Override public void forget() { softwareVault.forget(); }
         };
         try {
-            MessageLog.record("slow write", "t");
+            MessageLog.record("slow write", "t", null);
             assertTrue(writing.await(10, java.util.concurrent.TimeUnit.SECONDS));
             // The writer holds the file now; a new notification must still return at once.
-            Thread capture = new Thread(() -> MessageLog.record("during the write", "t"));
+            Thread capture = new Thread(() -> MessageLog.record("during the write", "t", null));
             capture.start();
             capture.join(2_000);
             assertFalse(capture.isAlive());

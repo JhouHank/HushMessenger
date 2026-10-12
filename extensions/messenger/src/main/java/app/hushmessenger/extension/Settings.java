@@ -349,14 +349,29 @@ public final class Settings {
     /** The notification hook asks this before it reads a message, so nothing is read when the switch is off or paused. */
     public static boolean logReceivedMessages() { return wouldUse("message_log"); }
 
+    /**
+     * The message's own id, which the notification hook hands over just before the text and thread (the constructor it
+     * runs in has room for two values at a time). The sink right after takes it on the same thread.
+     */
+    private static final ThreadLocal<String> INCOMING_ID = new ThreadLocal<>();
+
+    public static void incomingMessageId(String id) { INCOMING_ID.set(id); }
+
+    static String takeIncomingMessageId() {
+        String id = INCOMING_ID.get();
+        INCOMING_ID.remove();
+        return id;
+    }
+
     /** The notification hook hands the message here; the log stores it off this thread and swallows its own failures. */
-    public static void recordReceivedMessage(String text, String thread) { MessageLog.record(text, thread); }
+    public static void recordReceivedMessage(String text, String thread) { MessageLog.record(text, thread, takeIncomingMessageId()); }
 
     /** The same notification hook asks this for an auto reply: on, not paused, and with at least one reply written. */
     public static boolean autoReplyWanted() { return AutoReply.wanted(); }
 
     /** Hands an incoming message to the auto reply, which answers it off this thread. */
-    public static void autoReplyTo(String text, String thread) { AutoReply.received(text, thread); }
+    public static void autoReplyTo(String text, String thread) { AutoReply.received(text, thread, takeIncomingMessageId()); }
+
     /**
      * The chat camera button's intent, right before Messenger starts it. With the switch on it opens the capture screen,
      * which uses the phone's camera app. Off, Pause, safe mode and an install without the capture screen get Messenger's.

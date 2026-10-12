@@ -2074,8 +2074,59 @@ public class CompatReport {
     static final String MESSAGE_TYPE = "Lcom/facebook/messaging/model/messages/Message;";
     static final String THREAD_SUMMARY_TYPE = "Lcom/facebook/messaging/model/threads/ThreadSummary;";
 
-    /** The non-Parcel NewMessageNotification constructor, whose message and thread parameters the hook reads. */
+    static final String MESSENGER_BROWSER_LAUNCHER = "Lcom/facebook/messaging/browser/util/MessengerBrowserLauncher;";
+    static final String JSON_PUT = "Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;";
+
+    /**
+     * Message String fields the browser launcher reads straight after loading "message_id" and puts into a JSONObject
+     * under that key, all three on the same registers. Mirrors findMessageIdFields.
+     */
+    static Set<String> messageIdFields(List<ClassDef> classes) {
+        var fields = new LinkedHashSet<String>();
+        for (var cls : classes) {
+            if (!MESSENGER_BROWSER_LAUNCHER.equals(cls.getType())) continue;
+            for (var m : cls.getMethods()) {
+                if (m.getImplementation() == null) continue;
+                var code = new ArrayList<Instruction>();
+                m.getImplementation().getInstructions().forEach(code::add);
+                for (int at = 0; at + 2 < code.size(); at++) {
+                    var key = code.get(at);
+                    if ((key.getOpcode() != Opcode.CONST_STRING && key.getOpcode() != Opcode.CONST_STRING_JUMBO) ||
+                        !(((ReferenceInstruction) key).getReference() instanceof StringReference name) || !"message_id".equals(name.getString())) continue;
+                    if (code.get(at + 1).getOpcode() != Opcode.IGET_OBJECT ||
+                        !(((ReferenceInstruction) code.get(at + 1)).getReference() instanceof FieldReference field) ||
+                        !MESSAGE_TYPE.equals(field.getDefiningClass()) || !"Ljava/lang/String;".equals(field.getType())) continue;
+                    if (code.get(at + 2).getOpcode() != Opcode.INVOKE_VIRTUAL || !(code.get(at + 2) instanceof FiveRegisterInstruction put) ||
+                        !JSON_PUT.equals(((ReferenceInstruction) put).getReference().toString()) || put.getRegisterCount() != 3 ||
+                        put.getRegisterD() != ((OneRegisterInstruction) key).getRegisterA() ||
+                        put.getRegisterE() != ((TwoRegisterInstruction) code.get(at + 1)).getRegisterA()) continue;
+                    fields.add(field.getDefiningClass() + "->" + field.getName() + ":" + field.getType());
+                }
+            }
+        }
+        return fields;
+    }
+
+    /** The one id field, public so the notification class can read it, or null when there isn't exactly one. */
+    static String messageIdField(List<ClassDef> classes) {
+        var fields = messageIdFields(classes);
+        if (fields.size() != 1) return null;
+        var id = fields.iterator().next();
+        for (var cls : classes) {
+            if (!MESSAGE_TYPE.equals(cls.getType())) continue;
+            for (var f : cls.getFields()) {
+                if ((MESSAGE_TYPE + "->" + f.getName() + ":" + f.getType()).equals(id) && AccessFlags.PUBLIC.isSet(f.getAccessFlags())) return id;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The non-Parcel NewMessageNotification constructor, whose message and thread parameters the hook reads. Without one
+     * readable message id the log couldn't tell two messages apart, so the build reports no hook.
+     */
     static List<Method> messageLogHooks(List<ClassDef> classes) {
+        if (messageIdField(classes) == null) return List.of();
         for (var cls : classes) {
             if (!NEW_MESSAGE_NOTIFICATION.equals(cls.getType())) continue;
             var ctors = new ArrayList<Method>();
