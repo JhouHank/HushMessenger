@@ -2528,7 +2528,7 @@
         },
         {
             "name": "Stop MQTT logging",
-            "description": "Stops the health reports and push logging Messenger sends over its live connection (MQTT). Messages, calls and active status share that connection and keep working. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Drops the health reports and push logging Messenger's MQTT client sends. Messenger 582 sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Privacy",
             "dependencies": [
