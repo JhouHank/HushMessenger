@@ -85,8 +85,9 @@ public final class SettingsActivity extends Activity {
     /** A font copy is running. Process-wide, like the page that shows it, which the theme switch can recreate. */
     private static final java.util.concurrent.atomic.AtomicBoolean fontBusy = new java.util.concurrent.atomic.AtomicBoolean();
     private static java.lang.ref.WeakReference<SettingsActivity> fontPage = new java.lang.ref.WeakReference<>(null);
-    private TextView fontStatus;
-    private Button fontChoose, fontPhone;
+    private TextView fontStatus, fontSize, fontShift;
+    private Button fontChoose, fontPhone, fontSmaller, fontLarger, fontUp, fontDown;
+    private LinearLayout fontAdjust;
     /** #22's control and whether it could be turned on when it was built. */
     private LinearLayout menuRowControl;
     private boolean menuRowAvailable;
@@ -151,7 +152,7 @@ public final class SettingsActivity extends Activity {
         {"save_stories", "Save any story", "Adds Save to the More options menu on other people's stories, so you can keep the photo or video on your phone.", "privacy"},
         {"material_you", "Material You theme", "Colors Messenger's dark mode with your wallpaper colors on Android 12 and newer, and a fixed blue on Android 11. Turn on dark mode in Messenger first.", "theme"},
         {"app_icons", "Unlock app icons", "Lets you pick any icon in Messenger's App icon setting without a subscription. Messenger decides whether that setting shows for you. Turning this off can bring the default icon back.", "theme"},
-        {"custom_font", "Use your own font", "Shows Messenger's text in your phone's font instead of Meta's, or in a .ttf or .otf font file you choose below. Emoji don't change. Restart Messenger to see a change.", "theme"},
+        {"custom_font", "Use your own font", "Shows Messenger's text in your phone's font instead of Meta's, or in a .ttf or .otf font file you choose below, which you can also make larger or smaller and move up or down. Emoji don't change. Restart Messenger to see a change.", "theme"},
     };
 
     static final String DRAWER_ALIAS = "app.hushmessenger.extension.SettingsLauncher";
@@ -662,7 +663,63 @@ public final class SettingsActivity extends Activity {
         fontPhone.setOnClickListener(view -> usePhoneFont());
         ui.add(content, fontPhone, 8);
         ui.add(content, ui.text(text.get("font_file_help"), 13, ui.muted, false), 8);
+        // #48: size and place the picked file, for a font that draws small or sits high in a bubble.
+        fontAdjust = new LinearLayout(this);
+        fontAdjust.setTag("font_adjust");
+        fontAdjust.setOrientation(LinearLayout.VERTICAL);
+        fontSize = ui.text("", 14, ui.text, false);
+        fontSize.setTag("font_size_value");
+        fontSmaller = ui.button(text.get("font_size_smaller"));
+        fontSmaller.setTag("font_size_smaller");
+        fontSmaller.setOnClickListener(view -> stepFont(OwnFont.SCALE_KEY, -FontFile.SCALE_STEP));
+        fontLarger = ui.button(text.get("font_size_larger"));
+        fontLarger.setTag("font_size_larger");
+        fontLarger.setOnClickListener(view -> stepFont(OwnFont.SCALE_KEY, FontFile.SCALE_STEP));
+        fontAdjustRow(fontSize, fontSmaller, fontLarger);
+        fontShift = ui.text("", 14, ui.text, false);
+        fontShift.setTag("font_shift_value");
+        fontUp = ui.button(text.get("font_shift_up_button"));
+        fontUp.setTag("font_shift_up");
+        fontUp.setOnClickListener(view -> stepFont(OwnFont.SHIFT_KEY, -FontFile.SHIFT_STEP));
+        fontDown = ui.button(text.get("font_shift_down_button"));
+        fontDown.setTag("font_shift_down");
+        fontDown.setOnClickListener(view -> stepFont(OwnFont.SHIFT_KEY, FontFile.SHIFT_STEP));
+        fontAdjustRow(fontShift, fontUp, fontDown);
+        ui.add(fontAdjust, ui.text(text.get("font_adjust_help"), 13, ui.muted, false), 8);
+        ui.add(content, fontAdjust, 4);
         refreshFontFile();
+    }
+
+    /** A value with its two step buttons beside it. The value says the change out loud as it happens. */
+    private void fontAdjustRow(TextView value, Button less, Button more) {
+        value.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        LinearLayout row = ui.row();
+        row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
+        gap.setMarginStart(ui.dp(8));
+        row.addView(less, gap);
+        row.addView(more, new LinearLayout.LayoutParams(gap));
+        ui.add(fontAdjust, row, 8);
+    }
+
+    /** Moves the size or the text one step, held inside what the font file can take. */
+    private void stepFont(String key, int step) {
+        SharedPreferences prefs = Settings.preferences;
+        boolean size = OwnFont.SCALE_KEY.equals(key);
+        int now = size ? OwnFont.scale(prefs) : OwnFont.shift(prefs);
+        int next = size ? Math.max(FontFile.SCALE_LEAST, Math.min(FontFile.SCALE_MOST, now + step))
+            : Math.max(-FontFile.SHIFT_MOST, Math.min(FontFile.SHIFT_MOST, now + step));
+        if (next == now || !prefs.edit().putInt(key, next).commit()) return;
+        refreshFontFile();
+        feedback(text.get("font_adjust_saved", size ? fontSizeText(next) : fontShiftText(next)), Toast.LENGTH_SHORT);
+    }
+
+    private String fontSizeText(int scale) {
+        return text.get("font_size", scale);
+    }
+
+    private String fontShiftText(int shift) {
+        return shift == 0 ? text.get("font_shift_none") : text.get(shift > 0 ? "font_shift_down" : "font_shift_up", Math.abs(shift));
     }
 
     private void refreshFontFile() {
@@ -679,6 +736,17 @@ public final class SettingsActivity extends Activity {
         fontPhone.setEnabled(!busy);
         // A copy no name points at still gets a way out.
         fontPhone.setVisibility(!name.isEmpty() || copy ? View.VISIBLE : View.GONE);
+        // Sizing works on the picked file, so it shows only while there is one.
+        fontAdjust.setVisibility(!name.isEmpty() && copy ? View.VISIBLE : View.GONE);
+        SharedPreferences prefs = Settings.preferences;
+        int scale = OwnFont.scale(prefs), shift = OwnFont.shift(prefs);
+        String size = fontSizeText(scale), place = fontShiftText(shift);
+        if (!size.contentEquals(fontSize.getText())) fontSize.setText(size);
+        if (!place.contentEquals(fontShift.getText())) fontShift.setText(place);
+        fontSmaller.setEnabled(!busy && scale > FontFile.SCALE_LEAST);
+        fontLarger.setEnabled(!busy && scale < FontFile.SCALE_MOST);
+        fontUp.setEnabled(!busy && shift > -FontFile.SHIFT_MOST);
+        fontDown.setEnabled(!busy && shift < FontFile.SHIFT_MOST);
     }
 
     private void pickFontFile() {
@@ -800,6 +868,7 @@ public final class SettingsActivity extends Activity {
         boolean saved = Settings.preferences.edit().putString(OwnFont.NAME_KEY, "").commit();
         java.io.File copy = FontFile.file(this);
         if (saved && copy.exists() && !copy.delete()) android.util.Log.i("HushMessenger", "The font file copy couldn't be removed");
+        if (saved) FontFile.dropAdjusted(copy.getParentFile(), null);
         refreshFontFile();
         feedback(text.get(saved ? "font_phone_set" : "font_phone_failed"), Toast.LENGTH_LONG);
     }

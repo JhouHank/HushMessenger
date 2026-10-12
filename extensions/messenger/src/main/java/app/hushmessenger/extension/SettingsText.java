@@ -319,6 +319,16 @@ final class SettingsText {
         ENGLISH.put("font_file_busy", "Couldn't start that. Try again in a moment.");
         ENGLISH.put("font_phone_set", "Back to your phone's font. Restart Messenger to see it.");
         ENGLISH.put("font_phone_failed", "Couldn't go back to your phone's font. Try again.");
+        ENGLISH.put("font_size", "Text size %1$d%%");
+        ENGLISH.put("font_size_smaller", "Smaller");
+        ENGLISH.put("font_size_larger", "Larger");
+        ENGLISH.put("font_shift_none", "Text sits where the font puts it");
+        ENGLISH.put("font_shift_down", "Text moved down %1$d%%");
+        ENGLISH.put("font_shift_up", "Text moved up %1$d%%");
+        ENGLISH.put("font_shift_up_button", "Move up");
+        ENGLISH.put("font_shift_down_button", "Move down");
+        ENGLISH.put("font_adjust_help", "If your font looks too small or sits too high or low in a message bubble, size it or move it here. Each move is 2%% of the text size. Restart Messenger to see a change.");
+        ENGLISH.put("font_adjust_saved", "%1$s. Restart Messenger to see it.");
     }
 
     static String english(String id) {

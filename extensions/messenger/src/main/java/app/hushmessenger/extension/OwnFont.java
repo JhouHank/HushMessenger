@@ -22,6 +22,22 @@ final class OwnFont {
     static final String KEY = "custom_font";
     /** The picked file's name. Empty means the phone's font. */
     static final String NAME_KEY = "custom_font_name";
+    /** #48: the picked file's size in percent, 100 as the font comes. */
+    static final String SCALE_KEY = "custom_font_scale";
+    /** #48: how far the picked file's text sits lower in the line, in percent of its size. Negative is higher. */
+    static final String SHIFT_KEY = "custom_font_shift";
+
+    /** The saved size, held to the steps the settings offer. */
+    static int scale(SharedPreferences prefs) {
+        int scale = prefs.getInt(SCALE_KEY, 100);
+        return scale < FontFile.SCALE_LEAST || scale > FontFile.SCALE_MOST ? 100 : scale;
+    }
+
+    /** The saved move, held to the steps the settings offer. */
+    static int shift(SharedPreferences prefs) {
+        int shift = prefs.getInt(SHIFT_KEY, 0);
+        return Math.abs(shift) > FontFile.SHIFT_MOST ? 0 : shift;
+    }
 
     /** The phone's sans-serif and its named weights, the families {@link #isPhoneTypeface} knows. */
     private static final String[] PHONE_SANS = {"sans-serif", "sans-serif-thin", "sans-serif-light", "sans-serif-medium", "sans-serif-black"};
@@ -192,7 +208,7 @@ final class OwnFont {
             if (prefs == null || context == null) return null;
             synchronized (OwnFont.class) {
                 font = picked;
-                if (font == null) picked = font = Picked.read(prefs.getString(NAME_KEY, ""), context);
+                if (font == null) picked = font = Picked.read(prefs.getString(NAME_KEY, ""), context, scale(prefs), shift(prefs));
             }
         }
         return font == NONE ? null : font;
@@ -218,9 +234,14 @@ final class OwnFont {
             length = file == null ? 0 : file.length();
         }
 
-        static Picked read(String name, Context context) {
+        /** The picked copy, sized and moved first when [scale] or [shift] asks. One that can't be is used as it is. */
+        static Picked read(String name, Context context, int scale, int shift) {
             if (name == null || name.isEmpty()) return NONE;
             File file = FontFile.file(context);
+            if (file.isFile() && (scale != 100 || shift != 0)) {
+                File adjusted = FontFile.adjusted(file, scale, shift);
+                if (adjusted != null) file = adjusted;
+            }
             Typeface base = null;
             if (file.isFile()) {
                 try {

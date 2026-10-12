@@ -264,6 +264,57 @@ public class CustomFontSettingsTest {
         }
     }
 
+    /** #48: a picked file can be sized and moved in steps, held to what the font file takes. */
+    @Test public void aPickedFileIsSizedAndMovedInSteps() throws Exception {
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            assertEquals("nothing picked, nothing to size", View.GONE, root.findViewWithTag("font_adjust").getVisibility());
+        }
+        OwnFontTest.pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            View root = activity.getWindow().getDecorView();
+            assertEquals(View.VISIBLE, root.findViewWithTag("font_adjust").getVisibility());
+            TextView size = root.findViewWithTag("font_size_value"), place = root.findViewWithTag("font_shift_value");
+            View smaller = root.findViewWithTag("font_size_smaller"), larger = root.findViewWithTag("font_size_larger");
+            View up = root.findViewWithTag("font_shift_up"), down = root.findViewWithTag("font_shift_down");
+            assertEquals("Text size 100%", size.getText().toString());
+            assertEquals("Text sits where the font puts it", place.getText().toString());
+
+            larger.performClick();
+            assertEquals(105, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
+            assertEquals("Text size 105%", size.getText().toString());
+            assertEquals("Text size 105%. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+            for (int step = 0; step < 20; step++) larger.performClick();
+            assertEquals(FontFile.SCALE_MOST, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
+            assertFalse(larger.isEnabled());
+            for (int step = 0; step < 20; step++) smaller.performClick();
+            assertEquals(FontFile.SCALE_LEAST, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
+            assertEquals("Text size 70%", size.getText().toString());
+            assertFalse(smaller.isEnabled());
+            assertTrue(larger.isEnabled());
+
+            up.performClick();
+            assertEquals(-2, Settings.preferences.getInt(OwnFont.SHIFT_KEY, 0));
+            assertEquals("Text moved up 2%", place.getText().toString());
+            down.performClick();
+            down.performClick();
+            assertEquals("Text moved down 2%", place.getText().toString());
+            assertEquals("Text moved down 2%. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+            for (int step = 0; step < 20; step++) down.performClick();
+            assertEquals(FontFile.SHIFT_MOST, Settings.preferences.getInt(OwnFont.SHIFT_KEY, 0));
+            assertFalse(down.isEnabled());
+            assertTrue(up.isEnabled());
+
+            // Going back to the phone's font takes the sized copies with the picked one, and the rows go.
+            File sized = FontFile.adjusted(FontFile.file(activity), 120, 0);
+            assertNotNull(sized);
+            root.findViewWithTag("font_phone").performClick();
+            assertFalse(sized.exists());
+            assertEquals(View.GONE, root.findViewWithTag("font_adjust").getVisibility());
+        }
+    }
+
     @Test public void aNameWhoseCopyIsGoneSaysSoAndKeepsTheWayBack() {
         Settings.preferences.edit().putString(OwnFont.NAME_KEY, "Gone.ttf").commit();
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {

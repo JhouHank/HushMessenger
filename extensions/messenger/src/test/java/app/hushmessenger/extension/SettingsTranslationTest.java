@@ -139,6 +139,11 @@ public class SettingsTranslationTest {
             assertEquals(locale.getKey(), List.of(), problems(locale.getValue()));
     }
 
+    /** English is what a translation that won't format falls back to, so a stray % there takes the screen down. */
+    @Test public void theEnglishTextFormats() {
+        assertEquals(List.of(), problems(englishIds()));
+    }
+
     @Test public void theCheckFindsAMissingIdAnUnknownIdEmptyTextAndAChangedPlaceholder() {
         Map<String, String> table = new HashMap<>();
         for (String[] pair : marked(englishIds())) table.put(pair[0], pair[1]);
