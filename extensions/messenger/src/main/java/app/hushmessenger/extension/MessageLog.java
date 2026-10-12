@@ -185,34 +185,48 @@ public final class MessageLog {
      * notification Messenger built for one message. Otherwise remembers this capture and returns false. Keeps its record
      * across Clear, so the second half of a message that came in before a Clear can't land after it.
      *
-     * A capture the hook had no id for falls back to its words: it repeats any capture in the chat with the same text, and
-     * a later capture with an id repeats it. So one copy of a message that arrives without an id still pairs with the
-     * other, at the cost of two same-worded messages, one of them without an id, being kept once.
+     * A capture the hook had no id for falls back to its words: it pairs with one capture in the chat with the same text
+     * that hasn't been paired yet, with or without an id, either way round. Each capture pairs once, so a third "ok" in
+     * the minute is a new message, and a message whose two copies both had the id leaves nothing to pair with.
      */
     static boolean repeated(String thread, String id, String text, long now) {
         boolean hasId = id != null && !id.isEmpty();
         // Only a digest of the words is held, and only for the window.
         String words = text == null ? "" : Integer.toHexString(text.hashCode()) + ':' + text.length();
-        String byId = thread + '\u0000' + id;
         String loose = thread + '\u0001' + words;
-        String withId = thread + '\u0002' + words;
+        String unpaired = thread + '\u0002' + words + '\u0003';
         synchronized (PENDING) {
             // A clock moved back leaves times in the future, and those can't vouch for anything either.
             RECENT.values().removeIf(at -> now - at > DUPLICATE_WINDOW_MS || at > now);
-            if (hasId ? RECENT.containsKey(byId) || RECENT.containsKey(loose)
-                    : RECENT.containsKey(loose) || RECENT.containsKey(withId)) return true;
             if (hasId) {
-                RECENT.put(byId, now);
-                RECENT.put(withId, now);
-            } else {
-                RECENT.put(loose, now);
+                String byId = thread + '\u0000' + id;
+                if (RECENT.containsKey(byId)) {
+                    RECENT.remove(unpaired + id);
+                    return true;
+                }
+                remember(byId, now);
+                if (RECENT.remove(loose) != null) return true;
+                remember(unpaired + id, now);
+                return false;
             }
-            while (RECENT.size() > 2 * MAX_ENTRIES) {
-                Iterator<String> oldest = RECENT.keySet().iterator();
-                oldest.next();
-                oldest.remove();
+            if (RECENT.remove(loose) != null) return true;
+            for (Iterator<String> keys = RECENT.keySet().iterator(); keys.hasNext(); ) {
+                if (keys.next().startsWith(unpaired)) {
+                    keys.remove();
+                    return true;
+                }
             }
+            remember(loose, now);
             return false;
+        }
+    }
+
+    private static void remember(String key, long now) {
+        RECENT.put(key, now);
+        while (RECENT.size() > 2 * MAX_ENTRIES) {
+            Iterator<String> oldest = RECENT.keySet().iterator();
+            oldest.next();
+            oldest.remove();
         }
     }
 

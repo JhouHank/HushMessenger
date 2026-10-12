@@ -220,6 +220,26 @@ public class MessageLogTest {
         assertEquals("GROUP:8", entries.get(1).thread);
     }
 
+    /** A copy without an id pairs with one capture only, so the same words sent again in that minute are all kept. */
+    @Test public void eachCopyWithoutAnIdPairsOnce() throws Exception {
+        MessageLog.storeNow("ok", "GROUP:7");
+        MessageLog.storeNow("ok", "GROUP:7", "mid.1");
+        MessageLog.storeNow("ok", "GROUP:7", "mid.2");
+        MessageLog.storeNow("ok", "GROUP:7", "mid.3");
+        MessageLog.storeNow("lol", "GROUP:7", "mid.4");
+        MessageLog.storeNow("lol", "GROUP:7");
+        MessageLog.storeNow("lol", "GROUP:7");
+        // Both copies of this one came with the id, so the copy without one after it is another message.
+        MessageLog.storeNow("yes", "GROUP:7", "mid.5");
+        MessageLog.storeNow("yes", "GROUP:7", "mid.5");
+        MessageLog.storeNow("yes", "GROUP:7");
+        List<MessageLog.Entry> entries = MessageLog.entries();
+        assertEquals(7, entries.size());
+        assertEquals(3, entries.stream().filter(entry -> entry.text.equals("ok")).count());
+        assertEquals(2, entries.stream().filter(entry -> entry.text.equals("lol")).count());
+        assertEquals(2, entries.stream().filter(entry -> entry.text.equals("yes")).count());
+    }
+
     @Test public void theSameIdAfterTheWindowIsANewCapture() {
         long start = 1_000;
         assertFalse(MessageLog.repeated("t", "mid.1", "a", start));
