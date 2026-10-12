@@ -333,6 +333,38 @@ public class AutoReplyTest {
         assertTrue(queued.isEmpty());
     }
 
+    /** The second copy of a message no reply matched stays unanswered when a matching reply is saved in between. */
+    @Test public void aReplySavedBetweenTwoCopiesDoesntAnswerTheOlderMessage() {
+        replies(false, "free", "Busy");
+        notification(CHAT);
+        AutoReply.received("lunch?", CHAT, "c.1");
+        assertEquals(0, AutoReply.pending());
+        replies(false, "lunch", "At noon");
+        AutoReply.received("lunch?", CHAT, "c.1");
+        assertEquals(0, AutoReply.pending());
+        assertTrue(queued.isEmpty());
+        AutoReply.received("lunch?", CHAT, "c.2");
+        assertEquals(1, AutoReply.pending());
+    }
+
+    /** A failure inside the check stays in the extension, so Messenger still builds the notification. */
+    @Test public void aFailingCheckNeverReachesMessenger() {
+        replies(false, "", "Away");
+        AutoReply.Scheduler working = AutoReply.scheduler;
+        java.util.function.LongSupplier clock = AutoReply.clock;
+        AutoReply.clock = () -> { throw new IllegalStateException("clock gone"); };
+        try {
+            AutoReply.received("hello", CHAT, "c.1");
+            AutoReply.clock = clock;
+            AutoReply.scheduler = (task, delayMs) -> { throw new IllegalStateException("queue gone"); };
+            AutoReply.received("hello", CHAT, "c.2");
+            assertEquals(0, AutoReply.pending());
+        } finally {
+            AutoReply.scheduler = working;
+            AutoReply.clock = clock;
+        }
+    }
+
     /**
      * Your own line with the same words doesn't hide who sent a message, and never names you. Two other people with the
      * same words leave a group unknown.

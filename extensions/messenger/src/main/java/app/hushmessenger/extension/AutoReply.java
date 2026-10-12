@@ -53,11 +53,38 @@ public final class AutoReply {
     static final class Rule {
         final String when;
         final String reply;
+        /** One whole-word pattern per phrase in [when], compiled on first use. */
+        private volatile List<Pattern> terms;
         Rule(String when, String reply) {
             this.when = when == null ? "" : when.trim();
             this.reply = reply == null ? "" : reply.trim();
         }
+
+        List<Pattern> terms() {
+            List<Pattern> compiled = terms;
+            if (compiled != null) return compiled;
+            compiled = new ArrayList<>();
+            for (String term : when.split(",")) {
+                String word = term.trim();
+                if (word.isEmpty()) continue;
+                compiled.add(Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(word) + "(?![\\p{L}\\p{N}])",
+                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE));
+            }
+            return terms = compiled;
+        }
     }
+
+    /** The saved replies text and what it parsed to, so each message doesn't parse and compile them again. */
+    private static final class Parsed {
+        final String saved;
+        final List<Rule> rules;
+        Parsed(String saved, List<Rule> rules) {
+            this.saved = saved;
+            this.rules = rules;
+        }
+    }
+
+    private static volatile Parsed parsed;
 
     private static final ScheduledExecutorService WORKER = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "HushAutoReply");
@@ -96,43 +123,49 @@ public final class AutoReply {
     }
 
     /**
-     * The hook hands each incoming message here and returns at once; the answer runs on its own thread. A message that
-     * could never be answered isn't queued, a message whose id is already queued is the same message again, and past
-     * MAX_PENDING waiting messages a new one is skipped.
+     * The hook hands each incoming message here and returns at once; the answer runs on its own thread. A message whose
+     * id was already seen is the same message again, a message that could never be answered isn't queued, and past
+     * MAX_PENDING waiting messages a new one is skipped. It runs inside Messenger's notification code, so nothing it
+     * throws gets out.
      */
     static void received(String text, String thread, String id) {
-        if (text == null || thread == null || thread.isEmpty()) return;
-        SharedPreferences prefs = Settings.preferences;
-        if (prefs != null && watched != prefs) {
-            prefs.registerOnSharedPreferenceChangeListener(CHANGES);
-            watched = prefs;
-        }
-        long now = clock.getAsLong();
-        String kept = MessageLog.clip(text, MAX_TEXT_CHARS);
-        if (!answerable(kept, thread, now) || seen(thread, id, now)) return;
-        if (PENDING.incrementAndGet() > MAX_PENDING) {
-            PENDING.decrementAndGet();
-            android.util.Log.w("HushMessenger", "auto_reply: too many messages waiting, one was skipped");
-            return;
-        }
-        long generation = GENERATION.get();
         try {
-            scheduler.schedule(() -> run(kept, thread, id, generation, true), WAIT_MS);
-        } catch (RuntimeException rejected) {
-            PENDING.decrementAndGet();
-            Settings.hookFailedPrivately(KEY, "Can't queue the auto reply", rejected);
+            if (text == null || thread == null || thread.isEmpty()) return;
+            SharedPreferences prefs = Settings.preferences;
+            if (prefs != null && watched != prefs) {
+                prefs.registerOnSharedPreferenceChangeListener(CHANGES);
+                watched = prefs;
+            }
+            if (prefs == null || !Settings.wouldUse(KEY)) return;
+            if (!oneToOne(thread) && !prefs.getBoolean(GROUPS, false)) return;
+            long now = clock.getAsLong();
+            String kept = MessageLog.clip(text, MAX_TEXT_CHARS);
+            // Seen before the reply check, so the second copy of a message nothing answered can't get an answer from a
+            // reply saved in between.
+            if (seen(thread, id, now) || !answerable(prefs, kept, thread, now)) return;
+            if (PENDING.incrementAndGet() > MAX_PENDING) {
+                PENDING.decrementAndGet();
+                android.util.Log.w("HushMessenger", "auto_reply: too many messages waiting, one was skipped");
+                return;
+            }
+            long generation = GENERATION.get();
+            try {
+                scheduler.schedule(() -> run(kept, thread, id, generation, true), WAIT_MS);
+            } catch (RuntimeException rejected) {
+                PENDING.decrementAndGet();
+                Settings.hookFailedPrivately(KEY, "Can't queue the auto reply", rejected);
+            }
+        } catch (Throwable failure) {
+            Settings.hookFailedPrivately(KEY, "Can't read the message for an auto reply", failure);
         }
     }
 
     /**
-     * The cheap half of [attempt], checked before a message takes a place in the queue: on, a chat it may answer, not
-     * cooling down, and a reply that matches. A burst of messages that fail here can't crowd out one that passes. The
-     * queued run checks all of it again.
+     * The cheap half of [attempt], checked before a message takes a place in the queue: not cooling down, and a reply
+     * that matches. A burst of messages that fail here can't crowd out one that passes. The queued run checks all of it
+     * again.
      */
-    private static boolean answerable(String text, String thread, long now) {
-        SharedPreferences prefs = Settings.preferences;
-        if (prefs == null || !Settings.wouldUse(KEY)) return false;
-        if (!oneToOne(thread) && !prefs.getBoolean(GROUPS, false)) return false;
+    private static boolean answerable(SharedPreferences prefs, String text, String thread, long now) {
         Long last = lastReply.get(thread);
         if (last != null && now - last < COOLDOWN_MS && last <= now) return false;
         List<Rule> rules = rules(prefs);
@@ -242,13 +275,7 @@ public final class AutoReply {
         for (Rule rule : rules) {
             if (rule.reply.isEmpty()) continue;
             if (rule.when.isEmpty()) return rule;
-            for (String term : rule.when.split(",")) {
-                String word = term.trim();
-                if (word.isEmpty()) continue;
-                Pattern pattern = Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(word) + "(?![\\p{L}\\p{N}])",
-                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
-                if (pattern.matcher(text).find()) return rule;
-            }
+            for (Pattern pattern : rule.terms()) if (pattern.matcher(text).find()) return rule;
         }
         return null;
     }
@@ -264,6 +291,8 @@ public final class AutoReply {
     static List<Rule> rules(SharedPreferences prefs) {
         String saved = prefs.getString(RULES, null);
         if (saved == null || saved.isEmpty()) return Collections.emptyList();
+        Parsed last = parsed;
+        if (last != null && last.saved.equals(saved)) return last.rules;
         List<Rule> rules = new ArrayList<>();
         try {
             JSONArray array = new JSONArray(saved);
@@ -276,7 +305,9 @@ public final class AutoReply {
         } catch (JSONException damaged) {
             return Collections.emptyList();
         }
-        return rules;
+        List<Rule> kept = Collections.unmodifiableList(rules);
+        parsed = new Parsed(saved, kept);
+        return kept;
     }
 
     /** Keeps replies with text, trimmed and cut to size, at most [MAX_RULES]. Returns how many were kept. */
