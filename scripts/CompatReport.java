@@ -196,6 +196,7 @@ public class CompatReport {
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));
         PATCHES.put("Stop ad attribution uploads", List.of("attribution_uploads"));
         PATCHES.put("Stop inbox and ad link logging", List.of("ad_events"));
+        PATCHES.put("Stop MQTT logging", List.of("mqtt_telemetry"));
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
@@ -2650,6 +2651,83 @@ public class CompatReport {
         return events;
     }
 
+    static Set<String> literals(Method method) {
+        var strings = new HashSet<String>();
+        for (var i : instructions(method))
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
+        return strings;
+    }
+
+    /** The publish's not-connected answer: the first sget-object after "not_connected", returned at once, of its own class. */
+    static boolean hasNotSentAnswer(List<Instruction> code) {
+        int logged = -1;
+        for (int i = 0; i < code.size(); i++) {
+            if (!(code.get(i) instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr &&
+                "not_connected".equals(sr.getString()))) continue;
+            if (logged >= 0) return false;
+            logged = i;
+        }
+        if (logged < 0) return false;
+        for (int i = logged + 1; i < code.size() - 1; i++) {
+            if (code.get(i).getOpcode() != Opcode.SGET_OBJECT) continue;
+            if (!(((ReferenceInstruction) code.get(i)).getReference() instanceof FieldReference field)) return false;
+            return code.get(i + 1).getOpcode() == Opcode.RETURN_OBJECT && register(code.get(i + 1)) == register(code.get(i)) &&
+                field.getType().equals(field.getDefiningClass());
+        }
+        return false;
+    }
+
+    /** One iget-boolean tested by the next if-eqz whose false branch is the plain ping, a static (own class, X)V call. */
+    static boolean hasHealthKeepaliveFlag(Method method) {
+        var code = instructions(method);
+        int topic = -1;
+        for (int i = 0; i < code.size() && topic < 0; i++)
+            if (code.get(i) instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr &&
+                "/mqtt_health_stats".equals(sr.getString())) topic = i;
+        int sites = 0;
+        for (int at = 0; at < topic; at++) {
+            if (code.get(at).getOpcode() != Opcode.IGET_BOOLEAN || code.get(at + 1).getOpcode() != Opcode.IF_EQZ ||
+                ((TwoRegisterInstruction) code.get(at)).getRegisterA() != register(code.get(at + 1))) continue;
+            for (int target = 0; target < code.size(); target++) {
+                if (!jumpsTo(code, at + 1, target)) continue;
+                if (code.get(target).getOpcode() == Opcode.INVOKE_STATIC &&
+                    ((ReferenceInstruction) code.get(target)).getReference() instanceof MethodReference ping &&
+                    ping.getDefiningClass().equals(method.getDefiningClass()) && "V".equals(ping.getReturnType()) &&
+                    ping.getParameterTypes().size() == 2 && ping.getParameterTypes().get(0).toString().equals(method.getDefiningClass())) sites++;
+                break;
+            }
+        }
+        return sites == 1;
+    }
+
+    /**
+     * mqtt_telemetry: the MQTT client's instance publish (two callbacks, Integer, String, String, [B, I, J) that names
+     * exception/publish, not_connected and /mqtt_health_stats and returns a singleton when not connected, and the same
+     * class's instance (String)V keepalive that names exception/send_keepalive and /mqtt_health_stats and picks the plain
+     * ping on one config flag. Both or neither. Mirrors MqttTelemetry.kt.
+     */
+    static List<Method> mqttTelemetry(List<ClassDef> classes) {
+        var publish = new ArrayList<Method>();
+        var keepalive = new ArrayList<Method>();
+        var tail = List.of("Ljava/lang/Integer;", "Ljava/lang/String;", "Ljava/lang/String;", "[B", "I", "J");
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || AccessFlags.STATIC.isSet(method.getAccessFlags())) continue;
+            var params = new ArrayList<String>();
+            for (var t : method.getParameterTypes()) params.add(t.toString());
+            var strings = literals(method);
+            if (params.size() == 8 && method.getReturnType().startsWith("L") && params.get(0).startsWith("L") &&
+                params.get(1).startsWith("L") && params.subList(2, 8).equals(tail) &&
+                strings.containsAll(List.of("exception/publish", "not_connected", "/mqtt_health_stats")) &&
+                hasNotSentAnswer(instructions(method))) publish.add(method);
+            if (params.equals(List.of("Ljava/lang/String;")) && "V".equals(method.getReturnType()) &&
+                strings.containsAll(List.of("exception/send_keepalive", "/mqtt_health_stats")) &&
+                hasHealthKeepaliveFlag(method)) keepalive.add(method);
+        }
+        if (publish.size() != 1 || keepalive.size() != 1 ||
+            !publish.get(0).getDefiningClass().equals(keepalive.get(0).getDefiningClass())) return List.of();
+        return List.of(publish.get(0), keepalive.get(0));
+    }
+
     static Map<String, List<Method>> findControls(List<ClassDef> classes) {
         var found = new LinkedHashMap<String, List<Method>>();
         for (var key : CONTROL_KEYS) found.put(key, new ArrayList<>());
@@ -2672,6 +2750,7 @@ public class CompatReport {
         found.get("analytics_uploads").addAll(xanalyticsUploadTimers(classes));
         found.get("attribution_uploads").addAll(attributionUploads(classes));
         found.get("ad_events").addAll(adEvents(classes));
+        found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));
         found.get("system_camera").addAll(systemCameraLaunches(classes));

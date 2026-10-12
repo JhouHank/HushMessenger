@@ -5,6 +5,7 @@
 ### New
 
 - [#43](https://github.com/SysAdminDoc/HushMessenger/issues/43) **Hide People tab** and **Hide Notifications tab** are new Navigation switches. Each one takes its tab out of the bar at the bottom once Messenger restarts, and both start off.
+- [#44](https://github.com/SysAdminDoc/HushMessenger/issues/44) **Stop MQTT logging** is a new Privacy switch that starts off. Messenger's live connection also carries a health report and some push logging, and this stops both. Messages, calls and active status ride the same connection and keep working. When Messenger was sending the health report as its keepalive, it sends its own plain ping instead.
 
 ## 0.23.0 (2026-10-11)
 

@@ -150,6 +150,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ANALYTICS_UPLOADS -> method.validateAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.validateAttributionUpload()
             AD_EVENTS -> method.validateAdEvent()
+            MQTT_TELEMETRY -> method.validateMqttTelemetry()
             MESSAGE_LOG, AUTO_REPLY -> method.validateMessageLog()
             "original_photo" -> method.validateOriginalPhoto()
             ORIGINAL_VIDEO -> method.validateOriginalVideo()
@@ -204,6 +205,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ANALYTICS_UPLOADS -> method.injectAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
             AD_EVENTS -> method.injectAdEvent()
+            MQTT_TELEMETRY -> method.injectMqttTelemetry()
             MESSAGE_LOG -> method.injectMessageLog()
             AUTO_REPLY -> method.injectAutoReply()
             "original_photo" -> method.injectOriginalPhoto()
@@ -388,6 +390,9 @@ val stopAttributionUploadsPatch = controlPatch("attribution_uploads", "Stop ad a
 @Suppress("unused")
 val stopAdEventsPatch = controlPatch("ad_events", "Stop inbox and ad link logging",
     "Stops two reports Messenger logs. One says which part of your chat list was on screen, which Messenger files under inbox ads. The other says which ad brought you in when a link from an ad opens a chat.", "Privacy")
+@Suppress("unused")
+val stopMqttLoggingPatch = controlPatch("mqtt_telemetry", "Stop MQTT logging",
+    "Stops the health reports and push logging Messenger sends over its live connection (MQTT). Messages, calls and active status share that connection and keep working.", "Privacy")
 @Suppress("unused")
 val allowScreenshotPatch = controlPatch("allow_screenshot", "Allow screenshots", "Lets you screenshot protected chat media, such as view-once photos and Quicksnap, and stops screenshot notices. It doesn't add replay or saving.", "Privacy", "allow_screenshot", "screenshot_viewers")
 @Suppress("unused")

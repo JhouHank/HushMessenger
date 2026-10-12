@@ -139,6 +139,10 @@ internal val BASE_PROFILE = ControlProfile(
         ),
         "message_log" to setOf("Lcom/facebook/messaging/notify/type/NewMessageNotification;-><init>(Lcom/facebook/messaging/accountswitch/model/MessengerAccountType;Lcom/facebook/messaging/model/messages/Message;Lcom/facebook/messaging/model/threads/ThreadSummary;LX/97O;LX/5gg;Lcom/facebook/messaging/push/flags/ServerMessageAlertFlags;Lcom/facebook/push/constants/PushProperty;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZZZZZZZ)V"),
         "moments" to setOf("LX/WRi;->A05()Z", "LX/WWJ;->A05()Z"),
+        "mqtt_telemetry" to setOf(
+            "LX/0bI;->A0N(Ljava/lang/String;)V",
+            "LX/0bI;->A0R(LX/0gz;LX/0gP;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;[BIJ)LX/0in;",
+        ),
         "original_photo" to setOf(
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B",
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V",
@@ -300,6 +304,10 @@ internal val PROFILE_346415706 = ControlProfile(
         ),
         "message_log" to setOf("Lcom/facebook/messaging/notify/type/NewMessageNotification;-><init>(Lcom/facebook/messaging/accountswitch/model/MessengerAccountType;Lcom/facebook/messaging/model/messages/Message;Lcom/facebook/messaging/model/threads/ThreadSummary;LX/96C;LX/5f8;Lcom/facebook/messaging/push/flags/ServerMessageAlertFlags;Lcom/facebook/push/constants/PushProperty;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZZZZZZZ)V"),
         "moments" to setOf("LX/HEJ;->A05()Z", "LX/HPh;->A05()Z"),
+        "mqtt_telemetry" to setOf(
+            "LX/0bI;->A0N(Ljava/lang/String;)V",
+            "LX/0bI;->A0R(LX/0gz;LX/0gP;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;[BIJ)LX/0in;",
+        ),
         "original_photo" to setOf(
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B",
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V",

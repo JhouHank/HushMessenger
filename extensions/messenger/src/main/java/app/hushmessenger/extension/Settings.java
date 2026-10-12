@@ -303,6 +303,35 @@ public final class Settings {
     public static boolean stopAttributionUploads() { return enabled("attribution_uploads"); }
     /** Asked before the inbox visibility event and the ad deep link's entry event are logged; true drops that one event. */
     public static boolean stopAdEvents() { return enabled("ad_events"); }
+
+    static final String MQTT_TELEMETRY = "mqtt_telemetry";
+    /** The topics Messenger publishes its own connection logging on. Messages, typing and presence use other topics. */
+    static final Set<String> MQTT_TELEMETRY_TOPICS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("/mqtt_health_stats", "/fbns_exp_logging")));
+    /**
+     * Asked before every publish on Messenger's MQTT connection. True drops a logging publish as if the connection were
+     * down, which the health report's senders shrug off. Every other topic, and every topic while the switch is off,
+     * goes out as before. A failure here sends the publish, since this sits in front of every message too.
+     */
+    public static boolean dropMqttPublish(String topic) {
+        try {
+            return topic != null && MQTT_TELEMETRY_TOPICS.contains(topic) && enabled(MQTT_TELEMETRY);
+        } catch (RuntimeException error) {
+            hookFailed(MQTT_TELEMETRY, "Can't check an MQTT publish", error);
+            return false;
+        }
+    }
+    /**
+     * Messenger's config can make the keepalive send the health report instead of a plain ping. With the switch on the
+     * keepalive keeps to the plain ping, so the connection stays up without the report.
+     */
+    public static boolean mqttHealthKeepalive(boolean healthReport) {
+        try {
+            return healthReport && !enabled(MQTT_TELEMETRY);
+        } catch (RuntimeException error) {
+            hookFailed(MQTT_TELEMETRY, "Can't check the MQTT keepalive", error);
+            return healthReport;
+        }
+    }
     /** Asked each time a chat's swipe up for disappearing messages could start; true keeps the gesture from starting. */
     public static boolean blockDisappearingSwipe() { return enabled("disappearing_swipe"); }
     /** Messenger's own original-upload check allows 25 MB, so a bigger video keeps its re-encode. */
