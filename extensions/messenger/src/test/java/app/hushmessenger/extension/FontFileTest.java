@@ -435,6 +435,32 @@ public class FontFileTest {
                 ByteBuffer.wrap(both).getShort(hhea + 4));
     }
 
+    /** #48: hhea or OS/2 metrics left at zero tell the reader to look at the next pair, so a move keeps them at zero. */
+    @Test
+    public void aMoveLeavesMetricsTheFontLeftUnsetAtZero() throws Exception {
+        byte[] plain = font(STATIC_FONT);
+        int head = table(plain, 0, "head"), hhea = table(plain, 0, "hhea"), os2 = table(plain, 0, "OS/2");
+        ByteBuffer.wrap(plain).putShort(hhea + 4, (short) 0).putShort(hhea + 6, (short) 0);
+        ByteBuffer before = ByteBuffer.wrap(plain.clone());
+        assertTrue("the control: typo metrics are set", before.getShort(os2 + 68) != 0);
+        byte[] lower = plain.clone();
+        assertTrue(FontFile.adjust(lower, 100, 10));
+        ByteBuffer moved = ByteBuffer.wrap(lower);
+        int units = Math.round((before.getShort(head + 18) & 0xFFFF) * 10 / 100f);
+        assertEquals(0, moved.getShort(hhea + 4));
+        assertEquals(0, moved.getShort(hhea + 6));
+        assertEquals(before.getShort(os2 + 68) + units, moved.getShort(os2 + 68));
+        assertEquals(before.getShort(head + 42) + units, moved.getShort(head + 42));
+
+        ByteBuffer.wrap(plain).putShort(os2 + 68, (short) 0).putShort(os2 + 70, (short) 0);
+        lower = plain.clone();
+        assertTrue(FontFile.adjust(lower, 100, 10));
+        moved = ByteBuffer.wrap(lower);
+        assertEquals(0, moved.getShort(os2 + 68));
+        assertEquals(0, moved.getShort(os2 + 70));
+        assertEquals("the win pair still moves", (before.getShort(os2 + 74) & 0xFFFF) + units, moved.getShort(os2 + 74) & 0xFFFF);
+    }
+
     @Test
     public void aSizeOrMoveTheFontCantTakeLeavesItAlone() throws Exception {
         byte[] plain = font(STATIC_FONT);
@@ -502,9 +528,17 @@ public class FontFileTest {
         assertFalse(smaller.exists());
         assertEquals("no partial file is left", Arrays.asList(FontFile.NAME, repicked.getName()), sorted(folder.getRoot().list()));
 
+        // Another process's copy still being written stays. One a crash left behind goes once it's old.
+        File writing = File.createTempFile(FontFile.SIZING + "-", null, folder.getRoot());
+        File abandoned = File.createTempFile(FontFile.SIZING + "-", null, folder.getRoot());
+        Files.setLastModifiedTime(abandoned.toPath(),
+                java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - FontFile.SIZING_STALE_MS - 60_000));
         FontFile.dropAdjusted(folder.getRoot(), null);
         assertFalse(repicked.exists());
         assertTrue(source.exists());
+        assertTrue(writing.exists());
+        assertFalse(abandoned.exists());
+        assertTrue(writing.delete());
         assertNull(FontFile.adjusted(new File(folder.getRoot(), "not-there"), 125, 0));
         File words = new File(folder.newFolder("words"), FontFile.NAME);
         Files.write(words.toPath(), "not a font at all, only words".getBytes(StandardCharsets.UTF_8));

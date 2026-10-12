@@ -240,18 +240,22 @@ final class OwnFont {
             File file = FontFile.file(context);
             if (file.isFile() && (scale != 100 || shift != 0)) {
                 File adjusted = FontFile.adjusted(file, scale, shift);
-                if (adjusted != null) file = adjusted;
+                Typeface sized = adjusted == null ? null : build(adjusted);
+                if (sized != null) return new Picked(adjusted, sized);
+            } else if (file.isFile()) {
+                FontFile.dropAdjusted(file.getParentFile(), null);
             }
-            Typeface base = null;
-            if (file.isFile()) {
-                try {
-                    base = new Typeface.Builder(file).build();
-                } catch (RuntimeException failure) {
-                    base = null;
-                }
-            }
+            Typeface base = file.isFile() ? build(file) : null;
             if (base == null) android.util.Log.w("HushMessenger", "custom_font: the picked font file is missing or didn't load, so the phone's font is used");
             return new Picked(file, base);
+        }
+
+        private static Typeface build(File file) {
+            try {
+                return new Typeface.Builder(file).build();
+            } catch (RuntimeException failure) {
+                return null;
+            }
         }
 
         /** The copy at [weight] and [italic], or null when it has nothing to build. */

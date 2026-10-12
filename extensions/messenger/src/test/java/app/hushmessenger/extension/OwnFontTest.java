@@ -415,6 +415,35 @@ public class OwnFontTest {
         assertEquals(ink(cjk, CJK, drawn), ink(larger, CJK, 60));
     }
 
+    /** #48: a sized copy that Android won't load leaves the picked file as it comes, not the phone's font. */
+    @Test public void aSizedCopyThatWontLoadIsThePickedFileAsItComes() throws Exception {
+        File copy = pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        Typeface rubik = new Typeface.Builder(copy).build();
+        // A file under the copy's own name and length is taken as finished, so this broken one is what gets loaded.
+        byte[] broken = new byte[(int) copy.length()];
+        broken[1] = 1;
+        File sized = new File(copy.getParentFile(), FontFile.ADJUSTED + "-125-" + FontFile.SHIFT_MOST + "-"
+            + Long.toHexString(copy.lastModified()) + "-" + copy.length());
+        Files.write(sized.toPath(), broken);
+        assertEquals("the control: the broken copy is the one sizing hands back", sized, FontFile.adjusted(copy, 125, 0));
+        choose(125, 0);
+        Typeface used = OwnFont.typeface(400, false);
+        assertEquals(copy, OwnFont.picked().file);
+        assertEquals(width(rubik, LATIN, 60), width(used, LATIN, 60), 0.01f);
+        assertEquals(ink(rubik, LATIN), ink(used, LATIN));
+    }
+
+    /** #48: back at 100% with no move, the sized copies go. */
+    @Test public void noSizeOrMoveRemovesTheSizedCopies() throws Exception {
+        File copy = pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        File sized = FontFile.adjusted(copy, 125, 4);
+        assertNotNull(sized);
+        choose(100, 0);
+        assertNotNull(OwnFont.typeface(400, false));
+        assertEquals(copy, OwnFont.picked().file);
+        assertFalse(sized.exists());
+    }
+
     @Test public void aSavedSizeOrMoveOffTheStepsIsTheFontAsItComes() {
         assertEquals(100, OwnFont.scale(Settings.preferences));
         assertEquals(0, OwnFont.shift(Settings.preferences));

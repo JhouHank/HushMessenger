@@ -38,6 +38,9 @@ final class FontFile {
 
     /** #48: the picked font's size in percent, and how far its text sits lower in the line, in percent of that size. */
     static final String ADJUSTED = NAME + "-adjusted";
+    /** A copy still being written. Another process only removes one this old, so it never pulls one out from under a writer. */
+    static final String SIZING = NAME + "-sizing";
+    static final long SIZING_STALE_MS = 10 * 60_000L;
     static final int SCALE_LEAST = 70, SCALE_MOST = 160, SCALE_STEP = 5;
     static final int SHIFT_MOST = 20, SHIFT_STEP = 2;
     private static final int MAX_TABLES = 512;
@@ -267,21 +270,23 @@ final class FontFile {
             byte[] font = Files.readAllBytes(source.toPath());
             if (!adjust(font, scale, shift)) return null;
             // Each of Messenger's processes can get here at once, so each writes its own partial file.
-            partial = File.createTempFile(ADJUSTED + "-part", null, folder);
+            partial = File.createTempFile(SIZING + "-", null, folder);
             Files.write(partial.toPath(), font);
             Files.move(partial.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
             return target;
-        } catch (IOException | RuntimeException failure) {
+        } catch (IOException | RuntimeException | OutOfMemoryError failure) {
             if (partial != null) partial.delete();
             android.util.Log.w("HushMessenger", "custom_font: couldn't size the font file: " + failure.getClass().getSimpleName());
             return null;
         }
     }
 
-    /** Removes the sized copies and partial files other than [keep], or all of them when it's null. */
+    /** Removes the sized copies other than [keep], or all of them when it's null, and partial files left behind by a crash. */
     static void dropAdjusted(File folder, String keep) {
-        String prefix = ADJUSTED + "-";
-        File[] found = folder == null ? null : folder.listFiles((dir, file) -> file.startsWith(prefix) && !file.equals(keep));
+        String prefix = ADJUSTED + "-", sizing = SIZING + "-";
+        long abandoned = System.currentTimeMillis() - SIZING_STALE_MS;
+        File[] found = folder == null ? null : folder.listFiles((dir, file) -> file.startsWith(prefix) && !file.equals(keep)
+                || file.startsWith(sizing) && new File(dir, file).lastModified() < abandoned);
         if (found != null) for (File stale : found) stale.delete();
     }
 
@@ -318,9 +323,13 @@ final class FontFile {
             int units = Math.round(upem * 100f / scale);
             if (upem < 16 || units < 16 || units > 16384) return false;
             int move = Math.round(units * shift / 100f);
-            int[][] signed = {{head + 38, move}, {head + 42, move}, {hhea + 4, move}, {hhea + 6, move}};
-            int[][] typo = os2 < 0 ? new int[0][] : new int[][] {{os2 + 68, move}, {os2 + 70, move}};
-            int[][] win = os2 < 0 ? new int[0][] : new int[][] {{os2 + 74, move}, {os2 + 76, -move}};
+            // A pair left at zero means "not set", and the reader falls back to the next pair, so it stays zero.
+            int hheaMove = unset(bytes, hhea + 4, hhea + 6) ? 0 : move;
+            int typoMove = os2 < 0 || unset(bytes, os2 + 68, os2 + 70) ? 0 : move;
+            int winMove = os2 < 0 || unset(bytes, os2 + 74, os2 + 76) ? 0 : move;
+            int[][] signed = {{head + 38, move}, {head + 42, move}, {hhea + 4, hheaMove}, {hhea + 6, hheaMove}};
+            int[][] typo = os2 < 0 ? new int[0][] : new int[][] {{os2 + 68, typoMove}, {os2 + 70, typoMove}};
+            int[][] win = os2 < 0 ? new int[0][] : new int[][] {{os2 + 74, winMove}, {os2 + 76, -winMove}};
             for (int[][] group : new int[][][] {signed, typo})
                 for (int[] field : group) if (!fits(bytes.getShort(field[0]) + field[1], Short.MIN_VALUE, Short.MAX_VALUE)) return false;
             for (int[] field : win) if (!fits((bytes.getShort(field[0]) & 0xFFFF) + field[1], 0, 0xFFFF)) return false;
@@ -331,6 +340,10 @@ final class FontFile {
         } catch (IndexOutOfBoundsException truncated) {
             return false;
         }
+    }
+
+    private static boolean unset(java.nio.ByteBuffer bytes, int first, int second) {
+        return bytes.getShort(first) == 0 && bytes.getShort(second) == 0;
     }
 
     private static boolean fits(int value, int least, int most) {
