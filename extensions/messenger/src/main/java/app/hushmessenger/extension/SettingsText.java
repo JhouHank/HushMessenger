@@ -125,6 +125,7 @@ final class SettingsText {
         ENGLISH.put("unavailable", "Not available on this version of Android. Your choice is saved.");
         ENGLISH.put("camera_unsupported", "This install has no screen for opening the phone's camera app, so the chat camera stays Messenger's own. Root Mount installs can't add one. Your choice is saved.");
         ENGLISH.put("text_style_unsupported", "This install has no Bold and Italic entries for the text menu. Root Mount installs can't add them. Your choice is saved.");
+        ENGLISH.put("text_style_read_only", "Bold and Italic only work on text you're typing.");
         ENGLISH.put("bubble_stock", "Stock");
         ENGLISH.put("bubble_chat_heads", "Chat heads");
         ENGLISH.put("bubble_native", "Native Bubbles");

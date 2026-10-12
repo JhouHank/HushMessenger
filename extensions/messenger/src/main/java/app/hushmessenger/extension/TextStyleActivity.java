@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.widget.Toast;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +42,18 @@ public final class TextStyleActivity extends Activity {
             Settings.hookFailedPrivately(KEY, "Can't style the selected text", error);
         }
         if (styled != null) setResult(RESULT_OK, new Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, styled));
-        else setResult(RESULT_CANCELED);
+        else {
+            setResult(RESULT_CANCELED);
+            // Android offers the entries over text you can't edit too, like a received message, so say why nothing changed.
+            if (readOnly(getIntent()) && Settings.enabled(KEY)) {
+                Toast.makeText(getApplicationContext(), new SettingsText(this).get("text_style_read_only"), Toast.LENGTH_SHORT).show();
+            }
+        }
         finish();
+    }
+
+    static boolean readOnly(Intent intent) {
+        return intent != null && intent.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false);
     }
 
     /** What the menu entry this intent came through makes of its selection, or null to leave the text as it is. */
@@ -52,7 +63,7 @@ public final class TextStyleActivity extends Activity {
             : ITALIC.equals(entry.getClassName()) ? ITALIC_STYLE : 0;
         CharSequence selected = style == 0 ? null : intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
         // A read-only selection has nowhere to put the result.
-        if (selected == null || intent.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false)) return null;
+        if (selected == null || readOnly(intent)) return null;
         String styled = restyle(selected, style);
         return styled != null && Settings.enabled(KEY) ? styled : null;
     }
@@ -99,6 +110,8 @@ public final class TextStyleActivity extends Activity {
                 marks += new String(Character.toChars(mark));
                 next += Character.charCount(mark);
             }
+            // A digit with the emoji selector or a keycap is an emoji like 1️⃣, and a styled digit would break it.
+            if (marks.indexOf('️') >= 0 || marks.indexOf('⃣') >= 0) found = null;
             pieces.add(found == null ? new Piece(text.substring(at, next), -1, 0, "")
                 : new Piece(text.substring(at, next), found[0], found[1], marks));
             at = next;
