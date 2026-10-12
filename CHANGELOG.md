@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
+
 ### Settings
 
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
@@ -10,6 +12,7 @@
 
 ### Checks
 
+- Completed the remaining attribution-upload checks using the released build's device evidence.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
 
 ### New
