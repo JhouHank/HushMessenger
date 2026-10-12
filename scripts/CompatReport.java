@@ -2668,9 +2668,51 @@ public class CompatReport {
             var strings = new HashSet<String>();
             for (var i : method.getImplementation().getInstructions())
                 if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
-            if (strings.contains("MARK_THREAD_AS_SEEN_JOB") && strings.contains("broadcast_message_seen_internal")) seen.add(method);
+            if (strings.contains("MARK_THREAD_AS_SEEN_JOB") && strings.contains("broadcast_message_seen_internal") && seenThreadStore(cls))
+                seen.add(method);
         }
         return seen;
+    }
+
+    static final String THREAD_KEY = "Lcom/facebook/messaging/model/threadkey/ThreadKey;";
+
+    /**
+     * The seen hook reads the chat from the handler's own ThreadKey field, which ReadReceipts.kt's
+     * resolveReadReceiptThreadFields takes as the class's one public final ThreadKey field, stored once by its
+     * (FbUserSession, ThreadKey, ...) constructor straight from that parameter into this. Mirrored so a changed field or
+     * constructor shows up here instead of at patch time.
+     */
+    static boolean seenThreadStore(ClassDef owner) {
+        Field field = null;
+        for (var f : owner.getFields()) {
+            if (!THREAD_KEY.equals(f.getType()) || !AccessFlags.PUBLIC.isSet(f.getAccessFlags()) || !AccessFlags.FINAL.isSet(f.getAccessFlags())) continue;
+            if (field != null) return false;
+            field = f;
+        }
+        if (field == null) return false;
+        Method ctor = null;
+        for (var m : owner.getMethods()) {
+            var p = m.getParameterTypes();
+            if (!"<init>".equals(m.getName()) || m.getImplementation() == null || p.size() < 2 ||
+                    !"Lcom/facebook/auth/usersession/FbUserSession;".contentEquals(p.get(0)) || !THREAD_KEY.contentEquals(p.get(1))) continue;
+            if (ctor != null) return false;
+            ctor = m;
+        }
+        if (ctor == null) return false;
+        int parameterRegisters = 1;
+        for (var t : ctor.getParameterTypes()) parameterRegisters += t.charAt(0) == 'J' || t.charAt(0) == 'D' ? 2 : 1;
+        int self = ctor.getImplementation().getRegisterCount() - parameterRegisters;
+        int stores = 0;
+        boolean direct = false;
+        for (var i : ctor.getImplementation().getInstructions()) {
+            if (i.getOpcode() != Opcode.IPUT_OBJECT || !(((ReferenceInstruction) i).getReference() instanceof FieldReference ref) ||
+                    !owner.getType().equals(ref.getDefiningClass()) || !field.getName().equals(ref.getName()) || !field.getType().equals(ref.getType()))
+                continue;
+            stores++;
+            var registers = (TwoRegisterInstruction) i;
+            direct = registers.getRegisterA() == self + 2 && registers.getRegisterB() == self;
+        }
+        return stores == 1 && direct;
     }
 
     static List<Method> replyReadDispatches(List<ClassDef> classes) {
@@ -2684,10 +2726,40 @@ public class CompatReport {
                 var strings = new HashSet<String>();
                 for (var i : method.getImplementation().getInstructions())
                     if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
-                if (strings.contains("AdapterSender") && strings.contains("meta_ai_invocation")) events.add(method);
+                if (strings.contains("AdapterSender") && strings.contains("meta_ai_invocation") && replyReadShape(method)) events.add(method);
             }
         }
         return events;
+    }
+
+    /**
+     * reply_read injects at fixed indices, so ReadReceipts.kt's validateReplyRead pins the method's shape. The same
+     * outline is checked here, so a changed body shows up as unresolved instead of passing until patch time: 36
+     * registers, 402 instructions, the typed ThreadKey getter on p7's type at 33 with its result in v12, v12 taking
+     * v10 at 237, and at 239 the five-argument dispatch on p4's type that starts with the FbUserSession and ends with
+     * two Strings. The dataflow proof stays in the patch.
+     */
+    static boolean replyReadShape(Method method) {
+        var impl = method.getImplementation();
+        if (impl == null || impl.getRegisterCount() != 36) return false;
+        var code = new ArrayList<Instruction>();
+        impl.getInstructions().forEach(code::add);
+        if (code.size() != 402) return false;
+        var params = method.getParameterTypes();
+        if (code.get(33).getOpcode() != Opcode.INVOKE_INTERFACE_RANGE || !(code.get(33) instanceof ReferenceInstruction g) ||
+                !(g.getReference() instanceof MethodReference getter) || !params.get(7).toString().equals(getter.getDefiningClass()) ||
+                !getter.getParameterTypes().isEmpty() || !"Lcom/facebook/messaging/model/threadkey/ThreadKey;".equals(getter.getReturnType()))
+            return false;
+        if (code.get(34).getOpcode() != Opcode.MOVE_RESULT_OBJECT || ((OneRegisterInstruction) code.get(34)).getRegisterA() != 12) return false;
+        if (code.get(237).getOpcode() != Opcode.MOVE_OBJECT || ((TwoRegisterInstruction) code.get(237)).getRegisterA() != 12 ||
+                ((TwoRegisterInstruction) code.get(237)).getRegisterB() != 10) return false;
+        if (code.get(239).getOpcode() != Opcode.INVOKE_INTERFACE_RANGE || !(code.get(239) instanceof ReferenceInstruction d) ||
+                !(d.getReference() instanceof MethodReference dispatch) || !params.get(4).toString().equals(dispatch.getDefiningClass()) ||
+                !"V".equals(dispatch.getReturnType())) return false;
+        var types = dispatch.getParameterTypes();
+        return types.size() == 5 && "Lcom/facebook/auth/usersession/FbUserSession;".contentEquals(types.get(0)) &&
+            "Ljava/lang/String;".contentEquals(types.get(3)) && "Ljava/lang/String;".contentEquals(types.get(4)) &&
+            ((RegisterRangeInstruction) code.get(239)).getStartRegister() == 11 && ((RegisterRangeInstruction) code.get(239)).getRegisterCount() == 6;
     }
 
     static final String LAT_STATUS_JOB = "Lcom/facebook/attribution/LatStatusJob;";
