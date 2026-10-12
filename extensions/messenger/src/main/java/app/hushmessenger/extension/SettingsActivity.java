@@ -1349,6 +1349,8 @@ public final class SettingsActivity extends Activity {
     private Button messageLogClear;
     private long messageLogGeneration;
     private boolean messageLogClearFailed;
+    /** Opening the log is what put FLAG_SECURE on this screen's window, so closing it takes back only that. */
+    private boolean messageLogSecured;
     private MessageLogClearJob messageLogClearJob;
     private Dialog autoReplyDialog;
     private LinearLayout autoReplyList;
@@ -1378,10 +1380,9 @@ public final class SettingsActivity extends Activity {
         SettingsDialog sheet = new SettingsDialog(this, ui, text, text.get("message_log_title"), text.get("message_log_hint"));
         Dialog dialog = sheet.dialog;
         messageLogDialog = dialog;
-        // The log holds chat text, so the Recents thumbnail leaves it out while it's open. Screenshots still work.
-        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false);
+        hideFromRecents(dialog);
         dialog.setOnDismissListener(dismissed -> {
-            if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(true);
+            showInRecents();
             if (messageLogDialog == dismissed) {
                 messageLogDialog = null;
                 messageLogList = null;
@@ -1400,6 +1401,32 @@ public final class SettingsActivity extends Activity {
         sheet.action(close);
         sheet.show();
         loadMessageLog();
+    }
+
+    /**
+     * The log holds chat text, so the Recents thumbnail leaves it out while it's open. Android 13 and newer can do that on
+     * its own, and screenshots still work. Before that the only way is FLAG_SECURE, on this screen's window and on the
+     * log's own, which blocks screenshots of the log too. Both are set before any message is loaded.
+     */
+    private void hideFromRecents(Dialog dialog) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            setRecentsScreenshotEnabled(false);
+            return;
+        }
+        android.view.Window window = getWindow();
+        messageLogSecured = (window.getAttributes().flags & WindowManager.LayoutParams.FLAG_SECURE) == 0;
+        if (messageLogSecured) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        if (dialog.getWindow() != null) dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+    }
+
+    private void showInRecents() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            setRecentsScreenshotEnabled(true);
+            return;
+        }
+        if (!messageLogSecured) return;
+        messageLogSecured = false;
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
 
     private void loadMessageLog() {

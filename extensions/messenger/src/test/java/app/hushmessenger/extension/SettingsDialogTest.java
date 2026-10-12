@@ -265,6 +265,41 @@ public class SettingsDialogTest {
         }
     }
 
+    /**
+     * Before Android 13 the log stays out of Recents through FLAG_SECURE on the screen's window and its own, both set
+     * before it loads and kept through a rotation. Closing it leaves a flag the screen already had. Android 13 and newer
+     * hide it from Recents without the flag, so screenshots still work there.
+     */
+    @Test public void theLogStaysOutOfRecentsAndLeavesExistingSecureFlagsAlone() {
+        int secure = android.view.WindowManager.LayoutParams.FLAG_SECURE;
+        boolean legacy = Build.VERSION.SDK_INT < 33;
+        for (boolean alreadySecure : new boolean[] {false, true}) {
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                android.view.Window window = screen.get().getWindow();
+                if (alreadySecure) window.addFlags(secure);
+                window.getDecorView().findViewWithTag("message_log_view").performClick();
+                Dialog dialog = ShadowDialog.getLatestDialog();
+                assertEquals(legacy || alreadySecure, (window.getAttributes().flags & secure) != 0);
+                assertEquals(legacy, (dialog.getWindow().getAttributes().flags & secure) != 0);
+                dialog.getWindow().getDecorView().findViewWithTag("message_log_dialog_close").performClick();
+                assertFalse(dialog.isShowing());
+                assertEquals(alreadySecure, (window.getAttributes().flags & secure) != 0);
+            }
+        }
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            screen.get().getWindow().getDecorView().findViewWithTag("message_log_view").performClick();
+            screen.recreate();
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            Dialog restored = ShadowDialog.getLatestDialog();
+            assertTrue(restored.isShowing());
+            android.view.Window window = screen.get().getWindow();
+            assertEquals(legacy, (window.getAttributes().flags & secure) != 0);
+            assertEquals(legacy, (restored.getWindow().getAttributes().flags & secure) != 0);
+            restored.dismiss();
+            assertEquals(0, window.getAttributes().flags & secure);
+        }
+    }
+
     @Test public void aSetAsideLogShowsANoticeAboveTheNewMessagesInsteadOfAFailure() throws Exception {
         java.io.File aside = new java.io.File(Settings.appContext.getFilesDir(), MessageLog.DAMAGED);
         java.nio.file.Files.write(new java.io.File(Settings.appContext.getFilesDir(), MessageLog.FILE).toPath(), new byte[] {1, 2, 3});

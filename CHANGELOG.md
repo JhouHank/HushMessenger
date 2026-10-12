@@ -7,6 +7,7 @@ Development v0.23.3.
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
 - Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
 - **Keep a message log** tells messages apart by Messenger's own message ID instead of their words. Two messages that say the same thing in one chat are both kept, and the second notification Messenger builds for one message is still dropped. A sender is only shown when the chat's notification makes it clear who sent it, so the same words from two people in a group stay unnamed rather than borrowing someone's name. Names that **Auto reply** hands over before answering stay with the message they came from. The ID only lives in memory and is never saved to the log.
+- The message log's screen now stays out of the Recents preview on Android 12 and older too. Those versions can only do it by blocking screenshots, so screenshots of settings don't work while the log is open there. Android 13 and newer still allow them.
 
 ### Settings
 
