@@ -333,7 +333,10 @@ public class AutoReplyTest {
         assertTrue(queued.isEmpty());
     }
 
-    /** Your own line with the same words doesn't hide who sent a one-to-one message. A group stays unknown. */
+    /**
+     * Your own line with the same words doesn't hide who sent a message, and never names you. Two other people with the
+     * same words leave a group unknown.
+     */
     @Test public void aOneToOneChatStillNamesTheOtherPersonWhenYourOwnLineMatchesToo() {
         android.app.Person me = new android.app.Person.Builder().setName("Me").build();
         Notification.MessagingStyle style = new Notification.MessagingStyle(me)
@@ -344,5 +347,16 @@ public class AutoReplyTest {
         assertNull(ChatNotifications.sender(new Notification.Builder(context, "chats")
             .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Climbing")
             .setStyle(group("Ana", "ok", "Bo", "ok")).build(), "ok", GROUP));
+        assertEquals("Ana", ChatNotifications.sender(new Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Climbing")
+            .setStyle(group("Me", "ok", "Ana", "ok")).build(), "ok", GROUP));
+        // Only your own line has the words, so the message itself isn't shown yet.
+        assertNull(ChatNotifications.sender(new Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Climbing")
+            .setStyle(group("Me", "lunch?", "Ana", "hi")).build(), "lunch?", GROUP));
+        Notification mine = new Notification.Builder(context, "chats").setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setContentTitle("Ana").setStyle(new Notification.MessagingStyle(me).addMessage("lunch?", 1, me)
+                .addMessage("hi", 2, new android.app.Person.Builder().setName("Ana").build())).build();
+        assertEquals("Ana", ChatNotifications.sender(mine, "lunch?", CHAT));
     }
 }

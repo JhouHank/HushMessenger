@@ -36,12 +36,13 @@ final class ChatNotifications {
      * Who sent [text] in [thread]: the sender of the notification's lines with that text, when they all name the same
      * person. Two people sending the same words leaves it unknown. So does a group chat whose notification doesn't show
      * the text, since its newest sender could be someone else. A one-to-one chat has only one other person, so there the
-     * lines' only sender, else the title, stands in. Null when that leaves nobody.
+     * lines' only sender, else the title, stands in. Null when that leaves nobody. Your own lines never count.
      */
     static String sender(Notification notification, String text, String thread) {
         Bundle extras = notification.extras;
         if (extras == null) return null;
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
+        String self = selfName(extras);
         String matched = null;
         boolean disagree = false;
         String only = null;
@@ -51,7 +52,7 @@ final class ChatNotifications {
                 if (!(item instanceof Bundle)) continue;
                 Bundle message = (Bundle) item;
                 String name = senderOf(message);
-                if (name == null) continue;
+                if (name == null || name.equals(self)) continue;
                 CharSequence body = message.getCharSequence("text");
                 if (text != null && body != null && text.contentEquals(body)) {
                     if (matched == null) matched = name;
@@ -80,6 +81,16 @@ final class ChatNotifications {
         Bundle extras = notification.extras;
         CharSequence title = extras == null ? null : extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE);
         return title == null || title.length() == 0 ? null : title.toString();
+    }
+
+    /** The name the notification gives you, the person reading it. */
+    @SuppressWarnings("deprecation")
+    private static String selfName(Bundle extras) {
+        Object person = extras.get(Notification.EXTRA_MESSAGING_PERSON);
+        CharSequence name = null;
+        if (Build.VERSION.SDK_INT >= 28 && person instanceof android.app.Person) name = ((android.app.Person) person).getName();
+        if (name == null) name = extras.getCharSequence(Notification.EXTRA_SELF_DISPLAY_NAME);
+        return name == null || name.length() == 0 ? null : name.toString();
     }
 
     private static String senderOf(Bundle message) {
