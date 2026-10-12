@@ -78,7 +78,12 @@ if ($Development -and (-not $Bundle -or $BundleSha256 -notmatch '^[0-9a-f]{64}$'
     throw '-Development requires a frozen -Bundle, its -BundleSha256 and the recorded -HeldIndexSha256.'
 }
 if (-not $Development -and ($Bundle -or $BundleSha256 -or $HeldIndexSha256)) { throw 'Frozen development inputs require -Development.' }
-if ($Development) { $Bundle = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Bundle) }
+if ($Development) {
+    $Bundle = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Bundle)
+    # -notmatch above ignores case, and the rechecks after the test run compare case-sensitively with lowercase hashes.
+    $BundleSha256 = $BundleSha256.ToLowerInvariant()
+    $HeldIndexSha256 = $HeldIndexSha256.ToLowerInvariant()
+}
 
 foreach ($name in 'HUSHMESSENGER_BUILD_WRAPPER', 'BUILD_QUEUE_SCRIPT', 'HUSH_NATIVE_FIXTURES',
         'HUSHMESSENGER_DESKTOP_JAR', 'HUSHMESSENGER_COMPAT_CLASSPATH') {

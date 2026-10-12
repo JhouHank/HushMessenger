@@ -220,6 +220,32 @@ class ReleaseStages(unittest.TestCase):
         self.assertIn("uncommitted changes", result.stderr)
         self.assertFalse(self.development_state.exists())
 
+    def test_a_feed_change_git_status_misses_still_stops_the_preflight(self):
+        self.builder_action(
+            "& git -C $ProjectDir update-index --assume-unchanged patches-bundle.json\n"
+            "Set-Content -LiteralPath (Join-Path $ProjectDir 'patches-bundle.json') -Value 'changed'"
+        )
+        result = self.run_stage(extra=self.development_inputs())
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("held public feed changed", result.stderr)
+        self.assertFalse(self.development_state.exists())
+
+    def test_uppercase_hashes_are_accepted_and_recorded_in_lowercase(self):
+        result = self.run_stage(
+            extra=self.development_inputs(
+                **{
+                    "-BundleSha256": self.bundle_hash.upper(),
+                    "-HeldIndexSha256": self.feed_hash.upper(),
+                }
+            )
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        receipt = json.loads(self.development_state.read_text(encoding="utf-8-sig"))[
+            "preflight"
+        ]
+        self.assertEqual(self.bundle_hash, receipt["bundle_sha256"])
+        self.assertEqual(self.feed_hash, receipt["held_index_sha256"])
+
     def test_builder_cannot_stamp_a_different_commit_as_validated(self):
         self.builder_action(
             "& git -C $ProjectDir commit --allow-empty -qm 'later commit'"
