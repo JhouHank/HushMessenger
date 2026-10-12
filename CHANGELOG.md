@@ -7,6 +7,8 @@
 
 ### Settings
 
+- Enabled controls explain when they're waiting for Messenger to use them. Clearing a search keeps the category you picked.
+- Switches have clearer on and disabled states in both themes. Focus and pointer feedback match the rest of settings, and restart text fits narrower windows.
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
 - Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.
 - The restart screen keeps its text clear of camera cutouts and system bars.

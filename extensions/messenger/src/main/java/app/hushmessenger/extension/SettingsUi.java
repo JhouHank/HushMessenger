@@ -10,6 +10,7 @@ import android.graphics.drawable.StateListDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -18,7 +19,7 @@ import android.widget.TextView;
 final class SettingsUi {
     final Context context;
     final int background, surface, text, muted, accent, line, outline, selected, warning, warningSurface;
-    final int track, thumb, ripple, infoSurface, infoBorder, selectedText;
+    final int track, thumb, ripple, infoSurface, infoBorder, selectedText, error, selection;
     final boolean largeText;
 
     SettingsUi(Context context, boolean light) {
@@ -39,6 +40,8 @@ final class SettingsUi {
         infoSurface = light ? 0xfff2ebf0 : 0xff1b1f26;
         infoBorder = light ? 0xffe4d9e1 : 0xff292f39;
         selectedText = light ? 0xffffffff : background;
+        error = light ? 0xffb3261e : 0xffffb4ab;
+        selection = (accent & 0x00ffffff) | 0x55000000;
         largeText = context.getResources().getConfiguration().fontScale > 1.3f ||
             context.getResources().getConfiguration().screenWidthDp < 360 ||
             new SettingsText(context).isPseudo();
@@ -92,9 +95,9 @@ final class SettingsUi {
         StateListDrawable states = new StateListDrawable();
         GradientDrawable focused = shape(fill, focus, radius);
         focused.setStroke(dp(2), focus);
-        // A disabled button keeps the fill and loses the accent border, so it reads as off.
-        states.addState(new int[] {-android.R.attr.state_enabled}, shape(fill, line, radius));
+        states.addState(new int[] {-android.R.attr.state_enabled}, shape(fill == accent ? track : fill, line, radius));
         states.addState(new int[] {android.R.attr.state_focused}, focused);
+        states.addState(new int[] {android.R.attr.state_hovered}, shape(fill == accent ? fill : infoSurface, border, radius));
         states.addState(new int[] {}, shape(fill, border, radius));
         return new RippleDrawable(ColorStateList.valueOf(ripple), states, shape(0xffffffff, 0, radius));
     }
@@ -122,6 +125,36 @@ final class SettingsUi {
         view.setTextColor(new ColorStateList(new int[][] {{-android.R.attr.state_enabled}, {}}, new int[] {muted, selectedText}));
         view.setBackground(interactive(accent, 0, 4, outline));
         return view;
+    }
+
+    EditText field(String hint, int limit, boolean singleLine) {
+        EditText view = new EditText(context);
+        view.setId(View.generateViewId());
+        view.setHint(hint);
+        view.setTextSize(15);
+        view.setSingleLine(singleLine);
+        view.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(limit)});
+        view.setTextColor(text);
+        view.setHintTextColor(muted);
+        view.setHighlightColor(selection);
+        view.setMinHeight(dp(48));
+        view.setPadding(dp(12), dp(10), dp(12), dp(10));
+        view.setBackground(interactive(surface, outline, 8));
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            Drawable cursor = view.getTextCursorDrawable(), middle = view.getTextSelectHandle();
+            Drawable left = view.getTextSelectHandleLeft(), right = view.getTextSelectHandleRight();
+            if (cursor != null) view.setTextCursorDrawable(tinted(cursor));
+            if (middle != null) view.setTextSelectHandle(tinted(middle));
+            if (left != null) view.setTextSelectHandleLeft(tinted(left));
+            if (right != null) view.setTextSelectHandleRight(tinted(right));
+        }
+        return view;
+    }
+
+    private Drawable tinted(Drawable drawable) {
+        Drawable copy = drawable.mutate();
+        copy.setTint(accent);
+        return copy;
     }
 
     LinearLayout panel() {
@@ -160,10 +193,17 @@ final class SettingsUi {
         view.setGravity(Gravity.CENTER);
         view.setThumbTintList(null);
         view.setTrackTintList(null);
-        GradientDrawable handle = shape(thumb, outline, 4);
-        handle.setSize(dp(18), dp(18));
-        view.setThumbDrawable(handle);
+        StateListDrawable handles = new StateListDrawable();
+        for (int state : new int[] {-android.R.attr.state_enabled, android.R.attr.state_checked, 0}) {
+            GradientDrawable handle = shape(state < 0 ? muted : state > 0 ? selectedText : thumb, outline, 4);
+            handle.setSize(dp(18), dp(18));
+            handles.addState(state == 0 ? new int[] {} : new int[] {state}, handle);
+        }
+        view.setThumbDrawable(handles);
         StateListDrawable tracks = new StateListDrawable();
+        GradientDrawable disabled = shape(track, line, 6);
+        disabled.setSize(dp(40), dp(20));
+        tracks.addState(new int[] {-android.R.attr.state_enabled}, disabled);
         for (boolean on : new boolean[] {true, false}) {
             GradientDrawable drawable = shape(on ? accent : track, on ? accent : outline, 6);
             drawable.setSize(dp(40), dp(20));

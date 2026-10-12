@@ -61,6 +61,24 @@ public class SettingsNavigationTest {
         }
     }
 
+    @Test public void clearingTheQueryKeepsTheSelectedCategoryAndReturnsFocusToSearch() {
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            EditText search = root.findViewWithTag("find_control");
+            View clear = root.findViewWithTag("clear_query");
+            assertEquals(View.GONE, clear.getVisibility());
+            root.findViewWithTag("category_chats").performClick();
+            search.setText("no matching control");
+            assertEquals(View.VISIBLE, clear.getVisibility());
+            clear.performClick();
+            assertEquals("", search.getText().toString());
+            assertTrue(root.findViewWithTag("category_chats").isSelected());
+            assertEquals(ExpectedTotals.shown(18), ((TextView) root.findViewWithTag("search_status")).getText().toString());
+            assertTrue(search.hasFocus());
+            assertEquals(View.GONE, clear.getVisibility());
+        }
+    }
+
     @Test public void theRecreatedPageReplacesTheThemeSwitchToast() {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             ((Switch) screen.get().getWindow().getDecorView().findViewWithTag("light")).performClick();

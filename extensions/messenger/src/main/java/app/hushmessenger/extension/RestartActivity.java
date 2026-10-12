@@ -54,6 +54,7 @@ public class RestartActivity extends Activity {
         root.setBackgroundColor(ui.background);
         root.setPadding(ui.dp(24), ui.dp(24), ui.dp(24), ui.dp(24));
         root.setLayoutDirection(text.layoutDirection());
+        if (text.layoutDirection() == View.LAYOUT_DIRECTION_RTL) root.setTextDirection(View.TEXT_DIRECTION_RTL);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             DisplayCutout cutout = insets.getDisplayCutout();
             int left = insets.getSystemWindowInsetLeft(), top = insets.getSystemWindowInsetTop();
@@ -83,8 +84,10 @@ public class RestartActivity extends Activity {
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         ui.add(message, status, 28);
         TextView detail = ui.text(text.get("restart_saving"), 14, ui.muted, false);
+        detail.setTag("restart_detail");
         detail.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(ui.dp(220), -2);
+        detail.setMaxWidth(ui.dp(220));
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-2, -2);
         detailParams.topMargin = ui.dp(16);
         message.addView(detail, detailParams);
         ProgressBar progress = new ProgressBar(ui.context, null, android.R.attr.progressBarStyleHorizontal);

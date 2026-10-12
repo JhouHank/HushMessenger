@@ -44,6 +44,18 @@ public class RestartActivityTest {
         return info;
     }
 
+    @Test public void restartDetailsFitANarrowWindowWithLargeText() {
+        RuntimeEnvironment.setFontScale(2f);
+        var app = RuntimeEnvironment.getApplication();
+        View root = RestartActivity.content(new SettingsUi(app, false));
+        root.measure(View.MeasureSpec.makeMeasureSpec(240, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(420, View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, 240, 420);
+        TextView detail = root.findViewWithTag("restart_detail");
+        assertTrue(detail.getWidth() > 0);
+        assertTrue("Detail fits within the padded window", detail.getWidth() <= 192);
+    }
+
     @Test public void selectsActiveMessengerIconInsteadOfSettingsOrTheirAliases() {
         var app = RuntimeEnvironment.getApplication();
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(app.getPackageName());

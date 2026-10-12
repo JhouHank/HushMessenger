@@ -210,8 +210,8 @@ final class SettingsText {
         ENGLISH.put("minutes_short", "%dm");
         ENGLISH.put("hours_short", "%dh");
         ENGLISH.put("days_short", "%dd");
-        ENGLISH.put("not_active", "Not used yet since Messenger started");
-        ENGLISH.put("unsent_not_active", "No unsent message seen since Messenger started");
+        ENGLISH.put("not_active", "On. Waiting for Messenger to use it");
+        ENGLISH.put("unsent_not_active", "On. No unsent message received yet");
         ENGLISH.put("restart_pending_on", "Takes effect after Messenger restarts");
         ENGLISH.put("restart_pending_off", "Stays in effect until Messenger restarts");
         ENGLISH.put("meta_ai_tab_pending_on", "The Meta AI tab is hidden after Messenger restarts");
@@ -244,6 +244,11 @@ final class SettingsText {
         ENGLISH.put("group_count_many", "%d controls");
         ENGLISH.put("open_help", "Open Messenger from your app drawer");
         ENGLISH.put("message_log_view", "View log");
+        ENGLISH.put("search_clear", "Clear");
+        ENGLISH.put("search_clear_description", "Clear search");
+        ENGLISH.put("camera_missing", "No camera app is installed that can take a photo for Messenger.");
+        ENGLISH.put("camera_failed", "Can't open your camera app. Try again, or turn off Use the phone's camera app.");
+        ENGLISH.put("camera_permission", "Messenger needs camera permission to open your camera app. You can allow it in Android's app settings.");
         ENGLISH.put("message_log_clear", "Clear log");
         ENGLISH.put("message_log_close", "Close");
         ENGLISH.put("message_log_title", "Message log");

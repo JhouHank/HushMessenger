@@ -72,7 +72,7 @@ public final class SettingsActivity extends Activity {
     private final List<Button> tabs = new ArrayList<>();
     private final List<View> tabLines = new ArrayList<>();
     private TextView searchStatus, enabledCount, setupNote;
-    private Button safeModeAction;
+    private Button safeModeAction, clearQuery;
     private Button drawerSearchLink;
     private TextView updateStatus;
     private Button updateCheckNow, updateRelease;
@@ -459,21 +459,25 @@ public final class SettingsActivity extends Activity {
         ui.rule(setup, 12);
         ui.add(setup, controlRow("paused", text.format("paused"), "", false), 0);
         ui.add(content, setup, 0);
-        search = new EditText(this);
+        search = ui.field(text.get("search"), 100, true);
         search.setTag("find_control");
-        // The hint labels the field; a content description would make TalkBack skip what was typed.
-        search.setHint(text.get("search"));
         search.setTextSize(16);
-        search.setSingleLine(true);
-        search.setFilters(new InputFilter[] {new InputFilter.LengthFilter(100)});
-        search.setHighlightColor((ui.accent & 0x00ffffff) | 0x55000000);
-        tintTextHandles(search);
-        search.setTextColor(ui.text);
-        search.setHintTextColor(ui.muted);
-        search.setMinHeight(ui.dp(48));
-        search.setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(10));
-        search.setBackground(ui.interactive(ui.surface, ui.outline, 8));
-        ui.add(content, search, 16);
+        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        search.setOnEditorActionListener((view, action, event) -> {
+            if (action != android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) return false;
+            ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(search.getWindowToken(), 0);
+            return true;
+        });
+        LinearLayout searchRow = ui.row();
+        searchRow.addView(search, new LinearLayout.LayoutParams(0, -2, 1));
+        clearQuery = ui.button(text.get("search_clear"));
+        clearQuery.setTag("clear_query");
+        clearQuery.setContentDescription(text.get("search_clear_description"));
+        clearQuery.setOnClickListener(view -> { search.setText(""); search.requestFocus(); });
+        LinearLayout.LayoutParams clearQueryParams = new LinearLayout.LayoutParams(-2, -2);
+        clearQueryParams.setMarginStart(ui.dp(8));
+        searchRow.addView(clearQuery, clearQueryParams);
+        ui.add(content, searchRow, 16);
         LinearLayout filters = ui.row();
         for (String name : new String[] {"all", "inbox", "chats", "more"}) {
             Button button = ui.button(text.get(name));
@@ -562,15 +566,16 @@ public final class SettingsActivity extends Activity {
             choice.setId(View.generateViewId());
             choice.setTag("bubble_" + mode);
             choice.setText(text.get("bubble_" + mode));
-            choice.setTextColor(ui.text);
+            choice.setTextColor(new android.content.res.ColorStateList(
+                new int[][] {{-android.R.attr.state_enabled}, {}}, new int[] {ui.muted, ui.text}));
             choice.setTextSize(16);
             choice.setMinHeight(ui.dp(48));
             choice.setPadding(ui.dp(8), ui.dp(8), ui.dp(8), ui.dp(8));
             choice.setButtonTintList(new android.content.res.ColorStateList(
-                new int[][] {new int[] {android.R.attr.state_checked}, new int[] {}}, new int[] {ui.accent, ui.muted}));
+                new int[][] {{-android.R.attr.state_enabled}, {android.R.attr.state_checked}, {}}, new int[] {ui.outline, ui.accent, ui.muted}));
+            choice.setBackground(ui.interactive(0, 0, 8));
             choice.setChecked(mode.equals(Settings.selectedBubbleMode()));
             choice.setEnabled(Settings.available("bubbles") || "stock".equals(mode));
-            if (!choice.isEnabled()) choice.setAlpha(0.4f);
             choice.setOnClickListener(view -> {
                 Settings.preferences.edit().putBoolean("bubbles", !"stock".equals(mode))
                     .putBoolean(Settings.BUBBLE_CHAT_HEADS, "chat_heads".equals(mode)).apply();
@@ -823,8 +828,6 @@ public final class SettingsActivity extends Activity {
             refreshStatus(control);
         }
         control.setEnabled(available);
-        // The custom track has no disabled state, so dim it; the description says why.
-        if (!available) control.setAlpha(0.4f);
         control.setOnCheckedChangeListener((button, checked) -> {
             refreshStatus(control);
             if (binding) return;
@@ -2051,6 +2054,7 @@ public final class SettingsActivity extends Activity {
 
     private void filterControls(String query) {
         String needle = query.trim().toLowerCase(Locale.ROOT);
+        clearQuery.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
         String drawerWords = "hide app drawer icon launcher settings " + text.get("hide_drawer_icon");
         // One letter matches almost anything, so the link waits for a second one.
         drawerSearchLink.setVisibility(controlRows.isEmpty() || (needle.length() >= 2 && drawerWords.toLowerCase(Locale.ROOT).contains(needle)) ? View.VISIBLE : View.GONE);
