@@ -2705,6 +2705,11 @@ public class CompatReport {
         int stores = 0;
         boolean direct = false;
         for (var i : ctor.getImplementation().getInstructions()) {
+            // Like the patch, a constructor that reuses this or the ThreadKey's register before the store doesn't count.
+            if (stores == 0 && i.getOpcode().setsRegister() && i instanceof OneRegisterInstruction written) {
+                int low = written.getRegisterA(), high = low + (i.getOpcode().setsWideRegister() ? 1 : 0);
+                if (low <= self && self <= high || low <= self + 2 && self + 2 <= high) return false;
+            }
             if (i.getOpcode() != Opcode.IPUT_OBJECT || !(((ReferenceInstruction) i).getReference() instanceof FieldReference ref) ||
                     !owner.getType().equals(ref.getDefiningClass()) || !field.getName().equals(ref.getName()) || !field.getType().equals(ref.getType()))
                 continue;
@@ -2757,9 +2762,47 @@ public class CompatReport {
                 !(d.getReference() instanceof MethodReference dispatch) || !params.get(4).toString().equals(dispatch.getDefiningClass()) ||
                 !"V".equals(dispatch.getReturnType())) return false;
         var types = dispatch.getParameterTypes();
-        return types.size() == 5 && "Lcom/facebook/auth/usersession/FbUserSession;".contentEquals(types.get(0)) &&
-            "Ljava/lang/String;".contentEquals(types.get(3)) && "Ljava/lang/String;".contentEquals(types.get(4)) &&
-            ((RegisterRangeInstruction) code.get(239)).getStartRegister() == 11 && ((RegisterRangeInstruction) code.get(239)).getRegisterCount() == 6;
+        if (types.size() != 5 || !"Lcom/facebook/auth/usersession/FbUserSession;".contentEquals(types.get(0)) ||
+            !"Ljava/lang/String;".contentEquals(types.get(3)) || !"Ljava/lang/String;".contentEquals(types.get(4)) ||
+            ((RegisterRangeInstruction) code.get(239)).getStartRegister() != 11 || ((RegisterRangeInstruction) code.get(239)).getRegisterCount() != 6)
+            return false;
+        // The registers and branches validateReplyRead proves its dataflow on.
+        int[] p = new int[params.size()];
+        int next = impl.getRegisterCount() - params.stream().mapToInt(t -> t.charAt(0) == 'J' || t.charAt(0) == 'D' ? 2 : 1).sum();
+        for (int at = 0; at < p.length; at++) { p[at] = next; next += params.get(at).charAt(0) == 'J' || params.get(at).charAt(0) == 'D' ? 2 : 1; }
+        var getterArgs = (RegisterRangeInstruction) code.get(33);
+        if (getterArgs.getStartRegister() != p[7] || getterArgs.getRegisterCount() != 1) return false;
+        if (!moves(code.get(4), Opcode.MOVE_OBJECT_FROM16, 7, p[11]) || !moves(code.get(13), Opcode.MOVE_OBJECT_FROM16, 20, p[4]) ||
+            !moves(code.get(25), Opcode.MOVE_OBJECT_FROM16, 10, p[0]) || !moves(code.get(236), Opcode.MOVE_OBJECT_FROM16, 11, 20) ||
+            !moves(code.get(238), Opcode.MOVE_OBJECT, 15, 0) || !moves(code.get(73), Opcode.MOVE_OBJECT, 12, 5)) return false;
+        if (code.get(31).getOpcode() != Opcode.CONST_4 || ((OneRegisterInstruction) code.get(31)).getRegisterA() != 5 ||
+            ((NarrowLiteralInstruction) code.get(31)).getNarrowLiteral() != 0 || code.get(32).getOpcode() != Opcode.IF_EQZ ||
+            ((OneRegisterInstruction) code.get(32)).getRegisterA() != p[7] || !jumpsTo(code, 32, 73)) return false;
+        int[] address = new int[code.size() + 1];
+        var index = new HashMap<Integer, Integer>();
+        for (int at = 0; at < code.size(); at++) { index.put(address[at], at); address[at + 1] = address[at] + code.get(at).getCodeUnits(); }
+        var targets = new HashSet<Integer>();
+        for (int at = 0; at < code.size(); at++) {
+            if (!(code.get(at) instanceof OffsetInstruction jump)) continue;
+            Integer landed = index.get(address[at] + jump.getCodeOffset());
+            if (landed == null) return false;
+            if (code.get(landed) instanceof SwitchPayload payload) {
+                for (var element : payload.getSwitchElements()) targets.add(index.get(address[at] + element.getOffset()));
+            } else targets.add(landed);
+        }
+        for (var block : impl.getTryBlocks()) {
+            for (var handler : block.getExceptionHandlers()) targets.add(index.get(handler.getHandlerCodeAddress()));
+            // Code inserted at 239 would land inside a try that covers the seam.
+            for (int at = 234; at <= 240; at++)
+                if (address[at] >= block.getStartCodeAddress() && address[at] < block.getStartCodeAddress() + block.getCodeUnitCount()) return false;
+        }
+        for (int at : new int[] {31, 32, 33, 34, 237, 238, 239, 240}) if (targets.contains(at)) return false;
+        return true;
+    }
+
+    static boolean moves(Instruction instruction, Opcode opcode, int to, int from) {
+        return instruction.getOpcode() == opcode && instruction instanceof TwoRegisterInstruction move &&
+            move.getRegisterA() == to && move.getRegisterB() == from;
     }
 
     static final String LAT_STATUS_JOB = "Lcom/facebook/attribution/LatStatusJob;";
