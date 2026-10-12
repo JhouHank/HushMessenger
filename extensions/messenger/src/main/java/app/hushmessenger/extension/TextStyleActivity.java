@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Toast;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -20,7 +21,8 @@ import java.util.concurrent.TimeUnit;
  * Bold and Italic in the menu Android shows over selected text (#42). Messenger has no formatting in chats, so the
  * selection comes back in Unicode's sans-serif bold or italic letters, which every phone can show, and picking the
  * same one again turns them back. The two menu entries are aliases of this screen. Android lists every enabled one in
- * each of Messenger's text fields, so they're enabled only while the switch is in effect.
+ * each of Messenger's text fields that has a view id, so they're enabled only while the switch is in effect, and
+ * {@link #textFieldFocused} gives the chat box an id then.
  */
 public final class TextStyleActivity extends Activity {
     static final String KEY = "text_style";
@@ -235,6 +237,28 @@ public final class TextStyleActivity extends Activity {
             ComponentName name = new ComponentName(context.getPackageName(), entry);
             if (packages.getComponentEnabledSetting(name) != wanted)
                 packages.setComponentEnabledSetting(name, wanted, PackageManager.DONT_KILL_APP);
+        }
+    }
+
+    /** Whether this install has the menu entries. A manifest can't change while Messenger runs, so it's asked once. */
+    static volatile Boolean entries;
+
+    /**
+     * Messenger's text input, the chat box among them, calls this first on every focus change. Android adds PROCESS_TEXT
+     * entries, these two and every other app's, only to a field with a view id, and the chat box has none, so while the
+     * switch is in effect a field without one gets one. Its saving goes off first: without an id it never saved its
+     * state, so the draft stays out of saved state as before. A field that already has an id keeps it.
+     */
+    public static void textFieldFocused(View field) {
+        try {
+            if (field == null || !Settings.wouldUse(KEY) || field.getId() != View.NO_ID) return;
+            Boolean known = entries;
+            if (known == null) entries = known = present(field.getContext());
+            if (!known) return;
+            field.setSaveEnabled(false);
+            field.setId(View.generateViewId());
+        } catch (Throwable error) {
+            Settings.hookFailed(KEY, "Can't give a text field an id", error);
         }
     }
 

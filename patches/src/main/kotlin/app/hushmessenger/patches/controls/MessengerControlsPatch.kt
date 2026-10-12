@@ -152,6 +152,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ATTRIBUTION_UPLOADS -> method.validateAttributionUpload()
             AD_EVENTS -> method.validateAdEvent()
             MQTT_TELEMETRY -> method.validateMqttTelemetry()
+            TEXT_STYLE -> method.validateTextStyleField()
             MESSAGE_LOG, AUTO_REPLY -> method.validateMessageLog()
             "original_photo" -> method.validateOriginalPhoto()
             ORIGINAL_VIDEO -> method.validateOriginalVideo()
@@ -207,6 +208,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
             AD_EVENTS -> method.injectAdEvent()
             MQTT_TELEMETRY -> method.injectMqttTelemetry()
+            TEXT_STYLE -> method.injectTextStyleField()
             MESSAGE_LOG -> method.injectMessageLog()
             AUTO_REPLY -> method.injectAutoReply()
             "original_photo" -> method.injectOriginalPhoto()
@@ -574,8 +576,13 @@ val textStylePatch = bytecodePatch(
     compatibleWith(MessengerTarget.COMPATIBILITY)
     dependsOn(settingsExtension, textStyleResources)
     execute {
-        // Only the manifest changes. Recording it here lets a Root Mount install, which can't add the menu entries,
-        // show the switch as unavailable instead of hiding it.
+        validateControls(discoveredControls, setOf(TEXT_STYLE))
+        val original = discoveredControls.getValue(TEXT_STYLE).single()
+        val field = mutableClassDefBy(original.definingClass).methods.single { it.hookId() == original.hookId() }
+        // The chat box has no view id, and Android keeps every app's text actions out of a field without one.
+        injectControl(TEXT_STYLE, mapOf(TEXT_STYLE to listOf(field)))
+        // Recording it here lets a Root Mount install, which can't add the menu entries, show the switch as
+        // unavailable instead of hiding it. The extension then leaves the chat box alone too.
         recordControl(TEXT_STYLE)
         textStyleApplied = true
     }

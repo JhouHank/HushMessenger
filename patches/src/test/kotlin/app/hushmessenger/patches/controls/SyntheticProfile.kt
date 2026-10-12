@@ -77,6 +77,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     ATTRIBUTION_UPLOADS to setOf(ATTRIBUTION_WORKER),
     AD_EVENTS to setOf(SYNTHETIC_INBOX_VISIBILITY, SYNTHETIC_AD_ENTRY),
     MQTT_TELEMETRY to setOf(SYNTHETIC_MQTT_PUBLISH, SYNTHETIC_MQTT_KEEPALIVE),
+    TEXT_STYLE to setOf(SYNTHETIC_TEXT_FIELD_FOCUS),
     MESSAGE_LOG to setOf(newMessageNotificationCtor("LX/5qJ;", "LX/5Yc;")),
     AUTO_REPLY to setOf(newMessageNotificationCtor("LX/5qJ;", "LX/5Yc;")),
     EMOJI_SEARCH to setOf("LX/7TX;->A8Y(Landroid/text/Editable;Z)V"),

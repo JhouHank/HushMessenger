@@ -155,6 +155,7 @@ hook system_camera LX/5wE;->BxB(Landroid/os/Bundle;)Z
 hook system_camera LX/7Fd;->DaT(Lcom/facebook/messaging/montage/composer/model/MontageComposerFragmentParams;Lcom/facebook/messaging/send/trigger/NavigationTrigger;)V
 hook tab_notifications LX/1k9;->A09(LX/1k9;)Z
 hook tab_people LX/1k9;->A0E(LX/1k9;)Z
+hook text_style LX/A0R;->onFocusChanged(ZILandroid/graphics/Rect;)V
 hook typing LX/AnS;->run()V
 hook typing_mailbox LX/4fd;->A0J(Ljava/lang/String;Z)LX/33J;
 hook unsent_indicator LX/WFd;->BYY(I)Ljava/lang/String;

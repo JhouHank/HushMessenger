@@ -209,8 +209,7 @@ public class CompatReport {
         PATCHES.put("View stories anonymously", List.of("anonymous_stories"));
         PATCHES.put("Save any story", List.of("save_stories"));
         PATCHES.put("Slide chats in and out", List.of("chat_animation", "chat_fragment", "chat_inbox", "chat_legacy"));
-        // Manifest only: the selection menu entries need nothing from Messenger's code.
-        PATCHES.put("Bold and italic text", List.of());
+        PATCHES.put("Bold and italic text", List.of("text_style"));
         PATCHES.put("Open settings from menu", List.of("menu_settings"));
     }
 
@@ -2789,6 +2788,53 @@ public class CompatReport {
         return List.of(publish.get(0), keepalive.get(0));
     }
 
+    /** The focus change's one invoke-super of Android's onFocusChanged, made on this. */
+    static boolean hasFocusSuperCall(Method method) {
+        if (AccessFlags.STATIC.isSet(method.getAccessFlags()) || method.getImplementation() == null ||
+            !"onFocusChanged".equals(method.getName()) || !"V".equals(method.getReturnType())) return false;
+        var params = new ArrayList<String>();
+        for (var t : method.getParameterTypes()) params.add(t.toString());
+        if (!params.equals(List.of("Z", "I", "Landroid/graphics/Rect;"))) return false;
+        int self = method.getImplementation().getRegisterCount() - 4;
+        int calls = 0;
+        for (var i : instructions(method)) {
+            if (i.getOpcode() != Opcode.INVOKE_SUPER && i.getOpcode() != Opcode.INVOKE_SUPER_RANGE) continue;
+            if (!(((ReferenceInstruction) i).getReference() instanceof MethodReference call)) continue;
+            int receiver = i instanceof FiveRegisterInstruction f ? f.getRegisterC() : ((RegisterRangeInstruction) i).getStartRegister();
+            var types = new ArrayList<String>();
+            for (var t : call.getParameterTypes()) types.add(t.toString());
+            if (Set.of("Landroid/widget/TextView;", "Landroid/widget/EditText;").contains(call.getDefiningClass()) &&
+                "onFocusChanged".equals(call.getName()) && "V".equals(call.getReturnType()) && types.equals(params) &&
+                receiver == self) calls++;
+        }
+        return calls == 1;
+    }
+
+    /**
+     * text_style: the one method of an EditText subclass that names updateState:TextInputComponent.remeasureForUpdatedText
+     * has to be its instance onTextChanged(CharSequence, III)V, and the hook is the same class's
+     * onFocusChanged(ZILandroid/graphics/Rect;)V that calls Android's own on this. Mirrors TextStyle.kt.
+     */
+    static List<Method> textStyleField(List<ClassDef> classes) {
+        ClassDef field = null;
+        Method anchor = null;
+        int anchors = 0;
+        for (var cls : classes) {
+            if (!"Landroid/widget/EditText;".equals(cls.getSuperclass())) continue;
+            for (var method : cls.getMethods()) {
+                if (!literals(method).contains("updateState:TextInputComponent.remeasureForUpdatedText")) continue;
+                anchors++;
+                field = cls;
+                anchor = method;
+            }
+        }
+        if (anchors != 1 || AccessFlags.STATIC.isSet(anchor.getAccessFlags()) ||
+            !hookId(anchor).endsWith(";->onTextChanged(Ljava/lang/CharSequence;III)V")) return List.of();
+        var focus = new ArrayList<Method>();
+        for (var method : field.getMethods()) if (hasFocusSuperCall(method)) focus.add(method);
+        return focus.size() == 1 ? focus : List.of();
+    }
+
     static Map<String, List<Method>> findControls(List<ClassDef> classes) {
         var found = new LinkedHashMap<String, List<Method>>();
         for (var key : CONTROL_KEYS) found.put(key, new ArrayList<>());
@@ -2812,6 +2858,7 @@ public class CompatReport {
         found.get("attribution_uploads").addAll(attributionUploads(classes));
         found.get("ad_events").addAll(adEvents(classes));
         found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));
+        found.get("text_style").addAll(textStyleField(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));
         found.get("system_camera").addAll(systemCameraLaunches(classes));
