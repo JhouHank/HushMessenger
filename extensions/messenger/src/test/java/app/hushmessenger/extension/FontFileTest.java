@@ -459,6 +459,15 @@ public class FontFileTest {
         assertEquals(0, moved.getShort(os2 + 68));
         assertEquals(0, moved.getShort(os2 + 70));
         assertEquals("the win pair still moves", (before.getShort(os2 + 74) & 0xFFFF) + units, moved.getShort(os2 + 74) & 0xFFFF);
+
+        // Unsigned, so a win descent moved off zero would leave its range and turn the whole move down.
+        ByteBuffer.wrap(plain).putShort(os2 + 74, (short) 0).putShort(os2 + 76, (short) 0);
+        lower = plain.clone();
+        assertTrue(FontFile.adjust(lower, 100, 10));
+        moved = ByteBuffer.wrap(lower);
+        assertEquals(0, moved.getShort(os2 + 74));
+        assertEquals(0, moved.getShort(os2 + 76));
+        assertEquals("the head box still moves", before.getShort(head + 38) + units, moved.getShort(head + 38));
     }
 
     @Test
