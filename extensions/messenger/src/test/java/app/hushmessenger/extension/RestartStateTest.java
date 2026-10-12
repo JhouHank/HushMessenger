@@ -73,6 +73,9 @@ public class RestartStateTest {
         HostScreens.applicationCreated(app);
         boolean[] hidden = new boolean[1];
         Thread asker = new Thread(() -> hidden[0] = Settings.hidePeopleTab());
+        // The start the asker runs refreshes the text style entries. Doing that in place keeps it inside this test.
+        java.util.concurrent.Executor textStyleWork = TextStyleActivity.work;
+        TextStyleActivity.work = Runnable::run;
         try {
             synchronized (HostScreens.class) {
                 asker.start();
@@ -89,6 +92,7 @@ public class RestartStateTest {
             assertTrue("The answer stored first, not the off switch", hidden[0]);
             assertTrue("A hidden tab counts as a use", Settings.activeAt.containsKey("tab_people"));
         } finally {
+            TextStyleActivity.work = textStyleWork;
             HostScreens.applicationCreated(null);
             Settings.initialize(app);
         }
