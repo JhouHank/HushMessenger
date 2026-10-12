@@ -33,8 +33,6 @@ import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.text.Editable;
-import android.text.InputFilter;
-import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
 import android.text.TextWatcher;
 import java.util.ArrayList;
@@ -277,6 +275,9 @@ public final class SettingsActivity extends Activity {
                 View target = root.findViewWithTag(focused);
                 if (target != null && target.isShown()) target.requestFocus();
             });
+            Bundle draft = state.getBundle("auto_reply_draft");
+            if (draft != null) root.post(() -> showAutoReplies(draft));
+            else if (state.getBoolean("message_log_open")) root.post(this::showMessageLog);
         }
     }
 
@@ -297,6 +298,8 @@ public final class SettingsActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (autoReplyDialog != null) autoReplyDialog.dismiss();
+        if (messageLogDialog != null) messageLogDialog.dismiss();
         documentGeneration++;
         if (documentJob != null && documentJob.request == SAVE_CHOICES) {
             // The provider may already have truncated the file. Finish this authorized save,
@@ -1328,6 +1331,15 @@ public final class SettingsActivity extends Activity {
 
     private Dialog messageLogDialog;
     private LinearLayout messageLogList;
+    private Button messageLogClear;
+    private long messageLogGeneration;
+    private boolean messageLogClearing;
+    private Dialog autoReplyDialog;
+    private LinearLayout autoReplyList;
+    private android.widget.CheckBox autoReplyGroups;
+    private TextView autoReplyCount;
+    private Button autoReplyAdd;
+    private ScrollView autoReplyScroll;
 
     /** Two actions under the message-log switch: open the log or wipe it, no confirmation, just a toast. */
     private void addMessageLogActions(LinearLayout content) {
@@ -1346,7 +1358,9 @@ public final class SettingsActivity extends Activity {
     }
 
     private void showMessageLog() {
-        Dialog dialog = new Dialog(this);
+        if (isFinishing() || isDestroyed() || messageLogDialog != null) return;
+        SettingsDialog sheet = new SettingsDialog(this, ui, text, text.get("message_log_title"), text.get("message_log_hint"));
+        Dialog dialog = sheet.dialog;
         messageLogDialog = dialog;
         // The log holds chat text, so the Recents thumbnail leaves it out while it's open. Screenshots still work.
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false);
@@ -1355,55 +1369,54 @@ public final class SettingsActivity extends Activity {
             if (messageLogDialog == dismissed) {
                 messageLogDialog = null;
                 messageLogList = null;
+                messageLogClear = null;
+                messageLogGeneration++;
             }
         });
-        LinearLayout frame = ui.column();
-        frame.setBackgroundColor(ui.background);
-        frame.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(16));
-        // A dialog doesn't inherit the activity root's direction, and TalkBack announces the pane by this title.
-        frame.setLayoutDirection(text.layoutDirection());
-        frame.setAccessibilityPaneTitle(text.get("message_log_title"));
-        frame.addView(ui.text(text.get("message_log_title"), 24, ui.text, true));
-        ui.add(frame, ui.text(text.get("message_log_hint"), 14, ui.muted, false), 8);
-        ScrollView scroll = new ScrollView(this);
-        messageLogList = ui.column();
-        messageLogList.setPadding(0, ui.dp(12), 0, ui.dp(12));
-        messageLogList.addView(ui.text(text.get("message_log_loading"), 14, ui.muted, false));
-        scroll.addView(messageLogList);
-        frame.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        LinearLayout buttons = ui.row();
-        buttons.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
-        Button clear = ui.button(text.get("message_log_clear"));
-        clear.setOnClickListener(clicked -> clearMessageLog());
-        buttons.addView(clear);
+        messageLogList = sheet.body;
+        messageLogList.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        messageLogClear = ui.button(text.get("message_log_clear"));
+        messageLogClear.setTag("message_log_dialog_clear");
+        messageLogClear.setOnClickListener(clicked -> clearMessageLog());
+        sheet.action(messageLogClear);
         Button close = ui.primaryButton(text.get("message_log_close"));
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, -2);
-        closeParams.setMarginStart(ui.dp(8));
+        close.setTag("message_log_dialog_close");
         close.setOnClickListener(clicked -> dialog.dismiss());
-        buttons.addView(close, closeParams);
-        ui.add(frame, buttons, 8);
-        dialog.setContentView(frame);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(ui.background));
-            dialog.getWindow().setLayout(-1, -1);
-        }
-        dialog.show();
+        sheet.action(close);
+        sheet.show();
         loadMessageLog();
     }
 
     private void loadMessageLog() {
         final LinearLayout list = messageLogList;
         if (list == null) return;
+        final long generation = ++messageLogGeneration;
+        list.removeAllViews();
+        list.addView(ui.text(text.get("message_log_loading"), 14, ui.muted, false));
+        if (messageLogClear != null) messageLogClear.setEnabled(false);
         new Thread(() -> {
-            final List<MessageLog.Entry> entries = MessageLog.entries();
+            final MessageLog.LoadResult result = MessageLog.loadResult();
             runOnUiThread(() -> {
-                if (messageLogList != list) return;
+                if (messageLogList != list || generation != messageLogGeneration) return;
                 list.removeAllViews();
-                if (entries.isEmpty()) {
-                    list.addView(ui.text(text.get("message_log_empty"), 14, ui.muted, false));
-                    return;
+                if (messageLogClear != null) messageLogClear.setEnabled(result.failed || !result.entries.isEmpty());
+                if (result.failed) {
+                    LinearLayout failure = ui.panel();
+                    failure.addView(ui.text(text.get("message_log_load_failed"), 18, ui.error, true));
+                    ui.add(failure, ui.text(text.get("message_log_load_help"), 14, ui.muted, false), 8);
+                    Button retry = ui.button(text.get("retry"));
+                    retry.setTag("message_log_retry");
+                    retry.setOnClickListener(view -> loadMessageLog());
+                    ui.add(failure, retry, 16);
+                    ui.add(list, failure, 0);
+                } else if (result.entries.isEmpty()) {
+                    LinearLayout empty = ui.panel();
+                    empty.addView(ui.text(text.get("message_log_empty"), 18, ui.text, true));
+                    ui.add(empty, ui.text(text.get(Settings.wouldUse(MessageLog.KEY) ? "message_log_empty_on" : "message_log_empty_off"), 14, ui.muted, false), 8);
+                    ui.add(list, empty, 0);
                 }
-                for (MessageLog.Entry entry : entries) list.addView(messageLogEntry(entry));
+                if (!result.entries.isEmpty()) ui.add(list, ui.text(text.get("message_log_retention"), 13, ui.muted, false), 0);
+                for (MessageLog.Entry entry : result.entries) list.addView(messageLogEntry(entry));
             });
         }, "HushMessageLogView").start();
     }
@@ -1415,8 +1428,13 @@ public final class SettingsActivity extends Activity {
         // Messenger's chat key means nothing to a reader, so an entry without a name reads as an unknown chat.
         String who = entry.sender.isEmpty() ? (entry.chat.isEmpty() ? text.get("message_log_unknown_thread") : entry.chat)
             : entry.chat.isEmpty() ? entry.sender : text.get("message_log_in_group", entry.sender, entry.chat);
-        card.addView(ui.text(who + "  ·  " + formatSince(entry.time, "message_log_now", "message_log_ago"), 12, ui.muted, false));
-        ui.add(card, ui.text(entry.text == null || entry.text.isEmpty() ? text.get("message_log_no_text") : entry.text, 15, ui.text, false), 4);
+        TextView metadata = ui.text(who + "  ·  " + formatSince(entry.time, "message_log_now", "message_log_ago"), 12, ui.muted, true);
+        metadata.setContentDescription(who + ". " + android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(entry.time)) + ", " +
+            android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(entry.time)));
+        card.addView(metadata);
+        TextView body = ui.text(entry.text == null || entry.text.isEmpty() ? text.get("message_log_no_text") : entry.text, 15, ui.text, false);
+        body.setTextIsSelectable(true);
+        ui.add(card, body, 8);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.topMargin = ui.dp(8);
         card.setLayoutParams(params);
@@ -1433,119 +1451,241 @@ public final class SettingsActivity extends Activity {
         ui.add(content, actions, 8);
     }
 
-    /** Each reply is a words field and a reply field. Save keeps the ones with a reply and closes; Close drops edits. */
-    private void showAutoReplies() {
+    /** Drafts stay in saved instance state until Save commits them or Cancel discards them. */
+    private void showAutoReplies() { showAutoReplies(null); }
+
+    private void showAutoReplies(Bundle draft) {
         SharedPreferences prefs = Settings.preferences;
-        if (prefs == null) return;
-        Dialog dialog = new Dialog(this);
-        LinearLayout frame = ui.column();
-        frame.setBackgroundColor(ui.background);
-        frame.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(16));
-        frame.setLayoutDirection(text.layoutDirection());
-        frame.setAccessibilityPaneTitle(text.get("auto_reply_title"));
-        frame.addView(ui.text(text.get("auto_reply_title"), 24, ui.text, true));
-        ui.add(frame, ui.text(text.get("auto_reply_hint"), 14, ui.muted, false), 8);
-        ScrollView scroll = new ScrollView(this);
+        if (prefs == null || isFinishing() || isDestroyed() || autoReplyDialog != null) return;
+        SettingsDialog sheet = new SettingsDialog(this, ui, text, text.get("auto_reply_title"), text.get("auto_reply_hint"));
+        Dialog dialog = sheet.dialog;
+        autoReplyDialog = dialog;
+        autoReplyScroll = sheet.scroll;
+        dialog.setOnDismissListener(dismissed -> {
+            if (autoReplyDialog != dismissed) return;
+            autoReplyDialog = null;
+            autoReplyList = null;
+            autoReplyGroups = null;
+            autoReplyCount = null;
+            autoReplyAdd = null;
+            autoReplyScroll = null;
+        });
+        if (!Settings.wouldUse(AutoReply.KEY)) {
+            TextView status = ui.text(text.get("auto_reply_off"), 14, ui.muted, false);
+            status.setPadding(ui.dp(12), ui.dp(12), ui.dp(12), ui.dp(12));
+            status.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 8));
+            ui.add(sheet.body, status, 0);
+        }
+        LinearLayout listHeading = ui.row();
+        if (ui.largeText) listHeading.setOrientation(LinearLayout.VERTICAL);
+        autoReplyCount = ui.text("", 13, ui.muted, true);
+        autoReplyCount.setTag("auto_reply_count");
+        autoReplyCount.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        listHeading.addView(autoReplyCount, new LinearLayout.LayoutParams(ui.largeText ? -1 : 0, -2, ui.largeText ? 0 : 1));
+        autoReplyAdd = ui.button(text.get("auto_reply_add"));
+        autoReplyAdd.setTag("auto_reply_add");
+        listHeading.addView(autoReplyAdd, new LinearLayout.LayoutParams(ui.largeText ? -1 : -2, -2));
+        ui.add(sheet.body, listHeading, 12);
         LinearLayout list = ui.column();
-        list.setPadding(0, ui.dp(4), 0, ui.dp(8));
-        scroll.addView(list);
-        for (AutoReply.Rule rule : AutoReply.rules(prefs)) list.addView(autoReplyCard(list, rule));
-        if (list.getChildCount() == 0) list.addView(autoReplyCard(list, new AutoReply.Rule("", "")));
-        frame.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        autoReplyList = list;
+        ui.add(sheet.body, list, 0);
+        ArrayList<String> words = draft == null ? null : draft.getStringArrayList("words");
+        ArrayList<String> replies = draft == null ? null : draft.getStringArrayList("replies");
+        if (words != null && replies != null) {
+            for (int i = 0; i < Math.min(AutoReply.MAX_RULES, Math.min(words.size(), replies.size())); i++) {
+                View card = autoReplyCard(list, new AutoReply.Rule("", ""));
+                ((EditText) card.findViewWithTag("auto_reply_when")).setText(words.get(i));
+                ((EditText) card.findViewWithTag("auto_reply_reply")).setText(replies.get(i));
+                list.addView(card);
+            }
+        } else {
+            for (AutoReply.Rule rule : AutoReply.rules(prefs)) list.addView(autoReplyCard(list, rule));
+            if (list.getChildCount() == 0) list.addView(autoReplyCard(list, new AutoReply.Rule("", "")));
+        }
         android.widget.CheckBox groups = new android.widget.CheckBox(this);
+        autoReplyGroups = groups;
         groups.setTag("auto_reply_groups");
         groups.setText(text.get("auto_reply_groups"));
+        groups.setTextSize(15);
         groups.setTextColor(ui.text);
         groups.setButtonTintList(new android.content.res.ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {ui.accent, ui.outline}));
         groups.setMinHeight(ui.dp(48));
-        groups.setChecked(prefs.getBoolean(AutoReply.GROUPS, false));
-        ui.add(frame, groups, 4);
-        LinearLayout buttons = ui.row();
-        buttons.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
-        Button add = ui.button(text.get("auto_reply_add"));
-        add.setTag("auto_reply_add");
-        add.setOnClickListener(clicked -> {
-            if (list.getChildCount() >= AutoReply.MAX_RULES) {
-                feedback(text.get("auto_reply_full", AutoReply.MAX_RULES), Toast.LENGTH_SHORT);
-                return;
-            }
+        groups.setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8));
+        groups.setBackground(ui.interactive(0, 0, 8));
+        groups.setChecked(draft == null ? prefs.getBoolean(AutoReply.GROUPS, false) : draft.getBoolean("groups"));
+        ui.add(sheet.body, groups, 12);
+        autoReplyAdd.setOnClickListener(clicked -> {
+            if (list.getChildCount() >= AutoReply.MAX_RULES) return;
             View card = autoReplyCard(list, new AutoReply.Rule("", ""));
             list.addView(card);
-            card.findViewWithTag("auto_reply_when").requestFocus();
+            refreshReplyCount();
+            View field = card.findViewWithTag("auto_reply_when");
+            field.requestFocus();
+            field.post(() -> field.requestRectangleOnScreen(new Rect(0, 0, field.getWidth(), field.getHeight()), false));
         });
-        buttons.addView(add);
+        Button cancel = ui.button(text.get("auto_reply_cancel"));
+        cancel.setTag("auto_reply_cancel");
+        cancel.setOnClickListener(clicked -> dialog.dismiss());
+        sheet.action(cancel);
         Button save = ui.primaryButton(text.get("auto_reply_save"));
         save.setTag("auto_reply_save");
         save.setOnClickListener(clicked -> {
             List<AutoReply.Rule> rules = new ArrayList<>();
+            EditText firstInvalid = null;
             for (int i = 0; i < list.getChildCount(); i++) {
                 View card = list.getChildAt(i);
-                rules.add(new AutoReply.Rule(((EditText) card.findViewWithTag("auto_reply_when")).getText().toString(),
-                    ((EditText) card.findViewWithTag("auto_reply_reply")).getText().toString()));
+                EditText when = card.findViewWithTag("auto_reply_when"), reply = card.findViewWithTag("auto_reply_reply");
+                AutoReply.Rule rule = new AutoReply.Rule(when.getText().toString(), reply.getText().toString());
+                if (!rule.when.isEmpty() && rule.reply.isEmpty()) {
+                    TextView error = card.findViewWithTag("auto_reply_error");
+                    error.setVisibility(View.VISIBLE);
+                    reply.setBackground(ui.interactive(ui.surface, ui.error, 8, ui.error));
+                    if (Build.VERSION.SDK_INT >= 30) reply.setStateDescription(text.get("auto_reply_required"));
+                    if (firstInvalid == null) firstInvalid = reply;
+                }
+                rules.add(rule);
+            }
+            if (firstInvalid != null) {
+                firstInvalid.requestFocus();
+                firstInvalid.requestRectangleOnScreen(new Rect(0, 0, firstInvalid.getWidth(), firstInvalid.getHeight()), false);
+                firstInvalid.announceForAccessibility(text.get("auto_reply_required"));
+                return;
             }
             int kept = AutoReply.save(prefs, rules, groups.isChecked());
             feedback(kept == 0 ? text.get("auto_reply_saved_none") : text.get("auto_reply_saved", kept), Toast.LENGTH_SHORT);
             dialog.dismiss();
         });
-        LinearLayout.LayoutParams spaced = new LinearLayout.LayoutParams(-2, -2);
-        spaced.setMarginStart(ui.dp(8));
-        buttons.addView(save, spaced);
-        Button close = ui.button(text.get("message_log_close"));
-        close.setOnClickListener(clicked -> dialog.dismiss());
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, -2);
-        closeParams.setMarginStart(ui.dp(8));
-        buttons.addView(close, closeParams);
-        ui.add(frame, buttons, 8);
-        dialog.setContentView(frame);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(ui.background));
-            dialog.getWindow().setLayout(-1, -1);
+        sheet.action(save);
+        refreshReplyCount();
+        sheet.show();
+        if (draft != null) sheet.post(() -> {
+            int index = draft.getInt("focus_index", -1);
+            String tag = draft.getString("focus_tag");
+            if (index >= 0 && index < list.getChildCount() && tag != null) {
+                EditText field = list.getChildAt(index).findViewWithTag(tag);
+                if (field != null) {
+                    field.requestFocus();
+                    int length = field.length();
+                    field.setSelection(Math.max(0, Math.min(length, draft.getInt("selection_start", length))),
+                        Math.max(0, Math.min(length, draft.getInt("selection_end", length))));
+                }
+            }
+            sheet.scroll.scrollTo(0, draft.getInt("scroll"));
+        });
+    }
+
+    private void refreshReplyCount() {
+        if (autoReplyList == null) return;
+        int count = autoReplyList.getChildCount();
+        autoReplyCount.setText(text.get("auto_reply_count", text.number(count), text.number(AutoReply.MAX_RULES)));
+        autoReplyAdd.setEnabled(count < AutoReply.MAX_RULES);
+        for (int i = 0; i < count; i++) {
+            View card = autoReplyList.getChildAt(i);
+            ((TextView) card.findViewWithTag("auto_reply_number")).setText(text.get("auto_reply_number", text.number(i + 1)));
+            card.findViewWithTag("auto_reply_remove").setContentDescription(text.get("auto_reply_remove_number", text.number(i + 1)));
         }
-        dialog.show();
     }
 
     private View autoReplyCard(LinearLayout list, AutoReply.Rule rule) {
         LinearLayout card = ui.column();
         card.setBackground(ui.shape(ui.surface, ui.line, 8));
-        card.setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(6));
-        card.addView(replyField("auto_reply_when", text.get("auto_reply_when"), rule.when, AutoReply.MAX_WHEN_CHARS, true));
-        ui.add(card, replyField("auto_reply_reply", text.get("auto_reply_reply"), rule.reply, AutoReply.MAX_REPLY_CHARS, false), 8);
+        card.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(12));
+        TextView number = ui.text("", 13, ui.accent, true);
+        number.setTag("auto_reply_number");
+        number.setAccessibilityHeading(true);
+        card.addView(number);
+        EditText when = replyField(card, "auto_reply_when", text.get("auto_reply_when"), text.get("auto_reply_when_hint"), rule.when, AutoReply.MAX_WHEN_CHARS, true);
+        ui.add(card, ui.text(text.get("auto_reply_any"), 13, ui.muted, false), 6);
+        EditText reply = replyField(card, "auto_reply_reply", text.get("auto_reply_reply"), text.get("auto_reply_reply_hint"), rule.reply, AutoReply.MAX_REPLY_CHARS, false);
+        TextView error = ui.text(text.get("auto_reply_required"), 13, ui.error, false);
+        error.setTag("auto_reply_error");
+        error.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        error.setVisibility(View.GONE);
+        ui.add(card, error, 6);
+        TextWatcher clearError = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (error.getVisibility() != View.VISIBLE) return;
+                error.setVisibility(View.GONE);
+                reply.setBackground(ui.interactive(ui.surface, ui.outline, 8));
+                if (Build.VERSION.SDK_INT >= 30) reply.setStateDescription(null);
+            }
+            @Override public void afterTextChanged(Editable value) { }
+        };
+        when.addTextChangedListener(clearError);
+        reply.addTextChangedListener(clearError);
         LinearLayout row = ui.row();
-        row.setGravity(android.view.Gravity.END);
+        row.setGravity(Gravity.END);
         Button remove = ui.button(text.get("auto_reply_remove"));
-        remove.setOnClickListener(clicked -> list.removeView(card));
+        remove.setTag("auto_reply_remove");
+        remove.setOnClickListener(clicked -> {
+            int index = list.indexOfChild(card);
+            list.removeView(card);
+            refreshReplyCount();
+            if (list.getChildCount() == 0) autoReplyAdd.requestFocus();
+            else list.getChildAt(Math.min(index, list.getChildCount() - 1)).findViewWithTag("auto_reply_when").requestFocus();
+        });
         row.addView(remove);
-        ui.add(card, row, 4);
+        ui.add(card, row, 12);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.topMargin = ui.dp(8);
+        params.topMargin = ui.dp(12);
         card.setLayoutParams(params);
         return card;
     }
 
-    private EditText replyField(String tag, String hint, String value, int max, boolean singleLine) {
-        EditText field = new EditText(this);
+    private EditText replyField(LinearLayout card, String tag, String title, String hint, String value, int max, boolean singleLine) {
+        EditText field = ui.field(hint, max, singleLine);
         field.setTag(tag);
-        // The hint labels the field; a content description would make TalkBack skip what was typed.
-        field.setHint(hint);
         field.setText(value);
-        field.setTextSize(15);
-        field.setSingleLine(singleLine);
-        field.setFilters(new InputFilter[] {new InputFilter.LengthFilter(max)});
-        field.setHighlightColor((ui.accent & 0x00ffffff) | 0x55000000);
-        tintTextHandles(field);
-        field.setTextColor(ui.text);
-        field.setHintTextColor(ui.muted);
-        field.setMinHeight(ui.dp(48));
-        field.setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(8));
-        field.setBackground(ui.interactive(ui.surface, ui.outline, 8));
+        if (!singleLine) {
+            field.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            field.setMinLines(2);
+            field.setMaxLines(6);
+            field.setGravity(Gravity.TOP | Gravity.START);
+        }
+        TextView label = ui.text(title, 14, ui.text, true);
+        label.setLabelFor(field.getId());
+        ui.add(card, label, 16);
+        ui.add(card, field, 8);
         return field;
     }
 
+    private Bundle autoReplyDraft() {
+        if (autoReplyDialog == null || autoReplyList == null) return null;
+        Bundle draft = new Bundle();
+        ArrayList<String> words = new ArrayList<>(), replies = new ArrayList<>();
+        for (int i = 0; i < autoReplyList.getChildCount(); i++) {
+            View card = autoReplyList.getChildAt(i);
+            EditText when = card.findViewWithTag("auto_reply_when"), reply = card.findViewWithTag("auto_reply_reply");
+            words.add(when.getText().toString());
+            replies.add(reply.getText().toString());
+            EditText focused = when.hasFocus() ? when : reply.hasFocus() ? reply : null;
+            if (focused != null) {
+                draft.putInt("focus_index", i);
+                draft.putString("focus_tag", (String) focused.getTag());
+                draft.putInt("selection_start", focused.getSelectionStart());
+                draft.putInt("selection_end", focused.getSelectionEnd());
+            }
+        }
+        draft.putStringArrayList("words", words);
+        draft.putStringArrayList("replies", replies);
+        draft.putBoolean("groups", autoReplyGroups.isChecked());
+        draft.putInt("scroll", autoReplyScroll.getScrollY());
+        return draft;
+    }
+
     private void clearMessageLog() {
+        if (messageLogClearing) return;
+        messageLogClearing = true;
+        messageLogGeneration++;
+        if (messageLogClear != null) messageLogClear.setEnabled(false);
         new Thread(() -> {
-            MessageLog.clear();
+            boolean cleared = MessageLog.clear();
             runOnUiThread(() -> {
-                feedback(text.get("message_log_cleared"), Toast.LENGTH_SHORT);
+                messageLogClearing = false;
+                if (isFinishing() || isDestroyed()) return;
+                feedback(text.get(cleared ? "message_log_cleared" : "message_log_clear_failed"), Toast.LENGTH_LONG);
                 if (messageLogList != null) loadMessageLog();
             });
         }, "HushMessageLogClear").start();
@@ -2093,6 +2233,9 @@ public final class SettingsActivity extends Activity {
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {
+        Bundle draft = autoReplyDraft();
+        if (draft != null) state.putBundle("auto_reply_draft", draft);
+        state.putBoolean("message_log_open", messageLogDialog != null && messageLogDialog.isShowing());
         state.putString("page", page);
         state.putString("category", category);
         state.putString("query", search.getText().toString());
@@ -2138,20 +2281,4 @@ public final class SettingsActivity extends Activity {
         toast.show();
     }
 
-    /** Framework Material themes draw the cursor and handles in teal; match the settings accent. */
-    private void tintTextHandles(EditText field) {
-        if (Build.VERSION.SDK_INT < 29) return;
-        Drawable cursor = field.getTextCursorDrawable(), middle = field.getTextSelectHandle();
-        Drawable left = field.getTextSelectHandleLeft(), right = field.getTextSelectHandleRight();
-        if (cursor != null) field.setTextCursorDrawable(tinted(cursor));
-        if (middle != null) field.setTextSelectHandle(tinted(middle));
-        if (left != null) field.setTextSelectHandleLeft(tinted(left));
-        if (right != null) field.setTextSelectHandleRight(tinted(right));
-    }
-
-    private Drawable tinted(Drawable drawable) {
-        Drawable copy = drawable.mutate();
-        copy.setTint(ui.accent);
-        return copy;
-    }
 }

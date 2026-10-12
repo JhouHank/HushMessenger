@@ -55,6 +55,46 @@ public class MessageLogTest {
         return new File(Settings.appContext.getFilesDir(), MessageLog.FILE);
     }
 
+    @Test public void aReadFailureIsDifferentFromAnEmptyLog() throws Exception {
+        assertFalse(MessageLog.loadResult().failed);
+        MessageLog.storeNow("kept", "t");
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { return softwareVault.seal(plain); }
+            @Override public byte[] open(byte[] blob) throws Exception { throw new java.io.IOException("unavailable"); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.LoadResult result = MessageLog.loadResult();
+        assertTrue(result.failed);
+        assertTrue(result.entries.isEmpty());
+        assertTrue(logFile().exists());
+        MessageLog.vault = softwareVault;
+        assertFalse(MessageLog.loadResult().failed);
+        assertEquals("kept", MessageLog.loadResult().entries.get(0).text);
+    }
+
+    @Test public void clearingReportsAFailedKeyRemovalAndCanBeRetried() throws Exception {
+        MessageLog.storeNow("kept", "t");
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { return softwareVault.seal(plain); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() throws Exception { throw new java.io.IOException("key unavailable"); }
+        };
+        assertFalse(MessageLog.clear());
+        assertFalse(logFile().exists());
+        MessageLog.vault = softwareVault;
+        assertTrue(MessageLog.clear());
+        assertFalse(MessageLog.loadResult().failed);
+    }
+
+    @Test public void aDamagedLogRemainsVisibleAsAFailureUntilCleared() throws Exception {
+        Files.write(logFile().toPath(), new byte[] {1, 2, 3});
+        assertTrue(MessageLog.loadResult().failed);
+        assertTrue(MessageLog.loadResult().failed);
+        assertTrue(damagedFile().exists());
+        assertTrue(MessageLog.clear());
+        assertFalse(MessageLog.loadResult().failed);
+    }
+
     @Test public void keepsAnEncryptedCopyThatAnUnsendCantTakeBack() throws Exception {
         MessageLog.storeNow("secret note", "ONE_TO_ONE:1:2");
         // Messenger unsending the message later can't touch this file; the copy is independent.

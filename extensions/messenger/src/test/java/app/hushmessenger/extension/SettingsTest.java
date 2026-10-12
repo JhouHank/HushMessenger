@@ -162,7 +162,7 @@ public class SettingsTest {
             assertTrue(spoken.contains("Encrypted chats aren't supported"));
             assertTrue(spoken.contains("group chats aren't tested"));
             assertTrue(spoken.contains("Your own unsends may be limited"));
-            assertEquals("No unsent message seen since Messenger started",
+            assertEquals("On. No unsent message received yet",
                 ((android.widget.TextView) root.findViewWithTag("active_keep_unsent")).getText().toString());
         }
         assertEquals("[unsent] original text", Settings.labelKeptUnsent("original text", "retained-message"));

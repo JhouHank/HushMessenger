@@ -279,19 +279,32 @@ public final class MessageLog {
 
     /** Newest first, for the viewer. Reads and decrypts off the main thread, and removes expired entries from disk. */
     static List<Entry> entries() {
+        return loadResult().entries;
+    }
+
+    static final class LoadResult {
+        final List<Entry> entries;
+        final boolean failed;
+        LoadResult(List<Entry> entries, boolean failed) {
+            this.entries = entries;
+            this.failed = failed;
+        }
+    }
+
+    static LoadResult loadResult() {
         Context context = Settings.appContext;
-        if (context == null) return new ArrayList<>();
+        if (context == null) return new LoadResult(new ArrayList<>(), true);
         try {
             synchronized (LOCK) {
                 List<Entry> entries = load(context);
                 if (prune(entries, System.currentTimeMillis()) || repairedOnRead) save(context, entries);
                 List<Entry> newestFirst = new ArrayList<>(entries.size());
                 for (int i = entries.size() - 1; i >= 0; i--) newestFirst.add(entries.get(i));
-                return newestFirst;
+                return new LoadResult(newestFirst, new File(context.getFilesDir(), DAMAGED).exists());
             }
         } catch (Throwable failure) {
             Settings.hookFailedPrivately(KEY, "Can't read the message log", failure);
-            return new ArrayList<>();
+            return new LoadResult(new ArrayList<>(), true);
         }
     }
 
@@ -324,14 +337,15 @@ public final class MessageLog {
      */
     static java.util.concurrent.Future<?> dropLeftovers(Context context) {
         for (String name : new String[] {FILE, FILE + ".tmp", DAMAGED}) {
-            if (new File(context.getFilesDir(), name).exists()) return WRITER.submit(MessageLog::clear);
+            if (new File(context.getFilesDir(), name).exists()) return WRITER.submit(() -> { clear(); });
         }
         return null;
     }
 
     /** Deletes the file, anything set aside and the key, and drops messages still waiting to be written. */
-    static void clear() {
+    static boolean clear() {
         Context context = Settings.appContext;
+        boolean cleared = context != null;
         synchronized (LOCK) {
             synchronized (PENDING) {
                 PENDING.clear();
@@ -340,6 +354,7 @@ public final class MessageLog {
                 for (String name : new String[] {FILE, FILE + ".tmp", DAMAGED}) {
                     File file = new File(context.getFilesDir(), name);
                     if (file.exists() && !file.delete()) {
+                        cleared = false;
                         Settings.hookFailedPrivately(KEY, "Can't delete the message log",
                             new IOException("delete failed: " + name));
                     }
@@ -348,9 +363,11 @@ public final class MessageLog {
             try {
                 vault().forget();
             } catch (Throwable failure) {
+                cleared = false;
                 Settings.hookFailedPrivately(KEY, "Can't drop the message log key", failure);
             }
         }
+        return cleared;
     }
 
     /**
