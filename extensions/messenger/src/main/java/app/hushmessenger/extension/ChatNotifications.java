@@ -43,6 +43,7 @@ final class ChatNotifications {
         if (extras == null) return null;
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
         String matched = null;
+        boolean disagree = false;
         String only = null;
         boolean several = false;
         if (messages != null) {
@@ -53,14 +54,15 @@ final class ChatNotifications {
                 if (name == null) continue;
                 CharSequence body = message.getCharSequence("text");
                 if (text != null && body != null && text.contentEquals(body)) {
-                    if (matched != null && !matched.equals(name)) return null;
-                    matched = name;
+                    if (matched == null) matched = name;
+                    else if (!matched.equals(name)) disagree = true;
                 }
                 if (only == null) only = name;
                 else if (!only.equals(name)) several = true;
             }
         }
-        if (matched != null) return matched;
+        // Lines that disagree leave a group unknown, but a one-to-one chat still has only one other person.
+        if (matched != null && !disagree) return matched;
         if (thread == null || !oneToOne(thread)) return null;
         if (only != null && !several) return only;
         CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);

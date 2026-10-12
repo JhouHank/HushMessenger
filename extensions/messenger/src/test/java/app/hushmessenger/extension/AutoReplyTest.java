@@ -332,4 +332,17 @@ public class AutoReplyTest {
         assertEquals("The chat is cooling down", 0, AutoReply.pending());
         assertTrue(queued.isEmpty());
     }
+
+    /** Your own line with the same words doesn't hide who sent a one-to-one message. A group stays unknown. */
+    @Test public void aOneToOneChatStillNamesTheOtherPersonWhenYourOwnLineMatchesToo() {
+        android.app.Person me = new android.app.Person.Builder().setName("Me").build();
+        Notification.MessagingStyle style = new Notification.MessagingStyle(me)
+            .addMessage("ok", 1, me).addMessage("ok", 2, new android.app.Person.Builder().setName("Ana").build());
+        Notification shown = new Notification.Builder(context, "chats").setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setContentTitle("Ana").setStyle(style).build();
+        assertEquals("Ana", ChatNotifications.sender(shown, "ok", CHAT));
+        assertNull(ChatNotifications.sender(new Notification.Builder(context, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Climbing")
+            .setStyle(group("Ana", "ok", "Bo", "ok")).build(), "ok", GROUP));
+    }
 }
