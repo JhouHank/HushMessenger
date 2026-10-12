@@ -1477,7 +1477,7 @@ public final class SettingsActivity extends Activity {
                         ui.add(list, empty, result.setAside ? 12 : 0);
                     }
                 }
-                if (!result.entries.isEmpty()) ui.add(list, ui.text(text.get("message_log_retention"), 13, ui.muted, false), 0);
+                if (!result.entries.isEmpty()) ui.add(list, ui.text(text.get("message_log_retention"), 13, ui.muted, false), list.getChildCount() > 0 ? 12 : 0);
                 for (MessageLog.Entry entry : result.entries) list.addView(messageLogEntry(entry));
             });
         }, "HushMessageLogView").start();

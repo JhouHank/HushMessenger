@@ -316,10 +316,12 @@ public class SettingsDialogTest {
             awaitText(root, "A newer message");
             assertNull(findText(root, text.get("message_log_load_failed")));
             assertTrue(root.findViewWithTag("message_log_dialog_clear").isEnabled());
+            assertTrue("the retention line keeps a gap under the notice", topMargin(findText(root, text.get("message_log_retention"))) > 0);
             root.findViewWithTag("message_log_set_aside_remove").performClick();
             awaitGone(root, "message_log_set_aside_remove");
             awaitText(root, "A newer message");
             assertNull(root.findViewWithTag("message_log_set_aside_remove"));
+            assertEquals(0, topMargin(findText(root, text.get("message_log_retention"))));
             assertFalse(aside.exists());
         }
     }
@@ -351,6 +353,10 @@ public class SettingsDialogTest {
             Thread.sleep(10);
         } while (System.nanoTime() < deadline);
         throw new AssertionError("Text didn't appear: " + value);
+    }
+
+    private static int topMargin(View view) {
+        return ((ViewGroup.MarginLayoutParams) view.getLayoutParams()).topMargin;
     }
 
     private static TextView findText(View root, String value) {
