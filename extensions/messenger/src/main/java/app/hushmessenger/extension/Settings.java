@@ -201,6 +201,8 @@ public final class Settings {
     public static boolean hideMetaAiTab() {
         Boolean hidden = metaAiTab;
         if (hidden != null) return hidden;
+        // Started before the lock below, so nothing waits on HostScreens' startup lock while holding it.
+        if (!HostScreens.started) HostScreens.initializeLate();
         // Its own lock, so two first askers can't get different answers if the switch flips between them.
         synchronized (META_AI_TAB) {
             if (metaAiTab == null) metaAiTab = hideMetaAi();
@@ -246,6 +248,7 @@ public final class Settings {
         if (!original) return false;
         Boolean old = oldEmojiDrawer;
         if (old == null) {
+            if (!HostScreens.started) HostScreens.initializeLate();
             synchronized (EMOJI_DRAWER) {
                 if (oldEmojiDrawer == null) oldEmojiDrawer = wouldUse("emoji_drawer");
                 old = oldEmojiDrawer;

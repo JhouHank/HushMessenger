@@ -63,15 +63,35 @@ public class RestartStateTest {
         assertFalse("Pause shows every tab after the restart", Settings.hideNotificationsTab());
     }
 
-    /** Two first askers race: whichever answer is stored first is the one both get, even if the switch moved between. */
-    @Test public void anAnswerStoredFirstWinsOverALaterOneForTheSameTab() {
-        Settings.bottomTabs.put("tab_people", true);
-        assertTrue("The stored answer, not the off switch", Settings.hidePeopleTab());
-        assertTrue("A hidden tab counts as a use", Settings.activeAt.containsKey("tab_people"));
-        Settings.bottomTabs.put("tab_notifications", false);
-        Settings.preferences.edit().putBoolean("tab_notifications", true).commit();
-        assertFalse(Settings.hideNotificationsTab());
-        assertFalse(Settings.activeAt.containsKey("tab_notifications"));
+    /**
+     * A first asker that's waiting on settings to start doesn't hold the tab map, so another thread can store its answer
+     * meanwhile, and that answer, stored first, is the one the waiting asker gets. computeIfAbsent held the map's lock
+     * through the wait, so the other thread's store waited on a start that was waiting on it.
+     */
+    @Test public void aFirstAskerWaitingOnStartLeavesTheTabMapFree() throws Exception {
+        android.app.Application app = RuntimeEnvironment.getApplication();
+        HostScreens.applicationCreated(app);
+        boolean[] hidden = new boolean[1];
+        Thread asker = new Thread(() -> hidden[0] = Settings.hidePeopleTab());
+        try {
+            synchronized (HostScreens.class) {
+                asker.start();
+                long until = System.currentTimeMillis() + 5_000;
+                while (asker.getState() != Thread.State.BLOCKED && System.currentTimeMillis() < until) Thread.sleep(1);
+                assertEquals("The asker waits for settings to start", Thread.State.BLOCKED, asker.getState());
+                Thread other = new Thread(() -> Settings.bottomTabs.put("tab_people", true));
+                other.start();
+                other.join(5_000);
+                assertFalse("Another thread can store an answer meanwhile", other.isAlive());
+            }
+            asker.join(5_000);
+            assertFalse(asker.isAlive());
+            assertTrue("The answer stored first, not the off switch", hidden[0]);
+            assertTrue("A hidden tab counts as a use", Settings.activeAt.containsKey("tab_people"));
+        } finally {
+            HostScreens.applicationCreated(null);
+            Settings.initialize(app);
+        }
     }
 
     @Test public void aHeldAnswerShowsUntilARestartThroughTheSwitchPauseAndSafeMode() {
