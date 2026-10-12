@@ -35,6 +35,7 @@ Development v0.23.3.
 - Completed the remaining attribution-upload checks using the released build's device evidence.
 - Retired the outstanding Messenger 580 installation checks. Current builds support Messenger 582 only.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
+- The compatibility report now checks everything the reply and Seen hooks rely on in Messenger's code, so a build that moved them shows up in the report instead of failing at patch time.
 - The Meta AI, People and Notifications tab switches and the emoji drawer switch no longer wait on settings to start while holding their own lock. Nothing took those locks in the other order, so there was no hang to fix.
 
 ### New
