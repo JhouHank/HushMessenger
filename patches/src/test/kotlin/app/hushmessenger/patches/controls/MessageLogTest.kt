@@ -25,6 +25,8 @@ private const val THREAD_KEY_FIELD = "$MESSAGE->A0e:$THREAD_KEY_TYPE"
 private const val UNSENT_OWNER = "LX/8MY;"
 private const val UNSENT_CHECK = "$UNSENT_OWNER->A03($MESSAGE)Z"
 private const val MESSAGE_ID_FIELD = "$MESSAGE->A1m:Ljava/lang/String;"
+private const val HIDDEN_FIELD = "$MESSAGE->A2E:Z"
+private const val TEXT_BUILDER = "LX/5Ds;"
 private const val JSON_PUT_REF = "Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;"
 private const val ID_CONSUMER = "$MESSENGER_BROWSER_LAUNCHER->A00(Lorg/json/JSONObject;${MESSAGE}Landroid/os/Bundle;)V"
 private val STATIC_PUBLIC = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value or AccessFlags.FINAL.value
@@ -56,6 +58,21 @@ private val ID_CONSUMER_BODY = """
     iget-object v1, p1, $MESSAGE->A1x:Ljava/lang/String;
     invoke-virtual {p2, v0, v1}, Landroid/os/Bundle;->putString(Ljava/lang/String;Ljava/lang/String;)V
     return-void
+""".trimIndent()
+
+/**
+ * Messenger's notification text builder: "Secret conversation" when the message's text was hidden. The thread key read
+ * first is an object field, so it doesn't count.
+ */
+private val HIDDEN_READER_BODY = """
+    iget-object v0, p1, $MESSAGE->A0e:$THREAD_KEY_TYPE
+    iget-boolean v0, p1, $HIDDEN_FIELD
+    if-eqz v0, :shown
+    const-string v0, "Secret conversation"
+    return-object v0
+    :shown
+    const/4 v0, 0x0
+    return-object v0
 """.trimIndent()
 
 /** The stock classes the message log reads from, cut down to the shape the resolver checks. */
@@ -92,6 +109,8 @@ internal fun messageLogFixture(
     unsentOwnerFlags: Int = AccessFlags.PUBLIC.value or AccessFlags.ABSTRACT.value,
     idConsumer: String = ID_CONSUMER_BODY,
     idFlags: Int = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value,
+    hiddenReader: String = HIDDEN_READER_BODY,
+    hiddenFlags: Int = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value,
 ): List<MutableClass> {
     val notificationCtor = newMessageNotificationCtor("LX/5qJ;", "LX/5Yc;")
     val secret = fixtureClass(SECRET_STRING, listOf(
@@ -102,7 +121,8 @@ internal fun messageLogFixture(
         // A decoy that also returns a SecretString but names a different field, so "text" has to disambiguate.
         fixtureMethod("$MESSAGE->A0F()$SECRET_STRING", "const-string v0, \"snippet\"\niget-object v0, v1, $MESSAGE->A0m:$SECRET_STRING\nreturn-object v0", 2),
     ), extraFields = listOf(field(MESSAGE, "A0n", SECRET_STRING, bodyFlags), field(MESSAGE, "A0m", SECRET_STRING), field(MESSAGE, "A0e", THREAD_KEY_TYPE), field(MESSAGE, "A09", "J"),
-        field(MESSAGE, "A1m", "Ljava/lang/String;", idFlags), field(MESSAGE, "A1x", "Ljava/lang/String;")))
+        field(MESSAGE, "A1m", "Ljava/lang/String;", idFlags), field(MESSAGE, "A1x", "Ljava/lang/String;"),
+        field(MESSAGE, "A2E", "Z", hiddenFlags), field(MESSAGE, "A2M", "Z")))
     val notification = fixtureClass(NEW_MESSAGE_NOTIFICATION, listOf(
         fixtureMethod(notificationCtor, ctorBody, ctorRegisters),
         // The Parcel constructor the resolver must skip.
@@ -122,7 +142,12 @@ internal fun messageLogFixture(
     val decoy = fixtureClass("LX/2Ji;", listOf(fixtureMethod("LX/2Ji;->A0S($MESSAGE)Z",
         "iget-object v0, p0, $MESSAGE->A0e:$THREAD_KEY_TYPE\nif-eqz v0, :none\nconst/4 v0, 0x1\n:none\nreturn v0", 2, STATIC_PUBLIC)))
     val launcher = fixtureClass(MESSENGER_BROWSER_LAUNCHER, listOf(fixtureMethod(ID_CONSUMER, idConsumer, 5, STATIC_PUBLIC)))
-    return listOf(secret, message, notification, manager, unsent, decoy, launcher)
+    // A (Message)Z beside it reads another flag, and only the (Message, ThreadSummary)String shape names the hidden one.
+    val texts = fixtureClass(TEXT_BUILDER, listOf(
+        fixtureMethod("$TEXT_BUILDER->A01($MESSAGE$THREAD_SUMMARY)Ljava/lang/String;", hiddenReader, 4, AccessFlags.PUBLIC.value),
+        fixtureMethod("$TEXT_BUILDER->A00($MESSAGE)Z", "iget-boolean v0, p1, $MESSAGE->A2M:Z\nreturn v0", 3, AccessFlags.PUBLIC.value),
+    ))
+    return listOf(secret, message, notification, manager, unsent, decoy, launcher, texts)
 }
 
 private fun MutableMethod.code() = implementation!!.instructions.toList()
@@ -149,6 +174,7 @@ class MessageLogTest {
         assertEquals(THREAD_KEY_FIELD, contract.threadKeyField)
         assertEquals(UNSENT_CHECK, contract.unsentCheck)
         assertEquals(MESSAGE_ID_FIELD, contract.messageIdField)
+        assertEquals(HIDDEN_FIELD, contract.hiddenField)
     }
 
     @Test fun theHookReadsTheMessageAndThreadAndKeepsTheOriginalBody() {
@@ -170,25 +196,31 @@ class MessageLogTest {
         assertEquals(1, (code[6] as OneRegisterInstruction).registerA)
         assertEquals(Opcode.IF_NEZ, code[7].opcode)
         assertEquals(stock, code.branchTarget(7))
-        // The id goes over on its own first, since the constructor has room for only two values at once.
-        assertEquals(MESSAGE_ID_FIELD, reference(8, code))
+        // Text Messenger hid, such as a disappearing chat's "Secret conversation", goes to the stock constructor too.
+        assertEquals(Opcode.IGET_BOOLEAN, code[8].opcode)
+        assertEquals(HIDDEN_FIELD, reference(8, code))
         assertEquals(1, (code[8] as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA)
-        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(9, code))
-        assertEquals(BODY_FIELD, reference(10, code))
-        assertEquals(stock, code.branchTarget(11))
-        assertEquals(SECRET_FIELD, reference(12, code))
-        assertEquals(THREAD_KEY_FIELD, reference(13, code))
-        assertEquals(Opcode.IF_EQZ, code[14].opcode)
+        assertEquals(Opcode.IF_NEZ, code[9].opcode)
+        assertEquals(stock, code.branchTarget(9))
+        // The id goes over on its own first, since the constructor has room for only two values at once.
+        assertEquals(MESSAGE_ID_FIELD, reference(10, code))
+        assertEquals(1, (code[10] as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA)
+        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(11, code))
+        assertEquals(BODY_FIELD, reference(12, code))
+        assertEquals(stock, code.branchTarget(13))
+        assertEquals(SECRET_FIELD, reference(14, code))
+        assertEquals(THREAD_KEY_FIELD, reference(15, code))
+        assertEquals(Opcode.IF_EQZ, code[16].opcode)
         // Null thread skips toString and passes a null string, so the register stays String-typed on both paths.
-        assertEquals(18, code.branchTarget(14))
-        assertEquals("$THREAD_KEY_TYPE->toString()Ljava/lang/String;", reference(15, code))
-        assertEquals(Opcode.GOTO, code[17].opcode)
-        assertEquals(19, code.branchTarget(17))
-        assertEquals(Opcode.CONST_4, code[18].opcode)
-        assertEquals("$SETTINGS->recordReceivedMessage(Ljava/lang/String;Ljava/lang/String;)V", reference(19, code))
+        assertEquals(20, code.branchTarget(16))
+        assertEquals("$THREAD_KEY_TYPE->toString()Ljava/lang/String;", reference(17, code))
+        assertEquals(Opcode.GOTO, code[19].opcode)
+        assertEquals(21, code.branchTarget(19))
+        assertEquals(Opcode.CONST_4, code[20].opcode)
+        assertEquals("$SETTINGS->recordReceivedMessage(Ljava/lang/String;Ljava/lang/String;)V", reference(21, code))
         // The only way out after the handover is a message with no text. Each sink has its own handover right before
         // it, so a leftover id is replaced before any sink could take it.
-        assertEquals(listOf(11), (9..19).filter { code.branchTarget(it) == stock })
+        assertEquals(listOf(13), (11..21).filter { code.branchTarget(it) == stock })
         assertEquals(before, code.drop(stock))
     }
 
@@ -208,14 +240,15 @@ class MessageLogTest {
         assertEquals(logged.size - before.size, block)
         assertEquals("$SETTINGS->autoReplyWanted()Z", reference(0, code))
         assertEquals(UNSENT_CHECK, reference(5, code))
-        assertEquals(MESSAGE_ID_FIELD, reference(8, code))
-        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(9, code))
-        assertEquals(BODY_FIELD, reference(10, code))
-        assertEquals("$SETTINGS->autoReplyTo(Ljava/lang/String;Ljava/lang/String;)V", reference(19, code))
+        assertEquals(HIDDEN_FIELD, reference(8, code))
+        assertEquals(MESSAGE_ID_FIELD, reference(10, code))
+        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(11, code))
+        assertEquals(BODY_FIELD, reference(12, code))
+        assertEquals("$SETTINGS->autoReplyTo(Ljava/lang/String;Ljava/lang/String;)V", reference(21, code))
         // Each skip in the auto reply block lands on the message log block, which still checks its own gate and hands
-        // its own id over. An unsend never gets an auto reply either.
-        for (skip in listOf(2, 4, 7, 11)) assertEquals(block, code.branchTarget(skip))
-        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(block + 9, code))
+        // its own id over. An unsend or a message whose text Messenger hid never gets an auto reply either.
+        for (skip in listOf(2, 4, 7, 9, 13)) assertEquals(block, code.branchTarget(skip))
+        assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(block + 11, code))
         assertEquals("$SETTINGS->logReceivedMessages()Z", reference(block, code))
         assertEquals(before, code.drop(2 * block))
     }
@@ -321,9 +354,33 @@ class MessageLogTest {
             ctor.injectMessageLog()
             val after = ctor.code()
             assertEquals(contract!!.unsentCheck, reference(5, after), code)
-            assertEquals(MESSAGE_ID_FIELD, reference(8, after), code)
-            assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(9, after), code)
+            assertEquals(listOf(HIDDEN_FIELD), findHiddenTextFields(classes), code)
+            assertEquals(HIDDEN_FIELD, reference(8, after), code)
+            assertEquals(MESSAGE_ID_FIELD, reference(10, after), code)
+            assertEquals("$SETTINGS->incomingMessageId(Ljava/lang/String;)V", reference(11, after), code)
             assertEquals(before.map { it.opcode }, after.drop(after.size - before.size).map { it.opcode }, code)
+        }
+    }
+
+    /** Without one clear hidden-text flag, a disappearing chat's stand-in would be logged, so the switch stops first. */
+    @Test fun aHiddenTextFlagThatDoesNotMatchRefusesTheSwitchBeforeAnyEdit() {
+        val cases = mapOf(
+            "no text builder reads a flag" to (messageLogFixture(hiddenReader = "const/4 v0, 0x0\nreturn-object v0") to 0),
+            "two flags" to (messageLogFixture(hiddenReader = HIDDEN_READER_BODY.replace(
+                "iget-object v0, p1, $MESSAGE->A0e:$THREAD_KEY_TYPE", "iget-boolean v0, p1, $MESSAGE->A2M:Z")) to 2),
+            "field private" to (messageLogFixture(hiddenFlags = AccessFlags.PRIVATE.value) to 1),
+            "field package-private" to (messageLogFixture(hiddenFlags = 0) to 1),
+        )
+        for ((case, shape) in cases) {
+            val (classes, fields) = shape
+            assertEquals(fields, findHiddenTextFields(classes).size, case)
+            findControls(classes)
+            assertEquals(null, messageLogContract, case)
+            val ctor = ctorOf(classes)
+            val before = ctor.code()
+            assertFailsWith<PatchException>(case) { injectControl(MESSAGE_LOG, mapOf(MESSAGE_LOG to listOf(ctor))) }
+            assertFailsWith<PatchException>(case) { injectControl(AUTO_REPLY, mapOf(AUTO_REPLY to listOf(ctor))) }
+            assertEquals(before, ctor.code(), case)
         }
     }
 

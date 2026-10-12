@@ -12,6 +12,7 @@ Development v0.23.3.
 - **Auto reply** drops a message it hasn't answered yet when you turn it off or pause, and when you edit your replies, so an older message can't get a new answer. One message delivered twice gets one answer, at most 20 messages wait at once (messages it couldn't answer anyway don't count), and a phone clock set back no longer stretches a chat's five-minute wait.
 - When HushMessenger's settings can't start, the **Bold and italic text** entries leave the selection menu instead of staying there from an earlier run.
 - **Bold and italic text** now puts Bold and Italic in the chat box's menu too. Messenger's text field there had kept every app's text actions out, not just these two. On a Samsung phone you may need to turn on **Messenger Bold** and **Messenger Italic** once under **Manage apps** in that menu.
+- **Keep a message log** and **Auto reply** now skip messages from a chat with disappearing messages on. Messenger hides the words of those messages, so the log used to save a "Secret conversation" placeholder in place of the text. The check uses Messenger's own hidden-text flag, not the wording, so it works in every language.
 
 ### Settings
 

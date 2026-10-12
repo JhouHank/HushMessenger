@@ -67,6 +67,12 @@ internal class MessageLogContract(
      * a web page. The push and the sync copy of one message share it, and two messages with the same text don't.
      */
     val messageIdField: String,
+    /**
+     * Message's boolean that marks text Messenger hid from the notification. A chat with disappearing messages on gets a
+     * stand-in Message whose text is "Secret conversation" and whose notification has no Reply action. Messenger's own
+     * notification text builder, the one (Message, ThreadSummary)String method, reads this flag and nothing else.
+     */
+    val hiddenField: String,
 )
 
 internal var messageLogContract: MessageLogContract? = null
@@ -124,8 +130,22 @@ internal fun resolveMessageLogContract(classes: Iterable<ClassDef>): MessageLogC
     val messageId = findMessageIdFields(classes).singleOrNull() ?: return null
     if (!message.declaresReadable(messageId, NEW_MESSAGE_NOTIFICATION)) return null
 
-    return MessageLogContract(body, secretField, threadKeyField, unsentCheck, messageId)
+    val hidden = findHiddenTextFields(classes).singleOrNull() ?: return null
+    if (!message.declaresReadable(hidden, NEW_MESSAGE_NOTIFICATION)) return null
+
+    return MessageLogContract(body, secretField, threadKeyField, unsentCheck, messageId, hidden)
 }
+
+/** The Message boolean fields every (Message, ThreadSummary)String method reads. More than one can't be told apart. */
+internal fun findHiddenTextFields(classes: Iterable<ClassDef>): List<String> =
+    classes.flatMap { it.methods }.filter {
+        it.returnType == "Ljava/lang/String;" && it.parameterTypes.map { type -> type.toString() } == listOf(MESSAGE, THREAD_SUMMARY)
+    }.flatMap { method ->
+        method.implementation?.instructions?.toList().orEmpty().filter { it.opcode == Opcode.IGET_BOOLEAN }
+            .mapNotNull { (it as? ReferenceInstruction)?.reference as? FieldReference }
+            .filter { it.definingClass == MESSAGE && it.type == "Z" }
+            .map { fieldId(it) }
+    }.distinct()
 
 /**
  * Every Message String field the browser launcher reads straight after loading "message_id" and puts into a JSONObject
@@ -221,7 +241,7 @@ internal fun MutableMethod.validateMessageLog() {
  * At the constructor's start, before the super call, the hook reads the incoming message's id, text and thread from the
  * parameter object (never the one being built), and hands them to the extension off Messenger's own thread. Off, Pause
  * and safe mode read nothing: the extension's gate is checked first, so the text is never even loaded. An unsent
- * message is skipped, since its text is only Messenger's stand-in.
+ * message is skipped, since its text is only Messenger's stand-in, and so is one whose text Messenger hid.
  *
  * The constructor has only two free registers, so the id goes over first, on its own, and the sink picks it up on the
  * same thread. Every path to a sink passes its own handover first, so a sink can't get an earlier message's id.
@@ -245,6 +265,8 @@ private fun MutableMethod.injectIncomingMessage(gate: String, sink: String) {
         if-eqz v0, :stock_behavior
         invoke-static {v0}, ${contract.unsentCheck}
         move-result v1
+        if-nez v1, :stock_behavior
+        iget-boolean v1, v0, ${contract.hiddenField}
         if-nez v1, :stock_behavior
         iget-object v1, v0, ${contract.messageIdField}
         invoke-static {v1}, $SETTINGS->incomingMessageId(Ljava/lang/String;)V

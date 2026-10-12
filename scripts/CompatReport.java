@@ -2123,11 +2123,42 @@ public class CompatReport {
     }
 
     /**
+     * The Message boolean that the notification text builder, the one (Message, ThreadSummary)String method, reads to
+     * show "Secret conversation" instead of the text. Public, or null when there isn't exactly one. Mirrors
+     * findHiddenTextFields.
+     */
+    static String hiddenTextField(List<ClassDef> classes) {
+        var fields = new LinkedHashSet<String>();
+        for (var cls : classes) {
+            for (var m : cls.getMethods()) {
+                var params = m.getParameterTypes();
+                if (!"Ljava/lang/String;".equals(m.getReturnType()) || params.size() != 2 || !MESSAGE_TYPE.contentEquals(params.get(0)) ||
+                    !THREAD_SUMMARY_TYPE.contentEquals(params.get(1)) || m.getImplementation() == null) continue;
+                for (var insn : m.getImplementation().getInstructions()) {
+                    if (insn.getOpcode() == Opcode.IGET_BOOLEAN && ((ReferenceInstruction) insn).getReference() instanceof FieldReference field &&
+                        MESSAGE_TYPE.equals(field.getDefiningClass()) && "Z".equals(field.getType()))
+                        fields.add(field.getDefiningClass() + "->" + field.getName() + ":" + field.getType());
+                }
+            }
+        }
+        if (fields.size() != 1) return null;
+        var hidden = fields.iterator().next();
+        for (var cls : classes) {
+            if (!MESSAGE_TYPE.equals(cls.getType())) continue;
+            for (var f : cls.getFields()) {
+                if ((MESSAGE_TYPE + "->" + f.getName() + ":" + f.getType()).equals(hidden) && AccessFlags.PUBLIC.isSet(f.getAccessFlags())) return hidden;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The non-Parcel NewMessageNotification constructor, whose message and thread parameters the hook reads. Without one
-     * readable message id the log couldn't tell two messages apart, so the build reports no hook.
+     * readable message id the log couldn't tell two messages apart, and without the hidden-text flag it would log a
+     * disappearing chat's stand-in, so either way the build reports no hook.
      */
     static List<Method> messageLogHooks(List<ClassDef> classes) {
-        if (messageIdField(classes) == null) return List.of();
+        if (messageIdField(classes) == null || hiddenTextField(classes) == null) return List.of();
         for (var cls : classes) {
             if (!NEW_MESSAGE_NOTIFICATION.equals(cls.getType())) continue;
             var ctors = new ArrayList<Method>();
