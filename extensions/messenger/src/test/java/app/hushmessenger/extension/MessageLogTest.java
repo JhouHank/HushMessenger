@@ -65,6 +65,7 @@ public class MessageLogTest {
         };
         MessageLog.LoadResult result = MessageLog.loadResult();
         assertTrue(result.failed);
+        assertFalse(result.setAside);
         assertTrue(result.entries.isEmpty());
         assertTrue(logFile().exists());
         MessageLog.vault = softwareVault;
@@ -86,13 +87,29 @@ public class MessageLogTest {
         assertFalse(MessageLog.loadResult().failed);
     }
 
-    @Test public void aDamagedLogRemainsVisibleAsAFailureUntilCleared() throws Exception {
+    /** A set-aside file stays reported, but as a notice: the log keeps working, so it isn't a read failure. */
+    @Test public void aSetAsideLogIsReportedApartFromFailuresUntilRemoved() throws Exception {
         Files.write(logFile().toPath(), new byte[] {1, 2, 3});
-        assertTrue(MessageLog.loadResult().failed);
-        assertTrue(MessageLog.loadResult().failed);
+        MessageLog.LoadResult first = MessageLog.loadResult();
+        assertFalse(first.failed);
+        assertTrue(first.setAside);
         assertTrue(damagedFile().exists());
+        MessageLog.storeNow("after", "t");
+        MessageLog.LoadResult later = MessageLog.loadResult();
+        assertFalse(later.failed);
+        assertTrue(later.setAside);
+        assertEquals("after", later.entries.get(0).text);
+        assertTrue(MessageLog.removeSetAside());
+        assertFalse(damagedFile().exists());
+        MessageLog.LoadResult removed = MessageLog.loadResult();
+        assertFalse(removed.setAside);
+        assertEquals("after", removed.entries.get(0).text);
+        assertTrue(MessageLog.removeSetAside());
+
+        Files.write(logFile().toPath(), new byte[] {1, 2, 3});
+        assertTrue(MessageLog.loadResult().setAside);
         assertTrue(MessageLog.clear());
-        assertFalse(MessageLog.loadResult().failed);
+        assertFalse(MessageLog.loadResult().setAside);
     }
 
     @Test public void keepsAnEncryptedCopyThatAnUnsendCantTakeBack() throws Exception {

@@ -285,26 +285,41 @@ public final class MessageLog {
     static final class LoadResult {
         final List<Entry> entries;
         final boolean failed;
-        LoadResult(List<Entry> entries, boolean failed) {
+        /** An older file was moved aside as unreadable. The log itself works, so this isn't a failure. */
+        final boolean setAside;
+        LoadResult(List<Entry> entries, boolean failed, boolean setAside) {
             this.entries = entries;
             this.failed = failed;
+            this.setAside = setAside;
         }
     }
 
     static LoadResult loadResult() {
         Context context = Settings.appContext;
-        if (context == null) return new LoadResult(new ArrayList<>(), true);
+        if (context == null) return new LoadResult(new ArrayList<>(), true, false);
         try {
             synchronized (LOCK) {
                 List<Entry> entries = load(context);
                 if (prune(entries, System.currentTimeMillis()) || repairedOnRead) save(context, entries);
                 List<Entry> newestFirst = new ArrayList<>(entries.size());
                 for (int i = entries.size() - 1; i >= 0; i--) newestFirst.add(entries.get(i));
-                return new LoadResult(newestFirst, new File(context.getFilesDir(), DAMAGED).exists());
+                return new LoadResult(newestFirst, false, new File(context.getFilesDir(), DAMAGED).exists());
             }
         } catch (Throwable failure) {
             Settings.hookFailedPrivately(KEY, "Can't read the message log", failure);
-            return new LoadResult(new ArrayList<>(), true);
+            return new LoadResult(new ArrayList<>(), true, false);
+        }
+    }
+
+    /** Deletes only the file {@link #load} set aside. Nothing can open it, and the live log stays as it is. */
+    static boolean removeSetAside() {
+        Context context = Settings.appContext;
+        if (context == null) return false;
+        synchronized (LOCK) {
+            File aside = new File(context.getFilesDir(), DAMAGED);
+            if (!aside.exists() || aside.delete()) return true;
+            Settings.hookFailedPrivately(KEY, "Can't delete the set-aside message log", new IOException("delete failed: " + DAMAGED));
+            return false;
         }
     }
 

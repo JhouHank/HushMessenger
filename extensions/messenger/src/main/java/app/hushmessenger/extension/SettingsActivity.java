@@ -1417,7 +1417,7 @@ public final class SettingsActivity extends Activity {
             runOnUiThread(() -> {
                 if (messageLogList != list || generation != messageLogGeneration) return;
                 list.removeAllViews();
-                if (messageLogClear != null) messageLogClear.setEnabled(result.failed || messageLogClearFailed || !result.entries.isEmpty());
+                if (messageLogClear != null) messageLogClear.setEnabled(result.failed || result.setAside || messageLogClearFailed || !result.entries.isEmpty());
                 if (result.failed || messageLogClearFailed) {
                     LinearLayout failure = ui.panel();
                     failure.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -1428,15 +1428,39 @@ public final class SettingsActivity extends Activity {
                     retry.setOnClickListener(view -> { if (messageLogClearFailed) clearMessageLog(); else loadMessageLog(); });
                     ui.add(failure, retry, 16);
                     ui.add(list, failure, 0);
-                } else if (result.entries.isEmpty()) {
-                    LinearLayout empty = ui.panel();
-                    empty.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-                    empty.addView(ui.text(text.get("message_log_empty"), 18, ui.text, true));
-                    ui.add(empty, ui.text(text.get(Settings.wouldUse(MessageLog.KEY) ? "message_log_empty_on" : "message_log_empty_off"), 14, ui.muted, false), 8);
-                    ui.add(list, empty, 0);
+                } else {
+                    // The log works; only an older file it couldn't read was moved aside. Say so without calling it a failure.
+                    if (result.setAside) {
+                        LinearLayout notice = ui.panel();
+                        notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+                        notice.addView(ui.text(text.get("message_log_set_aside"), 18, ui.text, true));
+                        ui.add(notice, ui.text(text.get("message_log_set_aside_help"), 14, ui.muted, false), 8);
+                        Button remove = ui.button(text.get("message_log_set_aside_remove"));
+                        remove.setTag("message_log_set_aside_remove");
+                        remove.setOnClickListener(view -> { view.setEnabled(false); removeSetAsideLog(); });
+                        ui.add(notice, remove, 16);
+                        ui.add(list, notice, 0);
+                    }
+                    if (result.entries.isEmpty()) {
+                        LinearLayout empty = ui.panel();
+                        empty.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+                        empty.addView(ui.text(text.get("message_log_empty"), 18, ui.text, true));
+                        ui.add(empty, ui.text(text.get(Settings.wouldUse(MessageLog.KEY) ? "message_log_empty_on" : "message_log_empty_off"), 14, ui.muted, false), 8);
+                        ui.add(list, empty, result.setAside ? 12 : 0);
+                    }
                 }
                 if (!result.entries.isEmpty()) ui.add(list, ui.text(text.get("message_log_retention"), 13, ui.muted, false), 0);
                 for (MessageLog.Entry entry : result.entries) list.addView(messageLogEntry(entry));
+            });
+        }, "HushMessageLogView").start();
+    }
+
+    private void removeSetAsideLog() {
+        new Thread(() -> {
+            final boolean removed = MessageLog.removeSetAside();
+            runOnUiThread(() -> {
+                if (!removed) feedback(text.get("message_log_set_aside_failed"), Toast.LENGTH_LONG);
+                loadMessageLog();
             });
         }, "HushMessageLogView").start();
     }

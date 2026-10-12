@@ -265,6 +265,37 @@ public class SettingsDialogTest {
         }
     }
 
+    @Test public void aSetAsideLogShowsANoticeAboveTheNewMessagesInsteadOfAFailure() throws Exception {
+        java.io.File aside = new java.io.File(Settings.appContext.getFilesDir(), MessageLog.DAMAGED);
+        java.nio.file.Files.write(new java.io.File(Settings.appContext.getFilesDir(), MessageLog.FILE).toPath(), new byte[] {1, 2, 3});
+        assertTrue(MessageLog.loadResult().setAside);
+        MessageLog.write(Settings.appContext, List.of(new MessageLog.Entry(System.currentTimeMillis(), "t", "A newer message")));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            screen.get().getWindow().getDecorView().findViewWithTag("message_log_view").performClick();
+            View root = ShadowDialog.getLatestDialog().getWindow().getDecorView();
+            SettingsText text = new SettingsText(screen.get());
+            awaitText(root, text.get("message_log_set_aside"));
+            awaitText(root, "A newer message");
+            assertNull(findText(root, text.get("message_log_load_failed")));
+            assertTrue(root.findViewWithTag("message_log_dialog_clear").isEnabled());
+            root.findViewWithTag("message_log_set_aside_remove").performClick();
+            awaitGone(root, "message_log_set_aside_remove");
+            awaitText(root, "A newer message");
+            assertNull(root.findViewWithTag("message_log_set_aside_remove"));
+            assertFalse(aside.exists());
+        }
+    }
+
+    private static void awaitGone(View root, String tag) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        do {
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            if (root.findViewWithTag(tag) == null) return;
+            Thread.sleep(10);
+        } while (System.nanoTime() < deadline);
+        throw new AssertionError("View didn't go away: " + tag);
+    }
+
     private static void layout(View root) {
         for (int pass = 0; pass < 2; pass++) {
             root.measure(View.MeasureSpec.makeMeasureSpec(390, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(844, View.MeasureSpec.EXACTLY));
