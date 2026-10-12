@@ -61,11 +61,11 @@ public class TextStyleTest {
     }
 
     @Test public void keycapEmojiStayWhole() {
-        String keycap = "1️⃣";
+        String keycap = "1\uFE0F\u20E3";
         assertEquals(keycap + " " + points(0x1D5F5, 0x1D5F6), bold(keycap + " hi"));
         assertEquals(keycap + " " + points(0x1D7ED), bold(keycap + " 1"));
         assertNull(bold(keycap));
-        assertNull("A keycap without the selector is still an emoji", bold("1⃣"));
+        assertNull("A keycap without the selector is still an emoji", bold("1\u20E3"));
     }
 
     @Test public void boldAndItalicCombineAndComeOffOneAtATime() {
@@ -122,13 +122,18 @@ public class TextStyleTest {
     }
 
     @Test public void aReadOnlySelectionSaysWhyNothingChanged() {
-        Settings.preferences.edit().putBoolean(TextStyleActivity.KEY, true).commit();
         Intent received = selection(TextStyleActivity.BOLD, "Hi").putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true);
+        try (ActivityController<TextStyleActivity> controller = Robolectric.buildActivity(TextStyleActivity.class, received).create()) {
+            assertEquals(Activity.RESULT_CANCELED, shadowOf(controller.get()).getResultCode());
+        }
+        assertNull("Off says nothing, even on read-only text", ShadowToast.getLatestToast());
+        Settings.preferences.edit().putBoolean(TextStyleActivity.KEY, true).commit();
         try (ActivityController<TextStyleActivity> controller = Robolectric.buildActivity(TextStyleActivity.class, received).create()) {
             assertEquals(Activity.RESULT_CANCELED, shadowOf(controller.get()).getResultCode());
             assertTrue(controller.get().isFinishing());
         }
         assertEquals(new SettingsText(app).get("text_style_read_only"), ShadowToast.getTextOfLatestToast());
+        assertEquals("Nothing was styled, so it isn't a use", 0, Settings.lastActive(TextStyleActivity.KEY));
     }
 
     @Test public void theMenuEntriesFollowTheSwitchPauseAndSafeMode() {

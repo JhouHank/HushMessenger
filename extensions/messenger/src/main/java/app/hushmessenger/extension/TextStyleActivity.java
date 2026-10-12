@@ -45,7 +45,8 @@ public final class TextStyleActivity extends Activity {
         else {
             setResult(RESULT_CANCELED);
             // Android offers the entries over text you can't edit too, like a received message, so say why nothing changed.
-            if (readOnly(getIntent()) && Settings.enabled(KEY)) {
+            // wouldUse, since nothing was styled and this mustn't count as a use.
+            if (readOnly(getIntent()) && Settings.wouldUse(KEY)) {
                 Toast.makeText(getApplicationContext(), new SettingsText(this).get("text_style_read_only"), Toast.LENGTH_SHORT).show();
             }
         }
@@ -111,7 +112,7 @@ public final class TextStyleActivity extends Activity {
                 next += Character.charCount(mark);
             }
             // A digit with the emoji selector or a keycap is an emoji like 1️⃣, and a styled digit would break it.
-            if (marks.indexOf('️') >= 0 || marks.indexOf('⃣') >= 0) found = null;
+            if (marks.indexOf('\uFE0F') >= 0 || marks.indexOf('\u20E3') >= 0) found = null;
             pieces.add(found == null ? new Piece(text.substring(at, next), -1, 0, "")
                 : new Piece(text.substring(at, next), found[0], found[1], marks));
             at = next;
