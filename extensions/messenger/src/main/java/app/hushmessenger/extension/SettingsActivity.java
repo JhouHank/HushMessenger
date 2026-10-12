@@ -1459,6 +1459,7 @@ public final class SettingsActivity extends Activity {
         new Thread(() -> {
             final boolean removed = MessageLog.removeSetAside();
             runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
                 if (!removed) feedback(text.get("message_log_set_aside_failed"), Toast.LENGTH_LONG);
                 loadMessageLog();
             });

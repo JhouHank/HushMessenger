@@ -260,9 +260,9 @@ final class SettingsText {
         ENGLISH.put("message_log_empty_on", "New messages with notification text will appear here. Messages already in your chats aren't added.");
         ENGLISH.put("message_log_empty_off", "Turn on Keep a message log in Controls to save new messages with notification text. Messages already in your chats aren't added.");
         ENGLISH.put("message_log_load_failed", "Couldn't open the message log");
-        ENGLISH.put("message_log_load_help", "Try again. If a saved log is damaged, Clear log removes it so new messages can be saved.");
+        ENGLISH.put("message_log_load_help", "Try again. If it keeps failing, Clear log deletes the saved log and its key so new messages can be saved.");
         ENGLISH.put("message_log_set_aside", "An older log couldn't be read");
-        ENGLISH.put("message_log_set_aside_help", "It was set aside so new messages keep saving. Nothing can open it now, so removing it doesn't lose anything below.");
+        ENGLISH.put("message_log_set_aside_help", "It was set aside so new messages keep saving. Nothing can open it now, and removing it doesn't touch newer messages.");
         ENGLISH.put("message_log_set_aside_remove", "Remove old log");
         ENGLISH.put("message_log_set_aside_failed", "Couldn't remove the old log. Try again.");
         ENGLISH.put("message_log_clear_failed", "Couldn't clear the whole log");

@@ -10,8 +10,7 @@ Development v0.23.3.
 ### Settings
 
 - Auto replies keep their labels while you type, show how many replies are available and flag an unfinished reply before saving. Cancel leaves saved replies alone. Drafts, group choice and text selection survive a recreated settings screen.
-- Message log now explains an empty log, distinguishes a read failure from an empty result and offers retry. Clear log reports a failure if it can't remove the file or key. Saved message text can be selected.
-- An older message log that couldn't be read no longer keeps the log in an error state. New messages show under a short notice with a Remove old log button, and that button leaves them alone. Before, the only way out was Clear log, which deleted the new messages too.
+- Message log now explains an empty log, distinguishes a read failure from an empty result and offers retry. Clear log reports a failure if it can't remove the file or key. Saved message text can be selected. When an older log can't be read, it's set aside and new messages keep showing under a short notice with a Remove old log button.
 - Reply and message-log dialogs keep their actions reachable in short windows and large text, with matching keyboard, cutout and right-to-left spacing.
 - A failed log clear keeps its retry action available, even if the messages are already gone or the screen rotated during the clear. The settings header and restart reminder adapt to larger text to leave more room for controls.
 - Long replies grow with their text so the editor scrolls as one page. Replies and saved messages keep their own text direction in right-to-left layouts.
