@@ -23,6 +23,7 @@ Development v0.23.3.
 - Long replies grow with their text so the editor scrolls as one page. Replies and saved messages keep their own text direction in right-to-left layouts.
 - Large App-page labels reserve a separate switch column, including in right-to-left layouts.
 - Enabled controls explain when they're waiting for Messenger to use them. Clearing a search keeps the category you picked.
+- New **Hide the Menu row** choice on the App tab takes the HushMessenger row out of Messenger's Menu tab and side menu, so the long-press **Patch controls** shortcut is the only way in. It can be turned on once you've opened settings from that shortcut, and the row comes back by itself if the shortcut ever goes missing. Together with **Hide app drawer icon** that leaves just the long-press entry.
 - Switches have clearer on and disabled states in both themes. Focus and pointer feedback match the rest of settings, and restart text fits narrower windows.
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
 - Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.

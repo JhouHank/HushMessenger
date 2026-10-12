@@ -36,6 +36,7 @@ public class HostScreensTest {
         Settings.initialize(RuntimeEnvironment.getApplication());
         Settings.preferences.edit().clear().commit();
         CrashGuard.resetForTests();
+        HostScreens.controlsShortcut = null;
         HostScreens.shortcutWork = Runnable::run;
         // A failed start takes the Bold and Italic entries out on this executor, so it runs inline here too.
         realTextStyleWork = TextStyleActivity.work;
@@ -256,6 +257,42 @@ public class HostScreensTest {
         Application app = RuntimeEnvironment.getApplication();
         startWithoutProvider(app);
         assertEquals(Set.of(), dynamicIds(app.getSystemService(ShortcutManager.class)));
+    }
+
+    /** #22: settings opened from the long-press shortcut prove that way back works. Restart Messenger doesn't count. */
+    @Test public void onlyOpeningSettingsFromTheShortcutCountsAsAWayBack() {
+        Application app = RuntimeEnvironment.getApplication();
+        Intent restart = host("restart").setClassName(app, HostScreens.SHORTCUT_HOST);
+        try (var trampoline = Robolectric.buildActivity(HostScreens.ShortcutTrampoline.class, restart).setup()) {
+            assertFalse(Settings.preferences.getBoolean(Settings.SHORTCUT_USED, false));
+        }
+        Intent settings = host("settings").setClassName(app, HostScreens.SHORTCUT_HOST);
+        try (var trampoline = Robolectric.buildActivity(HostScreens.ShortcutTrampoline.class, settings).setup()) {
+            assertTrue(Settings.preferences.getBoolean(Settings.SHORTCUT_USED, false));
+        }
+    }
+
+    /** #22: the Menu row comes back whenever Patch controls is missing from the long-press menu, as after a failed publish. */
+    @Test public void theMenuRowHidesOnlyWhilePatchControlsIsPublished() {
+        Application app = RuntimeEnvironment.getApplication();
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        Settings.preferences.edit().putBoolean("hide_menu_row", true).putBoolean(Settings.SHORTCUT_USED, true).commit();
+        assertFalse(Settings.menuRowHidden());
+        Shadows.shadowOf(manager).setManifestShortcuts(List.of(new ShortcutInfo.Builder(app, HostScreens.STATIC_CONTROLS_SHORTCUT)
+            .setShortLabel("Patch controls").setIntent(new Intent(Intent.ACTION_VIEW)).build()));
+        assertFalse("asked once per process", Settings.menuRowHidden());
+        HostScreens.controlsShortcut = null;
+        assertTrue(Settings.menuRowHidden());
+        // Root Mount publishes a dynamic copy at its late start, and the next ask sees it.
+        Shadows.shadowOf(manager).setManifestShortcuts(List.of());
+        mount();
+        startWithoutProvider(app);
+        assertTrue(Settings.menuRowHidden());
+        // Messenger's conversation shortcuts pushed it out and the next start couldn't put it back.
+        manager.removeDynamicShortcuts(List.of(HostScreens.CONTROLS_SHORTCUT));
+        HostScreens.controlsShortcut = null;
+        assertFalse(Settings.menuRowHidden());
+        assertFalse(Settings.available("hide_menu_row"));
     }
 
     /** The two fields Messenger's Menu row view holder keeps, under their obfuscated names. */

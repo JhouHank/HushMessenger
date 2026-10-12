@@ -804,6 +804,7 @@ public final class SettingsActivity extends Activity {
         boolean available = Settings.available(key);
         if (!available) description += " " + text.format(CameraActivity.KEY.equals(key) ? "camera_unsupported"
             : TextStyleActivity.KEY.equals(key) ? "text_style_unsupported"
+            : "hide_menu_row".equals(key) ? "menu_row_needs_shortcut"
             : "bubbles".equals(key) && Build.VERSION.SDK_INT >= 30 ? "bubble_unsupported" : "unavailable");
         LinearLayout row = ui.row();
         LinearLayout labels = ui.column();
@@ -940,7 +941,7 @@ public final class SettingsActivity extends Activity {
         } catch (PackageManager.NameNotFoundException | SecurityException unavailable) {
             // Some bundles have settings activities but omit the launcher alias.
         }
-        TextView accessHelp = ui.text(text.get((hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing") + (menuRow ? "_menu" : "")), 13, ui.muted, false);
+        TextView accessHelp = ui.text(text.get((hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing") + (menuRow && !Settings.menuRowHidden() ? "_menu" : "")), 13, ui.muted, false);
         accessHelp.setTag("access_help");
         ui.add(access, accessHelp, 0);
         Button restart = ui.primaryButton(text.get("restart"));
@@ -955,6 +956,11 @@ public final class SettingsActivity extends Activity {
             TextView drawerHelp = ui.text(text.get(hosted ? "drawer_root" : !drawerAlias ? "drawer_missing" : "drawer_requires_menu"), 14, ui.muted, false);
             drawerHelp.setTag("drawer_help");
             ui.add(access, drawerHelp, 14);
+        }
+        // #22: only the long-press shortcut left, once it has proved it works here.
+        if (menuRow) {
+            ui.rule(access, 12);
+            ui.add(access, controlRow("hide_menu_row", text.format("hide_menu_row"), text.format("hide_menu_row_help"), false), 10);
         }
         if (drawerAlias && !hosted) {
             TextView sharedInstall = ui.text(text.get("shared_install_help"), 13, ui.muted, false);
@@ -2296,7 +2302,7 @@ public final class SettingsActivity extends Activity {
     private void filterControls(String query) {
         String needle = query.trim().toLowerCase(Locale.ROOT);
         clearQuery.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
-        String drawerWords = "hide app drawer icon launcher settings " + text.get("hide_drawer_icon");
+        String drawerWords = "hide app drawer icon launcher settings menu row " + text.get("hide_drawer_icon") + " " + text.get("hide_menu_row");
         // One letter matches almost anything, so the link waits for a second one.
         drawerSearchLink.setVisibility(controlRows.isEmpty() || (needle.length() >= 2 && drawerWords.toLowerCase(Locale.ROOT).contains(needle)) ? View.VISIBLE : View.GONE);
         int visible = 0;

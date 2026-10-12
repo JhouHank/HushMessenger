@@ -142,7 +142,33 @@ public final class HostScreens {
         } catch (RuntimeException error) {
             // A rate limit or launcher refusal leaves the Menu tab and side menu rows as the way in.
             Log.w("HushMessenger", "Can't add HushMessenger's launcher shortcuts", error);
+        } finally {
+            controlsShortcut = null;
         }
+    }
+
+    /** Whether Patch controls is on the launcher's long-press menu, asked once per process. Null until asked. */
+    static volatile Boolean controlsShortcut;
+
+    /** The static shortcut on a normal install, the dynamic copy on Root Mount. A failed read counts as missing. */
+    static boolean controlsShortcutPresent(Context context) {
+        Boolean known = controlsShortcut;
+        if (known != null) return known;
+        if (context == null) return false;
+        boolean present = false;
+        try {
+            ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+            if (manager != null) {
+                for (ShortcutInfo shortcut : manager.getManifestShortcuts())
+                    if (STATIC_CONTROLS_SHORTCUT.equals(shortcut.getId()) && shortcut.isEnabled()) present = true;
+                for (ShortcutInfo shortcut : manager.getDynamicShortcuts())
+                    if (CONTROLS_SHORTCUT.equals(shortcut.getId()) && shortcut.isEnabled()) present = true;
+            }
+        } catch (RuntimeException error) {
+            Log.w("HushMessenger", "Can't read HushMessenger's launcher shortcuts", error);
+        }
+        controlsShortcut = present;
+        return present;
     }
 
     /** Same target and extra as the static shortcut, so ShortcutTrampoline opens the hosted screen. */
@@ -228,7 +254,12 @@ public final class HostScreens {
         @Override @SuppressWarnings("deprecation") protected void onCreate(Bundle state) {
             super.onCreate(state);
             try {
-                open(this, getIntent().getStringExtra(EXTRA));
+                String screen = getIntent().getStringExtra(EXTRA);
+                if (SETTINGS.equals(screen)) {
+                    start(this);
+                    Settings.noteShortcutUsed();
+                }
+                open(this, screen);
             } catch (RuntimeException error) {
                 Log.e("HushMessenger", "Can't open a HushMessenger screen", error);
             }

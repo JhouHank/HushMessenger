@@ -127,7 +127,7 @@ public class SettingsReliabilityTest {
                 root.findViewWithTag("tab_app").performClick();
                 layout(screen.get(), 390, 844);
                 int rows = 0;
-                for (String key : new String[] {"hide_drawer_icon", "light", "material_you_black", "check_updates"}) {
+                for (String key : new String[] {"hide_drawer_icon", "hide_menu_row", "light", "material_you_black", "check_updates"}) {
                     Switch choice = root.findViewWithTag(key);
                     if (choice == null) continue;
                     rows++;

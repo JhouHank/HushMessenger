@@ -349,6 +349,40 @@ public class SetupSummaryTest {
         assertNotEquals(PackageManager.COMPONENT_ENABLED_STATE_DISABLED, packages.getComponentEnabledSetting(alias));
     }
 
+    /** #22: Hide the Menu row stays off until settings have opened from the long-press shortcut on this install. */
+    @Test public void hideTheMenuRowWaitsForTheLongPressShortcut() throws Exception {
+        installedFeatures("people", "menu_row");
+        try {
+            HostScreens.controlsShortcut = true;
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                View root = screen.get().getWindow().getDecorView();
+                root.findViewWithTag("tab_app").performClick();
+                android.widget.Switch hide = root.findViewWithTag("hide_menu_row");
+                assertFalse(hide.isEnabled());
+                assertEquals(new SettingsText(screen.get()).get("access_help_missing_menu"),
+                    ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
+            }
+            Settings.noteShortcutUsed();
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                View root = screen.get().getWindow().getDecorView();
+                root.findViewWithTag("tab_app").performClick();
+                android.widget.Switch hide = root.findViewWithTag("hide_menu_row");
+                assertTrue(hide.isEnabled());
+                hide.setChecked(true);
+                assertTrue(Settings.menuRowHidden());
+            }
+            // With the row gone, the App tab stops pointing at it.
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                View root = screen.get().getWindow().getDecorView();
+                root.findViewWithTag("tab_app").performClick();
+                assertEquals(new SettingsText(screen.get()).get("access_help_missing"),
+                    ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
+            }
+        } finally {
+            HostScreens.controlsShortcut = null;
+        }
+    }
+
     @Test public void drawerAliasExplainsThatUninstallingItRemovesMessenger() throws Exception {
         installedFeatures("people", "menu_row");
         var app = RuntimeEnvironment.getApplication();

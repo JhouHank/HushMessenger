@@ -459,6 +459,7 @@ public final class Settings {
             Context context = appContext;
             return context == null || TextStyleActivity.present(context);
         }
+        if ("hide_menu_row".equals(key)) return menuRowCanHide();
         if (!"bubbles".equals(key)) return true;
         if (Build.VERSION.SDK_INT < 30) return false;
         if (!HostScreens.started) HostScreens.initializeLate();
@@ -660,6 +661,28 @@ public final class Settings {
     static boolean drawerIconHidden() {
         SharedPreferences prefs = preferences;
         return installed.contains("menu_row") && prefs != null && prefs.getBoolean("hide_drawer_icon", false);
+    }
+
+    /** Set the first time settings open from the long-press shortcut, which proves that way in works on this phone. */
+    static final String SHORTCUT_USED = "shortcut_used";
+
+    static void noteShortcutUsed() {
+        SharedPreferences prefs = preferences;
+        if (prefs != null && !prefs.getBoolean(SHORTCUT_USED, false)) prefs.edit().putBoolean(SHORTCUT_USED, true).apply();
+    }
+
+    /**
+     * The Menu row can stay out only once the long-press shortcut has opened settings here and is still published. If
+     * the shortcut goes missing, as after a Root Mount start that couldn't publish it, the row comes back.
+     */
+    static boolean menuRowCanHide() {
+        SharedPreferences prefs = preferences;
+        return prefs != null && prefs.getBoolean(SHORTCUT_USED, false) && HostScreens.controlsShortcutPresent(appContext);
+    }
+
+    static boolean menuRowHidden() {
+        SharedPreferences prefs = preferences;
+        return prefs != null && prefs.getBoolean("hide_menu_row", false) && menuRowCanHide();
     }
 
     private static final String KEPT_UNSENT_KEY = "kept_unsent_ids";
@@ -1045,6 +1068,7 @@ public final class Settings {
     public static List addLegacyDrawerEntry(Object fragment, List sections) {
         if (fragment == null || sections == null) return sections;
         try {
+            if (menuRowHidden()) return sections;
             java.lang.reflect.Method getContext = fragment.getClass().getMethod("getContext");
             getContext.setAccessible(true);
             Object current = getContext.invoke(fragment);
@@ -1117,7 +1141,7 @@ public final class Settings {
     @SuppressWarnings("unchecked")
     public static void addMenuSettingsEntry(ArrayList list) {
         try {
-            if (list == null || list.isEmpty()) return;
+            if (list == null || list.isEmpty() || menuRowHidden()) return;
             // Messenger builds its QR code row into the same list, so find Settings by its folder key.
             int at = -1;
             for (int i = 0; i < list.size() && at < 0; i++) if (holdsSettingsKey(list.get(i))) at = i;
@@ -1207,10 +1231,11 @@ public final class Settings {
     }
 
     // The menu entry hooks don't ask Pause or safe mode first, on purpose: they're the way back into settings to undo either.
+    // Only Hide the Menu row takes them out, and only while the long-press shortcut is a proven way back.
     @SuppressWarnings("unchecked")
     public static java.util.List addMenuDrawerEntry(java.util.List list) {
         try {
-            if (list == null || list.size() < 2) return list;
+            if (list == null || list.size() < 2 || menuRowHidden()) return list;
             for (Object item : list) {
                 try {
                     java.lang.reflect.Field f = item.getClass().getDeclaredField("A05");
