@@ -11,6 +11,7 @@ import android.content.pm.ShortcutManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -25,6 +26,7 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowApplication;
 import org.robolectric.shadows.ShadowLog;
+import org.robolectric.shadows.ShadowSystemClock;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
@@ -280,18 +282,19 @@ public class HostScreensTest {
         assertFalse(Settings.menuRowHidden());
         Shadows.shadowOf(manager).setManifestShortcuts(List.of(new ShortcutInfo.Builder(app, HostScreens.STATIC_CONTROLS_SHORTCUT)
             .setShortLabel("Patch controls").setIntent(new Intent(Intent.ACTION_VIEW)).build()));
-        assertFalse("asked once per process", Settings.menuRowHidden());
-        HostScreens.controlsShortcut = null;
+        assertFalse("an answer holds for a while", Settings.menuRowHidden());
+        ShadowSystemClock.advanceBy(Duration.ofMillis(HostScreens.SHORTCUT_ANSWER_MS));
         assertTrue(Settings.menuRowHidden());
         // Root Mount publishes a dynamic copy at its late start, and the next ask sees it.
         Shadows.shadowOf(manager).setManifestShortcuts(List.of());
         mount();
         startWithoutProvider(app);
         assertTrue(Settings.menuRowHidden());
-        // Messenger's conversation shortcuts pushed it out and the next start couldn't put it back.
+        // Messenger's conversation shortcuts push it out while Messenger runs, with no start in between.
         manager.removeDynamicShortcuts(List.of(HostScreens.CONTROLS_SHORTCUT));
-        HostScreens.controlsShortcut = null;
-        assertFalse(Settings.menuRowHidden());
+        assertTrue("still held", Settings.menuRowHidden());
+        ShadowSystemClock.advanceBy(Duration.ofMillis(HostScreens.SHORTCUT_ANSWER_MS));
+        assertFalse("the row comes back", Settings.menuRowHidden());
         assertFalse(Settings.available("hide_menu_row"));
     }
 

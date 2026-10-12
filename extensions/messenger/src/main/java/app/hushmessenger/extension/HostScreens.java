@@ -147,13 +147,19 @@ public final class HostScreens {
         }
     }
 
-    /** Whether Patch controls is on the launcher's long-press menu, asked once per process. Null until asked. */
+    /** Whether Patch controls is on the launcher's long-press menu, and when that was read. Null until asked. */
     static volatile Boolean controlsShortcut;
+    static volatile long controlsShortcutAt;
+    /**
+     * Messenger's conversation shortcuts can push the Root Mount copy out while Messenger runs, so an answer holds only
+     * this long. The Menu row then comes back on the next build of the Menu tab or side menu.
+     */
+    static final long SHORTCUT_ANSWER_MS = 30_000;
 
     /** The static shortcut on a normal install, the dynamic copy on Root Mount. A failed read counts as missing. */
     static boolean controlsShortcutPresent(Context context) {
         Boolean known = controlsShortcut;
-        if (known != null) return known;
+        if (known != null && android.os.SystemClock.elapsedRealtime() - controlsShortcutAt < SHORTCUT_ANSWER_MS) return known;
         if (context == null) return false;
         boolean present = false;
         try {
@@ -167,6 +173,7 @@ public final class HostScreens {
         } catch (RuntimeException error) {
             Log.w("HushMessenger", "Can't read HushMessenger's launcher shortcuts", error);
         }
+        controlsShortcutAt = android.os.SystemClock.elapsedRealtime();
         controlsShortcut = present;
         return present;
     }
@@ -255,11 +262,10 @@ public final class HostScreens {
             super.onCreate(state);
             try {
                 String screen = getIntent().getStringExtra(EXTRA);
-                if (SETTINGS.equals(screen)) {
-                    start(this);
-                    Settings.noteShortcutUsed();
-                }
+                if (SETTINGS.equals(screen)) start(this);
                 open(this, screen);
+                // Proven only once settings actually opened from it.
+                if (SETTINGS.equals(screen)) Settings.noteShortcutUsed();
             } catch (RuntimeException error) {
                 Log.e("HushMessenger", "Can't open a HushMessenger screen", error);
             }

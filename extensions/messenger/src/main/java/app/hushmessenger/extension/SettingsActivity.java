@@ -91,6 +91,10 @@ public final class SettingsActivity extends Activity {
     /** #22's control and whether it could be turned on when it was built. */
     private LinearLayout menuRowControl;
     private boolean menuRowAvailable;
+    /** The App tab's line on how to get back here, which names the Menu row only while it shows. */
+    private TextView accessHelp;
+    private String accessHelpId;
+    private boolean accessHelpMenuRow;
     private String documentExport;
     private boolean documentImport;
     private boolean documentBusy;
@@ -347,6 +351,10 @@ public final class SettingsActivity extends Activity {
         parent.addView(menuRowControl, at, params);
     }
 
+    private String accessHelpText() {
+        return text.get(accessHelpId + (accessHelpMenuRow && !Settings.menuRowHidden() ? "_menu" : ""));
+    }
+
     private void refreshChoices() {
         if (lightTheme != Settings.preferences.getBoolean("light", false)) {
             if (!recreatingTheme) {
@@ -357,6 +365,10 @@ public final class SettingsActivity extends Activity {
         }
         // Opening settings from the long-press shortcut can bring this screen back rather than a new one.
         if (menuRowControl != null && Settings.available("hide_menu_row") != menuRowAvailable) rebuildMenuRowControl();
+        if (accessHelp != null) {
+            String help = accessHelpText();
+            if (!help.contentEquals(accessHelp.getText())) accessHelp.setText(help);
+        }
         binding = true;
         try {
             for (Switch control : switches) {
@@ -1032,7 +1044,9 @@ public final class SettingsActivity extends Activity {
         } catch (PackageManager.NameNotFoundException | SecurityException unavailable) {
             // Some bundles have settings activities but omit the launcher alias.
         }
-        TextView accessHelp = ui.text(text.get((hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing") + (menuRow && !Settings.menuRowHidden() ? "_menu" : "")), 13, ui.muted, false);
+        accessHelpId = hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing";
+        accessHelpMenuRow = menuRow;
+        accessHelp = ui.text(accessHelpText(), 13, ui.muted, false);
         accessHelp.setTag("access_help");
         ui.add(access, accessHelp, 0);
         Button restart = ui.primaryButton(text.get("restart"));

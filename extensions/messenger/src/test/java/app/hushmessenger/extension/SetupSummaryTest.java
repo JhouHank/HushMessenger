@@ -378,6 +378,10 @@ public class SetupSummaryTest {
                 assertTrue(hide.isEnabled());
                 hide.setChecked(true);
                 assertTrue(Settings.menuRowHidden());
+                // The same screen stops pointing at the row as soon as it's hidden.
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+                assertEquals(new SettingsText(screen.get()).get("access_help_missing"),
+                    ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
             }
             // With the row gone, the App tab stops pointing at it.
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
