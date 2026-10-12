@@ -1848,8 +1848,14 @@ public final class SettingsActivity extends Activity {
         }
         String skipped = (unknown == 0 ? "" : " " + text.count("import_unknown", unknown)) +
             (unavailable == 0 ? "" : " " + text.count("import_unavailable", unavailable));
+        // A backup carries Auto reply's switch but not its replies. Turning it on here would start answering with
+        // whatever replies this phone already has, so it only comes on from this screen. Turning it off still applies.
+        boolean autoReplyLeftOff = Boolean.TRUE.equals(supported.get(AutoReply.KEY)) &&
+            !Settings.preferences.getBoolean(AutoReply.KEY, false);
+        if (autoReplyLeftOff) supported.remove(AutoReply.KEY);
+        String autoReply = autoReplyLeftOff ? " " + text.get("import_auto_reply_off") : "";
         if (supported.isEmpty()) {
-            feedback(text.get("import_no_choices") + skipped, Toast.LENGTH_LONG);
+            feedback((autoReplyLeftOff ? text.get("import_auto_reply_off") : text.get("import_no_choices")) + skipped, Toast.LENGTH_LONG);
             return;
         }
         SharedPreferences.Editor editor = Settings.preferences.edit();
@@ -1858,7 +1864,7 @@ public final class SettingsActivity extends Activity {
         refreshChoices();
         // A backup can carry the pause, and a restored pause is easy to miss.
         String paused = Boolean.TRUE.equals(supported.get("paused")) ? " " + text.get("changes_paused") + "." : "";
-        feedback(text.count("imported", supported.size()) + paused + skipped, Toast.LENGTH_LONG);
+        feedback(text.count("imported", supported.size()) + paused + autoReply + skipped, Toast.LENGTH_LONG);
     }
 
     @Override protected void onActivityResult(int request, int result, Intent data) {

@@ -172,8 +172,9 @@ final class SettingsText {
         ENGLISH.put("export_failed", "Couldn't export. Try again.");
         ENGLISH.put("import_choices", "Import choices");
         ENGLISH.put("import_help", "Restores choices from text you copied with Export choices. Copy it first, then tap here.");
-        ENGLISH.put("imported_one", "Restored %d choice");
-        ENGLISH.put("imported_many", "Restored %d choices");
+        ENGLISH.put("imported_one", "Restored %d choice.");
+        ENGLISH.put("imported_many", "Restored %d choices.");
+        ENGLISH.put("import_auto_reply_off", "Auto reply stays off because backups don't include replies. Turn it on here if you want this phone's replies sent.");
         ENGLISH.put("import_empty", "Nothing to import. Copy your exported choices first, then tap Import choices.");
         ENGLISH.put("import_invalid", "Not a valid HushMessenger backup. Copy an export you haven't edited, 16 KB or smaller.");
         ENGLISH.put("restore_failed", "Couldn't read that file. Try again, or pick another file.");

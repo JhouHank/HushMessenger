@@ -12,6 +12,7 @@ Development v0.23.3.
 
 ### Settings
 
+- Restoring a settings backup no longer turns **Auto reply** on, since backups don't include the replies. A backup with it off still turns it off, this phone's replies are kept, and the restore message says so. The restore message also puts a period after the count now.
 - Auto replies keep their labels while you type, show how many replies are available and flag an unfinished reply before saving. Cancel leaves saved replies alone. Drafts, group choice and text selection survive a recreated settings screen.
 - Message log now explains an empty log, distinguishes a read failure from an empty result and offers retry. Clear log reports a failure if it can't remove the file or key. Saved message text can be selected. When an older log can't be read, it's set aside and new messages keep showing under a short notice with a Remove old log button.
 - Reply and message-log dialogs keep their actions reachable in short windows and large text, with matching keyboard, cutout and right-to-left spacing.
