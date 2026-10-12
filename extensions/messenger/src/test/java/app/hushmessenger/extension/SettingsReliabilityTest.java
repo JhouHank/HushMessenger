@@ -113,12 +113,13 @@ public class SettingsReliabilityTest {
 
     /**
      * At normal size an App row's description runs the panel's full width under the switch's 48dp box. The box is
-     * invisible, so the check is that no description line level with the drawn track reaches within 4dp of it.
+     * invisible, so the check is that no description line overlaps the drawn track, and a line level with it stays 4dp
+     * clear sideways. Arabic checks the mirrored row. The pseudo-locales get the large-text layout, so they can't.
      */
     @Test @Config(sdk = {28, 36})
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     public void normalSizeAppDescriptionsStayClearOfTheSwitchTrack() {
-        for (String locale : new String[] {"en-rUS", "ar-rXB"}) {
+        for (String locale : new String[] {"en-rUS-ldltr", "ar-rEG-ldrtl"}) {
             RuntimeEnvironment.setQualifiers(locale + "-w390dp-h844dp-mdpi");
             RuntimeEnvironment.setFontScale(1f);
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
@@ -134,6 +135,8 @@ public class SettingsReliabilityTest {
                     ViewGroup labels = (ViewGroup) row.getChildAt(0);
                     TextView description = (TextView) labels.getChildAt(1);
                     assertEquals(key + " uses the normal-size overlay", -48, ((ViewGroup.MarginLayoutParams) choice.getLayoutParams()).getMarginStart());
+                    assertEquals(locale + " row direction", locale.endsWith("ldrtl") ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR,
+                        row.getLayoutDirection());
                     // Drawing is what gives the track its bounds inside the switch.
                     choice.draw(new android.graphics.Canvas(android.graphics.Bitmap.createBitmap(choice.getWidth(), choice.getHeight(),
                         android.graphics.Bitmap.Config.ARGB_8888)));
