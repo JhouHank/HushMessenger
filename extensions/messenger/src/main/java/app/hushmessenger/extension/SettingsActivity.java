@@ -87,6 +87,9 @@ public final class SettingsActivity extends Activity {
     private static java.lang.ref.WeakReference<SettingsActivity> fontPage = new java.lang.ref.WeakReference<>(null);
     private TextView fontStatus;
     private Button fontChoose, fontPhone;
+    /** #22's control and whether it could be turned on when it was built. */
+    private LinearLayout menuRowControl;
+    private boolean menuRowAvailable;
     private String documentExport;
     private boolean documentImport;
     private boolean documentBusy;
@@ -326,6 +329,23 @@ public final class SettingsActivity extends Activity {
         super.onDestroy();
     }
 
+    private LinearLayout menuRowControl() {
+        return controlRow("hide_menu_row", text.format("hide_menu_row"), text.format("hide_menu_row_help"), false);
+    }
+
+    /** Swaps the Hide the Menu row control for one built with its current availability and reason. */
+    private void rebuildMenuRowControl() {
+        LinearLayout parent = (LinearLayout) menuRowControl.getParent();
+        if (parent == null) return;
+        switches.remove(menuRowControl.findViewWithTag("hide_menu_row"));
+        int at = parent.indexOfChild(menuRowControl);
+        ViewGroup.LayoutParams params = menuRowControl.getLayoutParams();
+        menuRowAvailable = Settings.available("hide_menu_row");
+        menuRowControl = menuRowControl();
+        parent.removeViewAt(at);
+        parent.addView(menuRowControl, at, params);
+    }
+
     private void refreshChoices() {
         if (lightTheme != Settings.preferences.getBoolean("light", false)) {
             if (!recreatingTheme) {
@@ -334,6 +354,8 @@ public final class SettingsActivity extends Activity {
             }
             return;
         }
+        // Opening settings from the long-press shortcut can bring this screen back rather than a new one.
+        if (menuRowControl != null && Settings.available("hide_menu_row") != menuRowAvailable) rebuildMenuRowControl();
         binding = true;
         try {
             for (Switch control : switches) {
@@ -960,7 +982,9 @@ public final class SettingsActivity extends Activity {
         // #22: only the long-press shortcut left, once it has proved it works here.
         if (menuRow) {
             ui.rule(access, 12);
-            ui.add(access, controlRow("hide_menu_row", text.format("hide_menu_row"), text.format("hide_menu_row_help"), false), 10);
+            menuRowAvailable = Settings.available("hide_menu_row");
+            menuRowControl = menuRowControl();
+            ui.add(access, menuRowControl, 10);
         }
         if (drawerAlias && !hosted) {
             TextView sharedInstall = ui.text(text.get("shared_install_help"), 13, ui.muted, false);

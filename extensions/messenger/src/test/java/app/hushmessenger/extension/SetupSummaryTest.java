@@ -359,10 +359,18 @@ public class SetupSummaryTest {
                 root.findViewWithTag("tab_app").performClick();
                 android.widget.Switch hide = root.findViewWithTag("hide_menu_row");
                 assertFalse(hide.isEnabled());
+                String reason = new SettingsText(screen.get()).format("menu_row_needs_shortcut");
+                assertTrue(hide.getContentDescription().toString().endsWith(reason));
                 assertEquals(new SettingsText(screen.get()).get("access_help_missing_menu"),
                     ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
+                // The shortcut brings this same screen back, so it has to unlock without a new one.
+                screen.pause();
+                Settings.noteShortcutUsed();
+                screen.resume();
+                hide = root.findViewWithTag("hide_menu_row");
+                assertTrue(hide.isEnabled());
+                assertFalse(hide.getContentDescription().toString().contains(reason));
             }
-            Settings.noteShortcutUsed();
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
                 View root = screen.get().getWindow().getDecorView();
                 root.findViewWithTag("tab_app").performClick();
