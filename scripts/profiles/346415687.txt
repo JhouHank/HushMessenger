@@ -149,6 +149,8 @@ hook system_camera LX/0gi;->A00(Landroid/content/Context;Landroid/net/Uri;)Ljava
 hook system_camera LX/5ok;->A00(Landroid/content/Context;Landroid/os/Bundle;Landroidx/fragment/app/Fragment;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/HJ6;)LX/6iH;
 hook system_camera LX/5xn;->BxF(Landroid/os/Bundle;)Z
 hook system_camera LX/7Gk;->Daf(Lcom/facebook/messaging/montage/composer/model/MontageComposerFragmentParams;Lcom/facebook/messaging/send/trigger/NavigationTrigger;)V
+hook tab_notifications LX/1kA;->A09(LX/1kA;)Z
+hook tab_people LX/1kA;->A0E(LX/1kA;)Z
 hook typing LX/Aol;->run()V
 hook typing_mailbox LX/4hB;->A0K(Ljava/lang/String;Z)LX/33K;
 hook unsent_indicator LX/WMT;->BYe(I)Ljava/lang/String;

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- [#43](https://github.com/SysAdminDoc/HushMessenger/issues/43) **Hide People tab** and **Hide Notifications tab** are new Navigation switches. Each one takes its tab out of the bar at the bottom once Messenger restarts, and both start off.
+
 ## 0.23.0 (2026-10-11)
 
 This release moves HushMessenger to Messenger 582.0.0.61.92 and adds seven switches, Auto reply and Use your own font among them.

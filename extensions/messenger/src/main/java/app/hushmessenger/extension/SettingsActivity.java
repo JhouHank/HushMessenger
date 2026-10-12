@@ -113,6 +113,8 @@ public final class SettingsActivity extends Activity {
         {"meta_ai", "Hide Meta AI", "Hides the Meta AI floating button, toolbar button, tab and menu entries, plus AI in search and in @ suggestions. Restart Messenger to see the tab go.", "navigation"},
         {"moments", "Hide Chat Moments", "Hides Chat Moments in the menu.", "navigation"},
         {"reels_badge", "Hide Reels badge", "Hides the Reels notification badge.", "navigation"},
+        {"tab_people", "Hide People tab", "Hides the People tab in the bar at the bottom. Restart Messenger to see the tab go.", "navigation"},
+        {"tab_notifications", "Hide Notifications tab", "Hides the Notifications tab in the bar at the bottom. Restart Messenger to see the tab go.", "navigation"},
         {"chat_animation", "Slide chats in and out", "Slides a chat in from the side when you open it and out when you go back. Chat heads and bubbles aren't affected.", "navigation"},
         {"ai_stickers", "Hide AI sticker tools", "Hides the Generate AI sticker buttons, the AI sticker tab and AI sticker suggestions.", "stickers"},
         {"avatar_stickers", "Hide avatar stickers", "Hides the avatar tab in the sticker keyboard.", "stickers"},
@@ -877,7 +879,8 @@ public final class SettingsActivity extends Activity {
         boolean failed = failedAt > 0 && failedAt >= used;
         // A control that keeps its first answer for the run says so until a restart, even with its switch now off.
         Boolean held = Settings.heldUntilRestart(key);
-        String status = held != null ? text.get(("meta_ai".equals(key) ? "meta_ai_tab_pending_" : "restart_pending_") + (held ? "off" : "on"))
+        String status = held != null ? text.get(("meta_ai".equals(key) ? "meta_ai_tab_pending_" : Settings.BOTTOM_TABS.contains(key) ? key + "_pending_"
+                : "restart_pending_") + (held ? "off" : "on"))
             : paused ? text.get("changes_paused") : failed ? formatSince(failedAt, "error_now", "error_ago")
             : used == 0 ? text.get("keep_unsent".equals(key) ? "unsent_not_active" : "not_active") : formatSince(used, "active_now", "active_ago");
         if (!status.contentEquals(label.getText())) label.setText(status);

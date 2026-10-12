@@ -308,4 +308,12 @@ class ControlDiscoveryTest {
         validateControls(found, setOf("ai_tab"))
         assertTrue(findControls(withToolbar.filter { it.type != "LX/1iN;" }).getValue("ai_tab").isEmpty())
     }
+
+    // The bottom bar builds every tab in one class; each tab switch takes only the gate that builds its own tab content.
+    @Test fun thePeopleAndNotificationsTabsAreEachTheirOwnBottomBarGate() {
+        val found = findControls(completeFixture())
+        assertEquals(listOf("LX/1iN;->A0D(LX/1iN;)Z"), found.getValue(TAB_PEOPLE).map { it.hookId() })
+        assertEquals(listOf("LX/1iN;->A08(LX/1iN;)Z"), found.getValue(TAB_NOTIFICATIONS).map { it.hookId() })
+        validateControls(found, setOf(TAB_PEOPLE, TAB_NOTIFICATIONS, "ai_tab"))
+    }
 }

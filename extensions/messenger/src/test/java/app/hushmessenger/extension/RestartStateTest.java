@@ -33,6 +33,34 @@ public class RestartStateTest {
     @After public void clearLatches() {
         Settings.metaAiTab = null;
         Settings.oldEmojiDrawer = null;
+        Settings.bottomTabs.clear();
+    }
+
+    @Test public void thePeopleAndNotificationsTabsEachHoldTheirFirstAnswerUntilARestart() {
+        Settings.preferences.edit().putBoolean("tab_people", true).commit();
+        assertTrue(Settings.hidePeopleTab());
+        assertFalse("Each tab follows its own switch", Settings.hideNotificationsTab());
+        Settings.preferences.edit().putBoolean("tab_people", false).putBoolean("tab_notifications", true).commit();
+        assertTrue("The bar keeps the tabs it counted first", Settings.hidePeopleTab());
+        assertFalse(Settings.hideNotificationsTab());
+        assertEquals(Boolean.TRUE, Settings.heldUntilRestart("tab_people"));
+        assertEquals(Boolean.FALSE, Settings.heldUntilRestart("tab_notifications"));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            TextView people = root.findViewWithTag("active_tab_people");
+            assertEquals("The People tab comes back after Messenger restarts", people.getText().toString());
+            assertEquals("An off switch still shows the tab is hidden until a restart", View.VISIBLE, people.getVisibility());
+            assertEquals("The Notifications tab is hidden after Messenger restarts",
+                ((TextView) root.findViewWithTag("active_tab_notifications")).getText().toString());
+        }
+
+        Settings.bottomTabs.clear();
+        assertNull("A restart asks again", Settings.heldUntilRestart("tab_people"));
+        assertFalse(Settings.hidePeopleTab());
+        assertTrue(Settings.hideNotificationsTab());
+        Settings.preferences.edit().putBoolean("paused", true).commit();
+        Settings.bottomTabs.clear();
+        assertFalse("Pause shows every tab after the restart", Settings.hideNotificationsTab());
     }
 
     @Test public void aHeldAnswerShowsUntilARestartThroughTheSwitchPauseAndSafeMode() {

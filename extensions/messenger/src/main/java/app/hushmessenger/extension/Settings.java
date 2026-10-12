@@ -208,6 +208,21 @@ public final class Settings {
 
     private static final Object META_AI_TAB = new Object();
 
+    /** Bottom tabs with a switch of their own, held for the run like the Meta AI tab. */
+    static final List<String> BOTTOM_TABS = List.of("tab_people", "tab_notifications");
+    /** First answer this process gave for each of {@link #BOTTOM_TABS}, by key, once the bottom bar asked. */
+    static final ConcurrentHashMap<String, Boolean> bottomTabs = new ConcurrentHashMap<>();
+
+    public static boolean hidePeopleTab() { return hideBottomTab("tab_people"); }
+    public static boolean hideNotificationsTab() { return hideBottomTab("tab_notifications"); }
+
+    private static boolean hideBottomTab(String key) {
+        // computeIfAbsent runs once per key, so two first askers can't get different answers.
+        boolean hidden = bottomTabs.computeIfAbsent(key, Settings::wouldUse);
+        if (hidden) activeAt.put(key, System.currentTimeMillis());
+        return hidden;
+    }
+
     /** First answer this process gave for the emoji drawer, or null before Messenger asked. */
     static volatile Boolean oldEmojiDrawer;
     private static final Object EMOJI_DRAWER = new Object();
@@ -238,7 +253,7 @@ public final class Settings {
      */
     static Boolean heldUntilRestart(String key) {
         Boolean held = "meta_ai".equals(key) ? metaAiTab : "emoji_drawer".equals(key) ? oldEmojiDrawer
-            : OwnFont.KEY.equals(key) ? customFont : null;
+            : OwnFont.KEY.equals(key) ? customFont : bottomTabs.get(key);
         return held == null || held == wouldUse(key) ? null : held;
     }
 

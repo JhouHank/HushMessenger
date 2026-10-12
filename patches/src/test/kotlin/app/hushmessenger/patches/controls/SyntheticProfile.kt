@@ -122,6 +122,8 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     "reels_badge" to setOf("LX/7xF;->A09(LX/7xF;)Z"),
     "ai_toolbar" to setOf("LX/2aP;->A04()Z"),
     "ai_tab" to setOf("LX/1iN;->A02(LX/1iN;)Z"),
+    TAB_PEOPLE to setOf("LX/1iN;->A0D(LX/1iN;)Z"),
+    TAB_NOTIFICATIONS to setOf("LX/1iN;->A08(LX/1iN;)Z"),
 )
 
 /**

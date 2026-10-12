@@ -16,6 +16,8 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
 internal data class PluginGate(val anchors: Set<String>)
 
 internal const val AD_CONTEXT_BANNER = "ad_context_banner"
+internal const val TAB_PEOPLE = "tab_people"
+internal const val TAB_NOTIFICATIONS = "tab_notifications"
 
 internal val pluginGates = mapOf(
     "people" to PluginGate(
@@ -104,6 +106,18 @@ internal val pluginGates = mapOf(
     "ai_tab" to PluginGate(
         setOf(
             "com.facebook.messaging.aibot.plugins.tab.tabcontent.MetaAiTabContentImplementation",
+        ),
+    ),
+    // The People and Notifications bottom tabs, anchored the same way. Each tab content is named by its bottom bar gate
+    // and, for Notifications, a static initializer that discovery never reads.
+    TAB_PEOPLE to PluginGate(
+        setOf(
+            "com.facebook.messaging.peopletab.plugins.tab.tabcontent.PeopleTabContentImplementation",
+        ),
+    ),
+    TAB_NOTIFICATIONS to PluginGate(
+        setOf(
+            "com.facebook.messaging.inbox.jewel.jeweltab.plugins.core.tabcontent.JewelTabContentImplementation",
         ),
     ),
 )
