@@ -89,6 +89,9 @@ public class SettingsScreenshotTest {
         Shadows.shadowOf(app.getPackageManager()).installPackage(installedPackage);
         Settings.preferences.edit().clear().commit();
         Settings.initialize(app);
+        // The failing vaults above record message_log failures, which a later test in this sandbox would read as its own.
+        Settings.activeAt.clear();
+        Settings.hookErrors.clear();
         HostScreens.started = originalStarted;
         HostScreens.failed = originalFailed;
     }
