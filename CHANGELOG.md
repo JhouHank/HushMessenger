@@ -9,6 +9,7 @@ Development v0.23.3.
 - **Keep a message log** tells messages apart by Messenger's own message ID instead of their words. Two messages that say the same thing in one chat are both kept, and the second notification Messenger builds for one message is still dropped. A sender is only shown when the chat's notification makes it clear who sent it, so the same words from two people in a group stay unnamed rather than borrowing someone's name. Names that **Auto reply** hands over before answering stay with the message they came from. The ID only lives in memory and is never saved to the log.
 - The message log's screen now stays out of the Recents preview on Android 12 and older too. Those versions can only do it by blocking screenshots, so screenshots of settings don't work while the log is open there. Android 13 and newer still allow them.
 - **Auto reply** drops a message it hasn't answered yet when you turn it off or pause, and when you edit your replies, so an older message can't get a new answer. One message delivered twice gets one answer, at most 20 messages wait at once, and a phone clock set back no longer stretches a chat's five-minute wait.
+- The People and Notifications tab switches work out their first answer outside the shared lock, so the first check can't hold up another part of HushMessenger that's starting at the same moment.
 
 ### Settings
 

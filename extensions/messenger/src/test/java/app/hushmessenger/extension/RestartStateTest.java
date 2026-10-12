@@ -63,6 +63,17 @@ public class RestartStateTest {
         assertFalse("Pause shows every tab after the restart", Settings.hideNotificationsTab());
     }
 
+    /** Two first askers race: whichever answer is stored first is the one both get, even if the switch moved between. */
+    @Test public void anAnswerStoredFirstWinsOverALaterOneForTheSameTab() {
+        Settings.bottomTabs.put("tab_people", true);
+        assertTrue("The stored answer, not the off switch", Settings.hidePeopleTab());
+        assertTrue("A hidden tab counts as a use", Settings.activeAt.containsKey("tab_people"));
+        Settings.bottomTabs.put("tab_notifications", false);
+        Settings.preferences.edit().putBoolean("tab_notifications", true).commit();
+        assertFalse(Settings.hideNotificationsTab());
+        assertFalse(Settings.activeAt.containsKey("tab_notifications"));
+    }
+
     @Test public void aHeldAnswerShowsUntilARestartThroughTheSwitchPauseAndSafeMode() {
         assertNull("Nothing is held before Messenger asks", Settings.heldUntilRestart("emoji_drawer"));
         Settings.preferences.edit().putBoolean("emoji_drawer", true).commit();

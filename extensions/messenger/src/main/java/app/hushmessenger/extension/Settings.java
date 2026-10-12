@@ -219,8 +219,15 @@ public final class Settings {
     public static boolean hideNotificationsTab() { return hideBottomTab("tab_notifications"); }
 
     private static boolean hideBottomTab(String key) {
-        // computeIfAbsent runs once per key, so two first askers can't get different answers.
-        boolean hidden = bottomTabs.computeIfAbsent(key, Settings::wouldUse);
+        // putIfAbsent keeps whichever answer landed first, so two first askers can't get different answers. wouldUse runs
+        // outside the map's lock because it can reach HostScreens.initializeLate, which takes a lock of its own.
+        Boolean held = bottomTabs.get(key);
+        if (held == null) {
+            boolean answer = wouldUse(key);
+            held = bottomTabs.putIfAbsent(key, answer);
+            if (held == null) held = answer;
+        }
+        boolean hidden = held;
         if (hidden) activeAt.put(key, System.currentTimeMillis());
         return hidden;
     }
