@@ -282,6 +282,8 @@ public class SettingsDialogTest {
                 assertEquals(legacy || alreadySecure, (window.getAttributes().flags & secure) != 0);
                 assertEquals(legacy, (dialog.getWindow().getAttributes().flags & secure) != 0);
                 dialog.getWindow().getDecorView().findViewWithTag("message_log_dialog_close").performClick();
+                // Dialog delivers its dismiss listener as a message, so the looper runs it before the flag is checked.
+                Shadows.shadowOf(Looper.getMainLooper()).idle();
                 assertFalse(dialog.isShowing());
                 assertEquals(alreadySecure, (window.getAttributes().flags & secure) != 0);
             }
@@ -296,6 +298,7 @@ public class SettingsDialogTest {
             assertEquals(legacy, (window.getAttributes().flags & secure) != 0);
             assertEquals(legacy, (restored.getWindow().getAttributes().flags & secure) != 0);
             restored.dismiss();
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
             assertEquals(0, window.getAttributes().flags & secure);
         }
     }
