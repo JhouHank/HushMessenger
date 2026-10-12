@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Settings
+
+- Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
+- Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.
+- The restart screen keeps its text clear of camera cutouts and system bars.
+
+### Checks
+
+- Checked that a failed system-emoji font merge retries the same file and stops after three failures.
+
 ### New
 
 - [#43](https://github.com/SysAdminDoc/HushMessenger/issues/43) **Hide People tab** and **Hide Notifications tab** are new Navigation switches. Each one takes its tab out of the bar at the bottom once Messenger restarts, and both start off.

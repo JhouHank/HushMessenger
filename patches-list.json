@@ -1,6 +1,6 @@
 {
     "NOTE": "Generated locally from the built MPP with :patches:generatePatchCatalog. Do not edit by hand.",
-    "version": "0.23.0",
+    "version": "0.23.1",
     "patches": [
         {
             "name": "Allow chat bubbles",
@@ -139,6 +139,63 @@
                     "type": "ResourcePatch",
                     "name": null,
                     "description": "Record HushMessenger capability: auto_reply",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Bold and italic text",
+            "description": "Adds Bold and Italic to the menu that shows when you select words you typed. They're special Unicode letters, so they show on any phone, but screen readers may read them oddly. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Conversations",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: text_style",
                     "dependencies": [
                         {
                             "type": "ResourcePatch",
@@ -575,6 +632,63 @@
             "options": []
         },
         {
+            "name": "Hide Notifications tab",
+            "description": "Hides the Notifications tab in the bar at the bottom. Restart Messenger to see the tab go. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Navigation",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: tab_notifications",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
             "name": "Hide People You May Know",
             "description": "Hides suggested people in chats, search and stories, and on the People and Notifications tabs, so you only see people you know. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
@@ -597,6 +711,63 @@
                     "type": "ResourcePatch",
                     "name": null,
                     "description": "Record HushMessenger capability: people",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
+        },
+        {
+            "name": "Hide People tab",
+            "description": "Hides the People tab in the bar at the bottom. Restart Messenger to see the tab go. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Navigation",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: tab_people",
                     "dependencies": [
                         {
                             "type": "ResourcePatch",
@@ -2297,6 +2468,63 @@
                     "values": {}
                 }
             ]
+        },
+        {
+            "name": "Stop MQTT logging",
+            "description": "Stops the health reports and push logging Messenger sends over its live connection (MQTT). Messages, calls and active status share that connection and keep working. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "default": true,
+            "category": "Privacy",
+            "dependencies": [
+                {
+                    "type": "BytecodePatch",
+                    "name": null,
+                    "description": "Load HushMessenger runtime controls",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                },
+                {
+                    "type": "ResourcePatch",
+                    "name": null,
+                    "description": "Record HushMessenger capability: mqtt_telemetry",
+                    "dependencies": [
+                        {
+                            "type": "ResourcePatch",
+                            "name": null,
+                            "description": "Install HushMessenger settings",
+                            "dependencies": []
+                        }
+                    ]
+                }
+            ],
+            "compatiblePackages": [
+                {
+                    "packageName": "com.facebook.orca",
+                    "name": "Messenger",
+                    "description": null,
+                    "apkFileType": "APK",
+                    "appIconColor": "#0084FF",
+                    "signatures": [
+                        "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27",
+                        "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+                    ],
+                    "targets": [
+                        {
+                            "version": "582.0.0.61.92",
+                            "versionCodes": null,
+                            "isExperimental": false,
+                            "minSdk": 28,
+                            "description": "Arm64 builds 346415686, 346415687, 346415690, 346415706, 346415707, 346415720, 346415721, 346415723, 346415759, 346415772, 346415773, 346415774, 346415776 and 346415777; checked again during patching"
+                        }
+                    ]
+                }
+            ],
+            "options": []
         },
         {
             "name": "Stop ad attribution uploads",

@@ -129,7 +129,9 @@ public class SettingsTranslationTest {
             directed++;
             assertTrue(entry.getKey(), entry.getValue().contains("Messenger's home screen icon"));
         }
-        assertEquals(8, directed);
+        assertEquals(6, directed);
+        for (String key : List.of("access_help_menu", "hide_drawer_icon_help"))
+            assertTrue(key, englishIds().get(key).contains("home screen icon"));
     }
 
     @Test public void everyShippedLocaleCoversEveryIdAndKeepsItsPlaceholders() {

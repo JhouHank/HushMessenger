@@ -23,21 +23,21 @@ final class SettingsUi {
 
     SettingsUi(Context context, boolean light) {
         this.context = context;
-        background = light ? 0xfff7f9fc : 0xff000000;
-        surface = light ? 0xffffffff : 0xff11161e;
-        text = light ? 0xff182435 : 0xfff5f7fc;
-        muted = light ? 0xff536478 : 0xffaebacb;
-        accent = light ? 0xff1467c8 : 0xff74aeff;
-        line = light ? 0xffd5deea : 0xff293241;
-        outline = light ? 0xff71839b : 0xff65768c;
+        background = light ? 0xfffaf7f9 : 0xff000000;
+        surface = light ? 0xffffffff : 0xff121419;
+        text = light ? 0xff211b23 : 0xfff4f1f3;
+        muted = light ? 0xff645966 : 0xffaeb3bf;
+        accent = light ? 0xff9e3157 : 0xfff3a6b8;
+        line = light ? 0xffded6dd : 0xff303640;
+        outline = light ? 0xff8b7c89 : 0xff657080;
         selected = accent;
         warning = light ? 0xff785100 : 0xffffcc67;
         warningSurface = light ? 0xffffefc5 : 0xff352800;
-        track = light ? 0xffc1c8d3 : 0xff313943;
+        track = light ? 0xffd9d0d8 : 0xff2b3039;
         thumb = light ? 0xffffffff : 0xffe1e6ef;
-        ripple = light ? 0x221467c8 : 0x3374aeff;
-        infoSurface = light ? 0xffeaf2fb : 0xff0c1928;
-        infoBorder = light ? 0xffbdd1ea : 0xff274361;
+        ripple = light ? 0x229e3157 : 0x33f3a6b8;
+        infoSurface = light ? 0xfff2ebf0 : 0xff1b1f26;
+        infoBorder = light ? 0xffe4d9e1 : 0xff292f39;
         selectedText = light ? 0xffffffff : background;
         largeText = context.getResources().getConfiguration().fontScale > 1.3f ||
             context.getResources().getConfiguration().screenWidthDp < 360 ||
@@ -71,7 +71,7 @@ final class SettingsUi {
     }
 
     TextView heading(String value) {
-        TextView view = text(value, 13, muted, true);
+        TextView view = text(value.toUpperCase(context.getResources().getConfiguration().getLocales().get(0)), 13, muted, true);
         view.setLetterSpacing(0.06f);
         view.setAccessibilityHeading(true);
         return view;
@@ -116,9 +116,17 @@ final class SettingsUi {
         return view;
     }
 
+    Button primaryButton(String title) {
+        Button view = button(title);
+        view.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        view.setTextColor(new ColorStateList(new int[][] {{-android.R.attr.state_enabled}, {}}, new int[] {muted, selectedText}));
+        view.setBackground(interactive(accent, 0, 4, outline));
+        return view;
+    }
+
     LinearLayout panel() {
         LinearLayout view = column();
-        view.setPadding(dp(16), dp(16), dp(16), dp(12));
+        view.setPadding(dp(16), dp(16), dp(16), dp(16));
         view.setBackground(shape(surface, line, 8));
         return view;
     }

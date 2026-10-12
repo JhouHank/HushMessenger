@@ -126,7 +126,7 @@ public class SetupSummaryTest {
                 View root = screen.get().getWindow().getDecorView();
                 root.findViewWithTag("tab_app").performClick();
                 String text = ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString();
-                assertEquals(menuRow, text.contains("Menu tab"));
+                assertEquals(menuRow, text.contains("Messenger's Menu"));
                 assertTrue(text.contains("app drawer"));
                 assertTrue(text.contains("Patch controls"));
             }
@@ -359,7 +359,7 @@ public class SetupSummaryTest {
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
                 android.widget.TextView help = screen.get().getWindow().getDecorView().findViewWithTag("shared_install_help");
                 assertNotNull(help);
-                assertTrue(help.getText().toString().contains("Messenger is removed and its data on your phone is erased"));
+                assertTrue(help.getText().toString().contains("removes Messenger and its local data"));
                 assertTrue(help.getText().toString().contains("Hide app drawer icon"));
                 assertNotEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, help.getImportantForAccessibility());
             }

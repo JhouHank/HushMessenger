@@ -84,6 +84,33 @@ public class SettingsReliabilityTest {
         }
     }
 
+    @Test @Config(sdk = {28, 36}) public void appDescriptionsKeepOneAccessibleSwitchAtLargeTextAndInRtl() {
+        for (String locale : new String[] {"en-rUS", "ar-rXB"}) {
+            RuntimeEnvironment.setQualifiers(locale + "-w320dp-h360dp-mdpi");
+            RuntimeEnvironment.setFontScale(2f);
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                View root = layout(screen.get(), 320, 360);
+                root.findViewWithTag("tab_app").performClick();
+                layout(screen.get(), 320, 360);
+                for (String key : new String[] {"light", "material_you_black", "check_updates"}) {
+                    Switch choice = root.findViewWithTag(key);
+                    assertReachable(screen.get(), choice, 320, 360);
+                    ViewGroup row = (ViewGroup) choice.getParent();
+                    AccessibilityNodeInfo node = row.createAccessibilityNodeInfo();
+                    assertEquals("android.widget.Switch", node.getClassName().toString());
+                    assertEquals(choice.getContentDescription(), node.getContentDescription());
+                    assertEquals(0, node.getChildCount());
+                    assertTrue(key + " fits horizontally", choice.getLeft() >= 0 && choice.getRight() <= row.getWidth());
+                    ViewGroup labels = (ViewGroup) row.getChildAt(0);
+                    TextView description = (TextView) labels.getChildAt(1);
+                    assertEquals(0, description.getLayout().getEllipsisCount(description.getLineCount() - 1));
+                    assertEquals(description.getLayout().getHeight(), description.getHeight());
+                    node.recycle();
+                }
+            }
+        }
+    }
+
     @Test @Config(sdk = 28) public void unavailableRowIsAnnouncedButCannotToggle() {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             Switch choice = screen.get().getWindow().getDecorView().findViewWithTag("bubbles");
@@ -356,7 +383,7 @@ public class SettingsReliabilityTest {
                 root.findViewWithTag("tab_app").performClick();
                 layout(screen.get(), size[0], size[1]);
                 TextView help = root.findViewWithTag("access_help");
-                assertTrue(help.getText().toString().contains("Menu tab"));
+                assertTrue(help.getText().toString().contains("Messenger's Menu"));
                 assertEquals(0, help.getLayout().getEllipsisCount(help.getLineCount() - 1));
                 assertEquals(help.getLayout().getHeight(), help.getHeight() - help.getPaddingTop() - help.getPaddingBottom());
                 if (size[1] > 360) {

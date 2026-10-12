@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
+import android.view.Gravity;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PersistableBundle;
@@ -252,7 +253,7 @@ public final class SettingsActivity extends Activity {
         controlsContent = pageContent(controlsScroll);
         buildControls(controlsContent);
         reminder = ui.text(text.get("reopen"), 12, ui.muted, false);
-        reminder.setPadding(ui.dp(20), ui.dp(12), ui.dp(20), ui.dp(16));
+        reminder.setPadding(ui.dp(20), ui.dp(12), ui.dp(20), ui.dp(40));
         ui.add(controlsPage, reminder, 0);
         appPage = ui.column();
         appPage.setTag("app_page");
@@ -341,7 +342,7 @@ public final class SettingsActivity extends Activity {
         placeBrand();
         placeHeader();
         ((ViewGroup) reminder.getParent()).removeView(reminder);
-        reminder.setPadding(ui.dp(compact ? 0 : 20), ui.dp(12), ui.dp(compact ? 0 : 20), ui.dp(16));
+        reminder.setPadding(ui.dp(compact ? 0 : 20), ui.dp(12), ui.dp(compact ? 0 : 20), ui.dp(compact ? 16 : 40));
         ui.add(compact ? controlsContent : controlsPage, reminder, 0);
     }
 
@@ -435,13 +436,13 @@ public final class SettingsActivity extends Activity {
 
     private void buildControls(LinearLayout content) {
         LinearLayout setup = ui.panel();
-        setup.setPadding(ui.dp(16), ui.dp(14), ui.dp(16), ui.dp(8));
+        setup.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(8));
         ui.add(setup, ui.heading(text.get("setup")), 0);
         enabledCount = ui.text("", 22, ui.text, true);
         enabledCount.setTag("enabled_count");
-        ui.add(setup, enabledCount, 8);
-        setupNote = ui.text("", 13, ui.muted, false);
-        ui.add(setup, setupNote, 6);
+        ui.add(setup, enabledCount, 12);
+        setupNote = ui.text("", 14, ui.muted, false);
+        ui.add(setup, setupNote, 10);
         safeModeAction = ui.button("");
         safeModeAction.setTag("resume_safe_mode");
         safeModeAction.setOnClickListener(view -> {
@@ -775,6 +776,7 @@ public final class SettingsActivity extends Activity {
 
     @SuppressWarnings("deprecation")
     private LinearLayout controlRow(String key, String title, String description, boolean divided) {
+        boolean appRow = !divided && !"paused".equals(key);
         boolean available = Settings.available(key);
         if (!available) description += " " + text.format(CameraActivity.KEY.equals(key) ? "camera_unsupported"
             : TextStyleActivity.KEY.equals(key) ? "text_style_unsupported"
@@ -783,8 +785,9 @@ public final class SettingsActivity extends Activity {
         LinearLayout labels = ui.column();
         labels.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         LinearLayout titleLine = ui.row();
+        if (appRow) titleLine.setPaddingRelative(0, 0, ui.dp(60), 0);
         if (ui.largeText) titleLine.setOrientation(LinearLayout.VERTICAL);
-        titleLine.addView(ui.text(text.display(title), 16, ui.text, false), new LinearLayout.LayoutParams(-2, -2));
+        titleLine.addView(ui.text(text.display(title), appRow ? 14 : 16, ui.text, false), new LinearLayout.LayoutParams(-2, -2));
         if ("ads".equals(key)) {
             TextView badge = ui.text(text.get("experimental"), 11, ui.warning, false);
             badge.setBackground(ui.shape(ui.warningSurface, 0, 4));
@@ -794,7 +797,7 @@ public final class SettingsActivity extends Activity {
             titleLine.addView(badge, params);
         }
         ui.add(labels, titleLine, 0);
-        if (!description.isEmpty()) ui.add(labels, ui.text(text.display(description), 14, ui.muted, false), 6);
+        if (!description.isEmpty()) ui.add(labels, ui.text(text.display(description), appRow ? 13 : 14, ui.muted, false), appRow ? 4 : 6);
         // A switch records a use only when Messenger reaches its screen or event, so an off switch shows nothing.
         // A failure newer than the last use means the switch isn't doing its job, so that shows instead.
         TextView activeLabel = null;
@@ -804,10 +807,15 @@ public final class SettingsActivity extends Activity {
             activityLabels.put(key, activeLabel);
             ui.add(labels, activeLabel, 4);
         }
-        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(labels, new LinearLayout.LayoutParams(appRow ? -1 : 0, -2, appRow ? 0 : 1));
         Switch control = ui.toggle(key, text.display(title), text.display(("ads".equals(key) ? text.format("experimental") + ". " : "") + description), Settings.preferences.getBoolean(key, false));
         LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(ui.dp(48), -2);
-        switchParams.setMarginStart(ui.dp(12));
+        // App descriptions use the full panel width below the title. The switch overlays only its title line.
+        switchParams.setMarginStart(ui.dp(appRow ? -48 : 12));
+        if (appRow) {
+            row.setGravity(Gravity.TOP);
+            control.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        }
         row.addView(control, switchParams);
         switches.add(control);
         if (divided) {
@@ -896,8 +904,9 @@ public final class SettingsActivity extends Activity {
     }
 
     private void buildApp(LinearLayout content) {
-        ui.add(content, ui.heading(text.get("quick_access")), 4);
+        ui.add(content, ui.heading(text.get("quick_access")), 0);
         LinearLayout access = ui.panel();
+        access.setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14));
         // The Menu tab row is its own patch, recorded as menu_row only when it applied.
         boolean menuRow = Settings.installed.contains("menu_row");
         // A Root Mount install has no drawer entry to mention or hide.
@@ -909,62 +918,68 @@ public final class SettingsActivity extends Activity {
         } catch (PackageManager.NameNotFoundException | SecurityException unavailable) {
             // Some bundles have settings activities but omit the launcher alias.
         }
-        TextView accessHelp = ui.text(text.get((hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing") + (menuRow ? "_menu" : "")), 14, ui.muted, false);
+        TextView accessHelp = ui.text(text.get((hosted ? "access_help_hosted" : drawerAlias ? "access_help" : "access_help_missing") + (menuRow ? "_menu" : "")), 13, ui.muted, false);
         accessHelp.setTag("access_help");
         ui.add(access, accessHelp, 0);
-        Button restart = ui.button(text.get("restart"));
+        Button restart = ui.primaryButton(text.get("restart"));
         restart.setTag("restart_messenger");
         restart.setOnClickListener(view -> HostScreens.open(this, HostScreens.RESTART));
-        ui.add(access, restart, 14);
+        ui.add(access, restart, 12);
         // Without the Menu row, a launcher that has no app shortcuts would leave no way back in.
         if (menuRow && drawerAlias && !hosted) {
-            ui.rule(access, 14);
-            ui.add(access, controlRow("hide_drawer_icon", text.format("hide_drawer_icon"), text.format("hide_drawer_icon_help"), false), 14);
+            ui.rule(access, 12);
+            ui.add(access, controlRow("hide_drawer_icon", text.format("hide_drawer_icon"), text.format("hide_drawer_icon_help"), false), 10);
         } else {
             TextView drawerHelp = ui.text(text.get(hosted ? "drawer_root" : !drawerAlias ? "drawer_missing" : "drawer_requires_menu"), 14, ui.muted, false);
             drawerHelp.setTag("drawer_help");
             ui.add(access, drawerHelp, 14);
         }
         if (drawerAlias && !hosted) {
-            TextView sharedInstall = ui.text(text.get("shared_install_help"), 14, ui.muted, false);
+            TextView sharedInstall = ui.text(text.get("shared_install_help"), 13, ui.muted, false);
             sharedInstall.setTag("shared_install_help");
+            sharedInstall.setPadding(ui.dp(12), ui.dp(12), ui.dp(12), ui.dp(12));
+            sharedInstall.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 4));
             ui.add(access, sharedInstall, 12);
         }
-        ui.add(content, access, 12);
+        ui.add(content, access, 8);
         ui.add(content, ui.heading(text.get("appearance")), 22);
         LinearLayout appearance = ui.panel();
+        appearance.setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14));
         ui.add(appearance, controlRow("light", text.format("light"), text.format("light_help"), false), 0);
         if (Settings.installed.contains("material_you")) {
-            ui.rule(appearance, 14);
-            ui.add(appearance, controlRow("material_you_black", text.format("material_you_black"), text.format("material_you_black_help"), false), 14);
+            ui.rule(appearance, 10);
+            ui.add(appearance, controlRow("material_you_black", text.format("material_you_black"), text.format("material_you_black_help"), false), 12);
         }
-        ui.rule(appearance, 14);
-        ui.add(appearance, ui.text(text.get("theme_help"), 13, ui.muted, false), 14);
+        ui.rule(appearance, 10);
+        ui.add(appearance, ui.text(text.get("theme_help"), 13, ui.muted, false), 12);
         ui.add(content, appearance, 12);
-        ui.add(content, ui.heading(text.get("about")), 22);
+        ui.add(content, ui.heading(text.get("about")), 18);
         LinearLayout about = ui.panel();
+        about.setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14));
         infoRow(about, text.get("version"), BuildConfig.VERSION_NAME);
-        ui.rule(about, 12);
+        ui.rule(about, 10);
         infoRow(about, text.get("installed"), text.number(installedControls.size()));
-        ui.rule(about, 12);
+        ui.add(content, about, 12);
+        ui.add(content, ui.heading(text.get("choices")), 22);
+        LinearLayout choices = ui.panel();
         Button copy = ui.button(text.get("copy"));
         copy.setTag("copy_setup");
         copy.setOnClickListener(view -> copySetup());
-        ui.add(about, copy, 8);
-        ui.add(about, ui.text(text.get("copy_help"), 13, ui.muted, false), 8);
-        ui.rule(about, 12);
+        ui.add(choices, copy, 0);
+        ui.add(choices, ui.text(text.get("copy_help"), 13, ui.muted, false), 8);
+        ui.rule(choices, 12);
         Button exportBtn = ui.button(text.get("export"));
         exportBtn.setTag("export_choices");
         exportBtn.setOnClickListener(view -> exportChoices());
-        ui.add(about, exportBtn, 8);
-        ui.add(about, ui.text(text.get("export_help"), 13, ui.muted, false), 8);
-        ui.rule(about, 12);
+        ui.add(choices, exportBtn, 8);
+        ui.add(choices, ui.text(text.get("export_help"), 13, ui.muted, false), 8);
+        ui.rule(choices, 12);
         Button importBtn = ui.button(text.get("import_choices"));
         importBtn.setTag("import_choices");
         importBtn.setOnClickListener(view -> importChoices());
-        ui.add(about, importBtn, 8);
-        ui.add(about, ui.text(text.get("import_help"), 13, ui.muted, false), 8);
-        ui.rule(about, 12);
+        ui.add(choices, importBtn, 8);
+        ui.add(choices, ui.text(text.get("import_help"), 13, ui.muted, false), 8);
+        ui.rule(choices, 12);
         Button saveFile = saveChoicesFile = ui.button(text.get("save_choices_file"));
         saveFile.setTag("save_choices_file");
         saveFile.setOnClickListener(view -> {
@@ -980,7 +995,7 @@ public final class SettingsActivity extends Activity {
                 feedback(text.get("export_failed"), Toast.LENGTH_LONG);
             }
         });
-        ui.add(about, saveFile, 8);
+        ui.add(choices, saveFile, 8);
         Button readFile = readChoicesFile = ui.button(text.get("read_choices_file"));
         readFile.setTag("read_choices_file");
         readFile.setOnClickListener(view -> {
@@ -995,20 +1010,20 @@ public final class SettingsActivity extends Activity {
                 feedback(text.get("choices_file_no_picker"), Toast.LENGTH_LONG);
             }
         });
-        ui.add(about, readFile, 8);
+        ui.add(choices, readFile, 8);
         documentStatus = ui.text("", 13, ui.muted, false);
         documentStatus.setTag("choices_file_status");
         documentStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         documentStatus.setVisibility(View.GONE);
-        ui.add(about, documentStatus, 8);
+        ui.add(choices, documentStatus, 8);
         cancelChoicesFile = ui.button(text.get("cancel_choices_file"));
         cancelChoicesFile.setTag("cancel_choices_file");
         cancelChoicesFile.setVisibility(View.GONE);
         cancelChoicesFile.setOnClickListener(view -> cancelDocumentJob(
             documentJob != null && documentJob.request == READ_CHOICES ? "choices_file_canceled_read" : "choices_file_canceled"));
-        ui.add(about, cancelChoicesFile, 8);
-        ui.add(about, ui.text(text.get("choices_file_help"), 13, ui.muted, false), 8);
-        ui.add(content, about, 12);
+        ui.add(choices, cancelChoicesFile, 8);
+        ui.add(choices, ui.text(text.get("choices_file_help"), 13, ui.muted, false), 8);
+        ui.add(content, choices, 12);
         LinearLayout updates = ui.panel();
         ui.add(updates, controlRow("check_updates", text.format("check_updates"), text.format("check_updates_help"), false), 0);
         updateStatus = ui.text("", 13, ui.muted, false);
@@ -1345,8 +1360,8 @@ public final class SettingsActivity extends Activity {
         // A dialog doesn't inherit the activity root's direction, and TalkBack announces the pane by this title.
         frame.setLayoutDirection(text.layoutDirection());
         frame.setAccessibilityPaneTitle(text.get("message_log_title"));
-        frame.addView(ui.text(text.get("message_log_title"), 20, ui.text, true));
-        ui.add(frame, ui.text(text.get("message_log_hint"), 13, ui.muted, false), 4);
+        frame.addView(ui.text(text.get("message_log_title"), 24, ui.text, true));
+        ui.add(frame, ui.text(text.get("message_log_hint"), 14, ui.muted, false), 8);
         ScrollView scroll = new ScrollView(this);
         messageLogList = ui.column();
         messageLogList.setPadding(0, ui.dp(12), 0, ui.dp(12));
@@ -1358,7 +1373,7 @@ public final class SettingsActivity extends Activity {
         Button clear = ui.button(text.get("message_log_clear"));
         clear.setOnClickListener(clicked -> clearMessageLog());
         buttons.addView(clear);
-        Button close = ui.button(text.get("message_log_close"));
+        Button close = ui.primaryButton(text.get("message_log_close"));
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, -2);
         closeParams.setMarginStart(ui.dp(8));
         close.setOnClickListener(clicked -> dialog.dismiss());
@@ -1425,8 +1440,8 @@ public final class SettingsActivity extends Activity {
         frame.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(16));
         frame.setLayoutDirection(text.layoutDirection());
         frame.setAccessibilityPaneTitle(text.get("auto_reply_title"));
-        frame.addView(ui.text(text.get("auto_reply_title"), 20, ui.text, true));
-        ui.add(frame, ui.text(text.get("auto_reply_hint"), 13, ui.muted, false), 4);
+        frame.addView(ui.text(text.get("auto_reply_title"), 24, ui.text, true));
+        ui.add(frame, ui.text(text.get("auto_reply_hint"), 14, ui.muted, false), 8);
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = ui.column();
         list.setPadding(0, ui.dp(4), 0, ui.dp(8));
@@ -1438,6 +1453,7 @@ public final class SettingsActivity extends Activity {
         groups.setTag("auto_reply_groups");
         groups.setText(text.get("auto_reply_groups"));
         groups.setTextColor(ui.text);
+        groups.setButtonTintList(new android.content.res.ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {ui.accent, ui.outline}));
         groups.setMinHeight(ui.dp(48));
         groups.setChecked(prefs.getBoolean(AutoReply.GROUPS, false));
         ui.add(frame, groups, 4);
@@ -1455,7 +1471,7 @@ public final class SettingsActivity extends Activity {
             card.findViewWithTag("auto_reply_when").requestFocus();
         });
         buttons.addView(add);
-        Button save = ui.button(text.get("auto_reply_save"));
+        Button save = ui.primaryButton(text.get("auto_reply_save"));
         save.setTag("auto_reply_save");
         save.setOnClickListener(clicked -> {
             List<AutoReply.Rule> rules = new ArrayList<>();
@@ -1983,10 +1999,10 @@ public final class SettingsActivity extends Activity {
 
     private void infoRow(LinearLayout parent, String title, String value) {
         LinearLayout row = ui.row();
-        row.setPadding(0, ui.dp(3), 0, ui.dp(4));
-        row.addView(ui.text(title, 16, ui.text, false), new LinearLayout.LayoutParams(0, -2, 1));
-        row.addView(ui.text(value, 16, ui.accent, true));
-        ui.add(parent, row, 4);
+        row.setPadding(0, ui.dp(3), 0, ui.dp(3));
+        row.addView(ui.text(title, 14, ui.text, false), new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(ui.text(value, 14, ui.muted, false));
+        ui.add(parent, row, 0);
     }
 
     private void showPage(String name) {
@@ -2062,7 +2078,7 @@ public final class SettingsActivity extends Activity {
             button.setSelected(selected);
             button.setTextColor(selected ? ui.selectedText : ui.muted);
             button.setBackground(new android.graphics.drawable.InsetDrawable(
-                ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 8, selected ? ui.text : ui.accent),
+                ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 4, selected ? ui.text : ui.accent),
                 0, ui.dp(6), 0, ui.dp(6)));
             button.setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8));
         }

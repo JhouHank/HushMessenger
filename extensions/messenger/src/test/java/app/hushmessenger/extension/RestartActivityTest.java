@@ -6,6 +6,10 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Insets;
+import android.view.DisplayCutout;
+import android.view.View;
+import android.view.WindowInsets;
 import android.widget.TextView;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -91,9 +95,10 @@ public class RestartActivityTest {
         for (boolean light : new boolean[] {false, true}) {
             Settings.preferences.edit().putBoolean("light", light).commit();
             try (var screen = Robolectric.buildActivity(RestartActivity.class).setup()) {
-                TextView status = (TextView) ((android.view.ViewGroup) screen.get().findViewById(android.R.id.content)).getChildAt(0);
+                android.view.View pane = screen.get().findViewById(android.R.id.content).findViewWithTag("restart_page");
+                TextView status = pane.findViewWithTag("restart_status");
                 SettingsUi ui = new SettingsUi(screen.get(), light);
-                assertEquals(ui.background, ((android.graphics.drawable.ColorDrawable) status.getBackground()).getColor());
+                assertEquals(ui.background, ((android.graphics.drawable.ColorDrawable) pane.getBackground()).getColor());
                 assertEquals(ui.text, status.getCurrentTextColor());
                 // From API 35 enforced edge-to-edge ignores bar colors; the full-window status view shows behind them.
                 if (android.os.Build.VERSION.SDK_INT < 35) {
@@ -111,6 +116,46 @@ public class RestartActivityTest {
             assertTrue(screen.get().isFinishing());
             assertNull(Shadows.shadowOf(screen.get()).getNextStartedActivity());
             assertTrue(ShadowToast.getTextOfLatestToast().contains("Couldn't restart"));
+        }
+    }
+
+    @Test @Config(sdk = {29, 36}) public void restartContentStaysClearOfCutoutsAndSystemBars() {
+        var app = RuntimeEnvironment.getApplication();
+        SettingsUi ui = new SettingsUi(app, false);
+        View content = RestartActivity.content(ui);
+        int[][] cases = {
+            {0, 24, 0, 24, 80, 0, 0, 0, 80, 24, 0, 24},
+            {0, 0, 0, 0, 0, 90, 0, 0, 0, 90, 0, 0},
+            {0, 24, 0, 254, 0, 0, 80, 40, 0, 24, 80, 254}
+        };
+        for (int[] c : cases) {
+            WindowInsets insets = new WindowInsets.Builder()
+                .setSystemWindowInsets(Insets.of(c[0], c[1], c[2], c[3]))
+                .setDisplayCutout(new DisplayCutout(Insets.of(c[4], c[5], c[6], c[7]), null, null, null, null))
+                .build();
+            WindowInsets left = content.dispatchApplyWindowInsets(insets);
+            assertArrayEquals(new int[] {ui.dp(24) + c[8], ui.dp(24) + c[9], ui.dp(24) + c[10], ui.dp(24) + c[11]},
+                new int[] {content.getPaddingLeft(), content.getPaddingTop(), content.getPaddingRight(), content.getPaddingBottom()});
+            assertNull(left.getDisplayCutout());
+        }
+    }
+
+    @Test public void restartContentFitsLargeTextInAShortWindow() {
+        for (String locale : new String[] {"en-rUS", "ar-rXB"}) {
+            RuntimeEnvironment.setQualifiers(locale + "-w320dp-h360dp-mdpi");
+            RuntimeEnvironment.setFontScale(2f);
+            for (boolean light : new boolean[] {false, true}) {
+                View content = RestartActivity.content(new SettingsUi(RuntimeEnvironment.getApplication(), light));
+                content.measure(View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY));
+                content.layout(0, 0, 320, 360);
+                TextView status = content.findViewWithTag("restart_status");
+                View message = (View) status.getParent();
+                View center = (View) message.getParent();
+                assertTrue("Message starts within its scrollable content", message.getTop() >= 0);
+                assertTrue("Message ends within its scrollable content", message.getBottom() <= center.getHeight());
+                assertEquals(0, status.getLayout().getEllipsisCount(status.getLineCount() - 1));
+            }
         }
     }
 
