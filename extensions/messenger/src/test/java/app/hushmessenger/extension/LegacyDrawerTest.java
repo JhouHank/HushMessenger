@@ -137,10 +137,10 @@ public class LegacyDrawerTest {
         List<?> source = Collections.emptyList();
         Settings.preferences.edit().putBoolean("hide_menu_row", true).putBoolean(Settings.SHORTCUT_USED, true).commit();
         try {
-            HostScreens.controlsShortcut = true;
+            HostScreensTest.answerControlsShortcut(true);
             assertSame(source, Settings.addLegacyDrawerEntry(new Fragment(RuntimeEnvironment.getApplication()), source));
             assertEquals(0, FactoryShadow.calls);
-            HostScreens.controlsShortcut = false;
+            HostScreensTest.answerControlsShortcut(false);
             assertEquals("HushMessenger", added(Settings.addLegacyDrawerEntry(new Fragment(RuntimeEnvironment.getApplication()), source)).A06);
         } finally {
             HostScreens.controlsShortcut = null;

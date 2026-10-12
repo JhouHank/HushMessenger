@@ -353,7 +353,7 @@ public class SetupSummaryTest {
     @Test public void hideTheMenuRowWaitsForTheLongPressShortcut() throws Exception {
         installedFeatures("people", "menu_row");
         try {
-            HostScreens.controlsShortcut = true;
+            HostScreensTest.answerControlsShortcut(true);
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
                 View root = screen.get().getWindow().getDecorView();
                 root.findViewWithTag("tab_app").performClick();

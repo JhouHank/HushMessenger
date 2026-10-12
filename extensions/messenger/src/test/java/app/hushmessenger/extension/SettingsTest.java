@@ -388,15 +388,15 @@ public class SettingsTest {
         var application = RuntimeEnvironment.getApplication();
         java.util.List<Object> side = java.util.List.of(new Object(), new Object());
         try {
-            HostScreens.controlsShortcut = true;
+            HostScreensTest.answerControlsShortcut(true);
             Settings.preferences.edit().putBoolean("hide_menu_row", true).commit();
             assertEquals("not opened from the shortcut yet", 2, menuRows(application).size());
             Settings.noteShortcutUsed();
             assertEquals(1, menuRows(application).size());
             assertSame(side, Settings.addMenuDrawerEntry(side));
-            HostScreens.controlsShortcut = false;
+            HostScreensTest.answerControlsShortcut(false);
             assertEquals("the shortcut went missing", 2, menuRows(application).size());
-            HostScreens.controlsShortcut = true;
+            HostScreensTest.answerControlsShortcut(true);
             Settings.preferences.edit().putBoolean("hide_menu_row", false).commit();
             assertEquals(2, menuRows(application).size());
             assertTrue(Settings.hookErrors.isEmpty());

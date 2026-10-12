@@ -34,6 +34,12 @@ import static org.junit.Assert.*;
 public class HostScreensTest {
     private static final int SEPARATE = Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
 
+    /** Stands in for the shortcut answer, fresh as of now, so its 30 s expiry can't swap in a real ShortcutManager read. */
+    static void answerControlsShortcut(boolean present) {
+        HostScreens.controlsShortcut = present;
+        HostScreens.controlsShortcutAt = android.os.SystemClock.elapsedRealtime();
+    }
+
     @Before public void reset() {
         Settings.initialize(RuntimeEnvironment.getApplication());
         Settings.preferences.edit().clear().commit();
