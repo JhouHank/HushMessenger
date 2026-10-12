@@ -139,7 +139,8 @@ public class CompatReport {
         Map.entry("ai_toolbar", Set.of("com.facebook.messaging.inbox.tab.plugins.core.tabtoolbarbutton.aihomebutton.AiHomeButtonKillSwitch")),
         Map.entry("ai_tab", Set.of("com.facebook.messaging.aibot.plugins.tab.tabcontent.MetaAiTabContentImplementation")),
         Map.entry("tab_people", Set.of("com.facebook.messaging.peopletab.plugins.tab.tabcontent.PeopleTabContentImplementation")),
-        Map.entry("tab_notifications", Set.of("com.facebook.messaging.inbox.jewel.jeweltab.plugins.core.tabcontent.JewelTabContentImplementation"))
+        Map.entry("tab_notifications", Set.of("com.facebook.messaging.inbox.jewel.jeweltab.plugins.core.tabcontent.JewelTabContentImplementation")),
+        Map.entry("mark_read_action", Set.of("com.facebook.messaging.threadlist.threaditemmenu.plugins.core.markreadmenuitem.MarkReadMenuItemImplementation"))
     );
 
     static final String APP_COMMUNICATION = "com.facebook.permission.prod.FB_APP_COMMUNICATION";
@@ -169,6 +170,7 @@ public class CompatReport {
         PATCHES.put("Hide inbox promotions", List.of("inbox_promotions"));
         PATCHES.put("Hide stories and notes", List.of("stories"));
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
+        PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
         PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));

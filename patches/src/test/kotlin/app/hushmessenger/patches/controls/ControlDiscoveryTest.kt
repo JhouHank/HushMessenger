@@ -323,4 +323,20 @@ class ControlDiscoveryTest {
         assertEquals(listOf("LX/1iN;->A08(LX/1iN;)Z"), found.getValue(TAB_NOTIFICATIONS).map { it.hookId() })
         validateControls(found, setOf(TAB_PEOPLE, TAB_NOTIFICATIONS, "ai_tab"))
     }
+
+    // Both chat menu builders gate Mark as read by its plugin name. Mark as unread has the same shape and its own name.
+    @Test fun markAsReadIsBothChatMenuGatesAndNotMarkAsUnread() {
+        val unread = fixtureMethod("LX/MKS;->A0G()Z",
+            pluginBody("com.facebook.messaging.threadlist.threaditemmenu.plugins.core.markunreadmenuitem.MarkUnreadMenuItemImplementation"))
+        val classes = completeFixture().map { cls ->
+            if (cls.type != unread.definingClass) cls
+            else fixtureClass(cls.type, cls.methods.toList() + unread)
+        }
+        val found = findControls(classes)
+        assertEquals(setOf("LX/KHu;->A0W()Z", "LX/MKS;->A0F()Z"), found.getValue("mark_read_action").map { it.hookId() }.toSet())
+        validateControls(found, setOf("mark_read_action"))
+        assertFailsWith<PatchException> {
+            validateControls(findControls(classes.filter { it.type != "LX/KHu;" }), setOf("mark_read_action"))
+        }
+    }
 }

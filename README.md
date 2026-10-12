@@ -19,7 +19,7 @@
 
 # HushMessenger
 
-Development v0.23.3 adds clearer settings states, reply drafts that survive recreation and recoverable message-log errors. Reply read receipts stay scoped to the chat and account that sent the reply. It contains 54 patches and 48 controls. The latest published bundle is still v0.23.0.
+Development v0.23.3 adds clearer settings states, reply drafts that survive recreation and recoverable message-log errors. Reply read receipts stay scoped to the chat and account that sent the reply. It contains 55 patches and 49 controls. The latest published bundle is still v0.23.0.
 
 HushMessenger is a Morphe patch source for Facebook Messenger. Published v0.23.0 offers 50 patches. 44 of them are controls with searchable settings and long-press shortcuts, and all 44 are in Morphe Manager's default selection with their switches off, so you don't need Expert mode to find one. Three help a re-signed build install, open and reach those settings. The other three start unselected and change the app package itself: one installs a second copy under another package name, **Spoof package version** stops Play Store update offers, and **Custom new-message sound** swaps in a sound file you choose. You bring the original Messenger APK. This repository provides the patch code and a `.mpp` bundle.
 
@@ -105,6 +105,7 @@ The **Controls** tab has **All**, **Inbox**, **Chats** and **More** filters. Use
 | Hide inbox promotions | Hides promotion banners in the chat list. |
 | Hide stories and notes | Hides the row of stories and notes above your chats. |
 | Hide inbox tabs | Hides the Home and Channels tabs inside the inbox. |
+| Hide Mark as read | Starts off. Hides Mark as read in the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays. |
 | Hide People tab | Starts off. Hides the People tab in the bar at the bottom. Restart Messenger to see it go. |
 | Hide Notifications tab | Starts off. Hides the Notifications tab in the bar at the bottom. Restart Messenger to see it go. |
 | Hide Facebook shortcuts | Removes Facebook toolbar, profile and sharing shortcuts, and the "Also from Meta" section in the Menu tab (Muse, Subscriptions, Facebook Reels and the rest). |
@@ -845,6 +846,7 @@ These are source-verified boundaries, not new device-effectiveness claims. The c
 | `inbox_promotions` | `LX/23U.A0J/A0K` | Two Quickpromotion paths |
 | `stories` | `LX/1wB.A00` | Combined stories/notes tray, not separate options |
 | `subtabs` | `LX/2KH.run` | Native subtab eligibility; preserve valid selected folder |
+| `mark_read_action` | Both chat menu gates for the Mark as read plugin (582 `LX/KHu.A0W`, `LX/MKS.A0F`) | Chat list menu only. Mark as unread, community menus and the notification's own action stay |
 | `facebook` | 21 toolbar/profile/share/menu gates | Cross-app login and trust are separate |
 | `meta_ai` | FAB `6fC`, toolbar `2TA`, tab `1iZ`, menu/search/chip gates | Existing AI chats retained; tab choice needs restart |
 | `moments` | `LX/H6Y.A05`, `LX/HHT.A05` | Menu/drawer navigation |

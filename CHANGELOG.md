@@ -4,6 +4,7 @@
 
 Development v0.23.3.
 
+- New **Hide Mark as read** switch. It takes Mark as read out of the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays where it is. Like every switch it starts off.
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
 - Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
 - **Keep a message log** tells messages apart by Messenger's own message ID instead of their words. Two messages that say the same thing in one chat are both kept when Messenger gives each one an ID, and the second notification Messenger builds for one message is still dropped. A copy that arrives without an ID pairs with one earlier capture of the same words in that chat, so a third "ok" in the same minute still gets logged. A sender is only shown when the chat's notification makes it clear who sent it, so the same words from two people in a group stay unnamed rather than borrowing someone's name. Your own lines in the notification never name you as the sender. Names that **Auto reply** hands over before answering stay with the message they came from. The ID only lives in memory and is never saved to the log.

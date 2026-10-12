@@ -133,6 +133,7 @@ internal val BASE_PROFILE = ControlProfile(
         "hide_read_receipts" to setOf("LX/4nG;->A00(Lcom/facebook/auth/usersession/FbUserSession;LX/4nG;Ljava/lang/String;)V"),
         "inbox_promotions" to setOf("LX/265;->A0J()Z", "LX/265;->A0K()Z"),
         "keep_unsent" to setOf("LX/S5c;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V"),
+        "mark_read_action" to setOf("LX/KHu;->A0W()Z", "LX/MKS;->A0F()Z"),
         "menu_settings" to setOf(
             "LX/9wI;->A1h()V", "LX/KEC;->Ay6(LX/0MI;)Ljava/util/ArrayList;", "LX/KQo;->onClick(Landroid/view/View;)V",
             "LX/NYv;->CDC(LX/4sU;I)V", "LX/NZ3;->A0J(Ljava/util/List;)V",
@@ -298,6 +299,7 @@ internal val PROFILE_346415706 = ControlProfile(
         "hide_read_receipts" to setOf("LX/4li;->A00(Lcom/facebook/auth/usersession/FbUserSession;LX/4li;Ljava/lang/String;)V"),
         "inbox_promotions" to setOf("LX/264;->A0J()Z", "LX/264;->A0K()Z"),
         "keep_unsent" to setOf("LX/MDj;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V"),
+        "mark_read_action" to setOf("LX/HIy;->A0V()Z", "LX/JOh;->A0F()Z"),
         "menu_settings" to setOf(
             "LX/9uz;->A1h()V", "LX/HEG;->Ay5(LX/0MI;)Ljava/util/ArrayList;", "LX/HUf;->onClick(Landroid/view/View;)V",
             "LX/TUj;->CD7(LX/4qw;I)V", "LX/TUm;->A0I(Ljava/util/List;)V",
