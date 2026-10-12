@@ -111,6 +111,50 @@ public class SettingsReliabilityTest {
         }
     }
 
+    /**
+     * At normal size an App row's description runs the panel's full width under the switch's 48dp box. The box is
+     * invisible, so the check is that no description line level with the drawn track reaches within 4dp of it.
+     */
+    @Test @Config(sdk = {28, 36})
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    public void normalSizeAppDescriptionsStayClearOfTheSwitchTrack() {
+        for (String locale : new String[] {"en-rUS", "ar-rXB"}) {
+            RuntimeEnvironment.setQualifiers(locale + "-w390dp-h844dp-mdpi");
+            RuntimeEnvironment.setFontScale(1f);
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                View root = layout(screen.get(), 390, 844);
+                root.findViewWithTag("tab_app").performClick();
+                layout(screen.get(), 390, 844);
+                int rows = 0;
+                for (String key : new String[] {"hide_drawer_icon", "light", "material_you_black", "check_updates"}) {
+                    Switch choice = root.findViewWithTag(key);
+                    if (choice == null) continue;
+                    rows++;
+                    ViewGroup row = (ViewGroup) choice.getParent();
+                    ViewGroup labels = (ViewGroup) row.getChildAt(0);
+                    TextView description = (TextView) labels.getChildAt(1);
+                    assertEquals(key + " uses the normal-size overlay", -48, ((ViewGroup.MarginLayoutParams) choice.getLayoutParams()).getMarginStart());
+                    // Drawing is what gives the track its bounds inside the switch.
+                    choice.draw(new android.graphics.Canvas(android.graphics.Bitmap.createBitmap(choice.getWidth(), choice.getHeight(),
+                        android.graphics.Bitmap.Config.ARGB_8888)));
+                    Rect track = new Rect(choice.getTrackDrawable().getBounds());
+                    assertFalse(key + " track drawn", track.isEmpty());
+                    track.offset(choice.getLeft(), choice.getTop());
+                    android.text.Layout text = description.getLayout();
+                    int x = labels.getLeft() + description.getLeft() + description.getTotalPaddingLeft();
+                    int y = labels.getTop() + description.getTop() + description.getTotalPaddingTop();
+                    for (int line = 0; line < text.getLineCount(); line++) {
+                        Rect drawn = new Rect(x + (int) Math.floor(text.getLineLeft(line)) - 4, y + text.getLineTop(line),
+                            x + (int) Math.ceil(text.getLineRight(line)) + 4, y + text.getLineBottom(line));
+                        assertFalse(locale + " " + key + " line " + line + " " + drawn + " meets the track " + track,
+                            Rect.intersects(drawn, track));
+                    }
+                }
+                assertTrue(locale + " checked the App rows", rows >= 2);
+            }
+        }
+    }
+
     @Test @Config(sdk = 28) public void unavailableRowIsAnnouncedButCannotToggle() {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             Switch choice = screen.get().getWindow().getDecorView().findViewWithTag("bubbles");
