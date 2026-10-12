@@ -299,7 +299,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
             if (method.parameterTypes == listOf("Ljava/lang/String;", "Z") && TYPING_MAILBOX_CALL in strings) add("typing_mailbox")
             // An open chat marks itself read, which also sends Seen, only through the job its seen handler schedules here.
             if (method.isChatSeenBroadcast()) add(HIDE_READ_RECEIPTS)
-            if (method.isSendMessageEvent()) add(REPLY_READ)
+            if (method.isReplyReadDispatch()) add(REPLY_READ)
             // Opening a story card sends its seen state through the handler Messenger tags with this name.
             if (method.returnType == "V" && method.parameterTypes == listOf(MONTAGE_CARD, "Z") &&
                 !AccessFlags.STATIC.isSet(method.accessFlags) && STORY_MARK_READ_TAG in strings) add("anonymous_stories")
@@ -371,6 +371,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(MESSAGE_LOG).addAll(findMessageLogHook(classes))
     found.getValue(AUTO_REPLY).addAll(findMessageLogHook(classes))
     messageLogContract = resolveMessageLogContract(classes)
+    readReceiptThreadFields = resolveReadReceiptThreadFields(classes)
     found.getValue(SYSTEM_CAMERA).addAll(findSystemCamera(classes))
     for ((hook, methods) in findCustomFont(classes)) found.getValue(hook).addAll(methods)
     return found

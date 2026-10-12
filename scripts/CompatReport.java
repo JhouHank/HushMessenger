@@ -2571,8 +2571,8 @@ public class CompatReport {
 
     /**
      * hide_read_receipts: the open chat's seen handler, a static (FbUserSession, own class, String)V that names
-     * MARK_THREAD_AS_SEEN_JOB and broadcast_message_seen_internal. reply_read: SendMessageEvent's five-argument
-     * constructor. Mirrors ReadReceipts.kt.
+     * MARK_THREAD_AS_SEEN_JOB and broadcast_message_seen_internal. reply_read: the common typed composer
+     * dispatcher. Mirrors ReadReceipts.kt.
      */
     static List<Method> chatSeenBroadcasts(List<ClassDef> classes) {
         var seen = new ArrayList<Method>();
@@ -2590,13 +2590,19 @@ public class CompatReport {
         return seen;
     }
 
-    static List<Method> sendMessageEvents(List<ClassDef> classes) {
+    static List<Method> replyReadDispatches(List<ClassDef> classes) {
         var events = new ArrayList<Method>();
         for (var cls : classes) {
-            if (!SEND_MESSAGE_EVENT.equals(cls.getType())) continue;
-            for (var method : cls.getMethods())
-                if ("<init>".equals(method.getName()) && "V".equals(method.getReturnType()) && method.getParameterTypes().size() == 5)
-                    events.add(method);
+            for (var method : cls.getMethods()) {
+                var params = method.getParameterTypes();
+                if (!AccessFlags.STATIC.isSet(method.getAccessFlags()) || !"V".equals(method.getReturnType()) || params.size() != 15 ||
+                        !"Lcom/facebook/auth/usersession/FbUserSession;".contentEquals(params.get(0)) || !SEND_MESSAGE_EVENT.contentEquals(params.get(11)) ||
+                        method.getImplementation() == null) continue;
+                var strings = new HashSet<String>();
+                for (var i : method.getImplementation().getInstructions())
+                    if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
+                if (strings.contains("AdapterSender") && strings.contains("meta_ai_invocation")) events.add(method);
+            }
         }
         return events;
     }
@@ -2746,7 +2752,7 @@ public class CompatReport {
         found.get("xhe_audio").addAll(shareCopies(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
         found.get("hide_read_receipts").addAll(chatSeenBroadcasts(classes));
-        found.get("reply_read").addAll(sendMessageEvents(classes));
+        found.get("reply_read").addAll(replyReadDispatches(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));
         found.get("analytics_uploads").addAll(xanalyticsUploadTimers(classes));

@@ -98,6 +98,7 @@ internal val settingsExtension = bytecodePatch(description = "Load HushMessenger
         nativeBubbleRoutesVerified = false
         communityInboxContract = null
         messageLogContract = null
+        readReceiptThreadFields = emptyMap()
     }
 }
 

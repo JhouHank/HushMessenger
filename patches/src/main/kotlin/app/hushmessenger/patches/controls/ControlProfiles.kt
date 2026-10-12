@@ -156,7 +156,7 @@ internal val BASE_PROFILE = ControlProfile(
         "people_story" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0Z(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V"),
         "people_tab" to setOf("LX/EtE;->A01(LX/EtE;)V"),
         "reels_badge" to setOf("LX/4DG;->A09(LX/4DG;)Z"),
-        "reply_read" to setOf("Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5Xu;LX/B1Y;Ljava/lang/String;Ljava/lang/String;Z)V"),
+        "reply_read" to setOf("LX/9tp;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/5Ac;LX/4ts;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/CeF;LX/5E8;LX/5Ab;LX/Cbl;LX/5vA;LX/5XD;LX/5Pd;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/4u0;Ljava/lang/String;)V"),
         "save_stories" to setOf("LX/KQq;->onClick(Landroid/view/View;)V"),
         "screenshot_viewers" to setOf(
             "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1D(Landroid/os/Bundle;)Landroid/app/Dialog;",
@@ -321,7 +321,7 @@ internal val PROFILE_346415706 = ControlProfile(
         "people_story" to setOf("Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V"),
         "people_tab" to setOf("LX/HQU;->A01(LX/HQU;)V"),
         "reels_badge" to setOf("LX/4Bi;->A09(LX/4Bi;)Z"),
-        "reply_read" to setOf("Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5WM;LX/B0G;Ljava/lang/String;Ljava/lang/String;Z)V"),
+        "reply_read" to setOf("LX/9sW;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/594;LX/4sK;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/CdT;LX/5Ca;LX/593;LX/Cb1;LX/5td;LX/5Vf;LX/5O5;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/4sS;Ljava/lang/String;)V"),
         "save_stories" to setOf("LX/NCw;->onClick(Landroid/view/View;)V"),
         "screenshot_viewers" to setOf(
             "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;",

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.Window;
@@ -462,21 +463,41 @@ public final class Settings {
     }
     /** How long after you send something the open chat may mark itself read, which shows Seen as stock Messenger does. */
     static final long REPLY_READ_MS = 5_000;
-    static volatile long lastSentAt;
+    static volatile ReplyMarker lastReply;
+
+    static final class ReplyMarker {
+        final WeakReference<Object> session;
+        final WeakReference<Object> thread;
+        final long sentAt;
+
+        ReplyMarker(Object session, Object thread, long sentAt) {
+            this.session = new WeakReference<>(session);
+            this.thread = new WeakReference<>(thread);
+            this.sentAt = sentAt;
+        }
+    }
 
     /**
      * Hide read receipts: whether the open chat skips the job that marks it read and sends Seen. Right after you send
-     * something from it, the job runs, since a reply shows you read the chat anyway.
+     * something from it, only that chat in the same session may run the job, since a reply shows you read it anyway.
      */
-    public static boolean hideChatSeen() {
+    public static boolean hideChatSeen(Object session, Object thread) {
         if (!wouldUse("hide_read_receipts")) return false;
-        long since = System.currentTimeMillis() - lastSentAt;
-        if (since >= 0 && since < REPLY_READ_MS) return false;
+        ReplyMarker reply = lastReply;
+        if (session != null && thread != null && reply != null && reply.session.get() == session) {
+            Object sentThread = reply.thread.get();
+            long since = SystemClock.elapsedRealtime() - reply.sentAt;
+            if (sentThread != null && since >= 0 && since < REPLY_READ_MS && sentThread.equals(thread)) return false;
+        }
         return enabled("hide_read_receipts");
     }
 
-    /** The composer's send event, built each time you send from a chat. */
-    public static void noteMessageSent() { lastSentAt = System.currentTimeMillis(); }
+    /** Record the account and thread only after the native composer dispatch returns. */
+    public static void noteMessageSent(Object session, Object thread) {
+        if (session != null && thread != null && wouldUse("hide_read_receipts")) {
+            lastReply = new ReplyMarker(session, thread, SystemClock.elapsedRealtime());
+        }
+    }
     public static boolean keepUnsent() { return wouldUse("keep_unsent"); }
     public static boolean viewStoriesAnonymously() { return enabled("anonymous_stories"); }
     public static boolean saveAnyStory() { return enabled("save_stories"); }

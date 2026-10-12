@@ -113,7 +113,7 @@ class ControlDiscoveryTest {
                     if (staticGate) AccessFlags.STATIC.value else 0)
             }
         }
-        return methods.groupBy { it.definingClass }.map { (type, grouped) ->
+        return (methods.groupBy { it.definingClass }.map { (type, grouped) ->
             val extra = when (type) {
                 "LX/Txc;" -> listOf(fixtureMethod("LX/Txc;->CH7(Landroid/view/ViewGroup;I)LX/4jw;",
                     "new-instance v0, LX/TxV;\nconst/4 v0, 0x0\nreturn-object v0"))
@@ -129,7 +129,14 @@ class ControlDiscoveryTest {
         )), peopleJewelKeyHolder(), storyCardKeyHolder(), debugDumperFixture(), messageWrapperFixture(type = "LX/K1Y;"), searchFieldFixture()) +
             aiStickerCellFixture() + communityInboxFixture().filter { it.type != IMMUTABLE_LIST } + emojiDrawerFixture() + emojiSearchFixture() + aiMentionsFixture() + searchBarFixture() + shareCopyFixture() + disappearingSwipeFixture() + analyticsUploadFixture() + attributionUploadFixture() + adEventsFixture() + mqttClientFixture() + messageLogFixture() + readReceiptsFixture() + systemCameraFixture() + customFontFixture() +
             syntheticHooks.getValue("screenshot_viewers").map { screenshotViewerFixture(it) }
-                .groupBy { it.definingClass }.map { (type, group) -> fixtureClass(type, group) }
+                .groupBy { it.definingClass }.map { (type, group) -> fixtureClass(type, group) })
+        .let { classes ->
+            // Both privacy and community fixtures contribute contracts to the same native ThreadKey class.
+            val keys = classes.filter { it.type == THREAD_KEY_TYPE }
+            classes.filter { it.type != THREAD_KEY_TYPE } + fixtureClass(THREAD_KEY_TYPE,
+                keys.flatMap { it.methods }, extraFields = keys.flatMap { it.fields },
+                flags = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value)
+        }
     }
 
     // The search field builds a render-less click helper first, then the Ask Meta AI chip component.

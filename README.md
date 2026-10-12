@@ -1,7 +1,7 @@
 ![HushMessenger. Keep the conversation. Cut the friction.](assets/readme-hero.png)
 
 <p align="center">
-  <a href="#verification-and-build"><img src="https://img.shields.io/badge/development-0.23.1-F3A6B8" alt="Development version 0.23.1"></a>
+  <a href="#verification-and-build"><img src="https://img.shields.io/badge/development-0.23.2-F3A6B8" alt="Development version 0.23.2"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License GPL-3.0"></a>
   <img src="https://img.shields.io/badge/platform-Android%209%2B%20arm64-3DDC84" alt="Platform Android 9 or newer, arm64">
   <img src="https://img.shields.io/badge/Messenger-582.0.0.61.92-0084FF" alt="Messenger 582.0.0.61.92">
@@ -19,7 +19,7 @@
 
 # HushMessenger
 
-Development v0.23.1 gives settings a rose accent, clearer panels and a dedicated restart screen. The App page puts Restart first and separates the uninstall warning from other help. It contains 54 patches and 48 controls. The latest published bundle is still v0.23.0.
+Development v0.23.2 keeps the rose settings design and scopes reply read receipts to the chat and account that sent the reply. It contains 54 patches and 48 controls. The latest published bundle is still v0.23.0.
 
 HushMessenger is a Morphe patch source for Facebook Messenger. Published v0.23.0 offers 50 patches. 44 of them are controls with searchable settings and long-press shortcuts, and all 44 are in Morphe Manager's default selection with their switches off, so you don't need Expert mode to find one. Three help a re-signed build install, open and reach those settings. The other three start unselected and change the app package itself: one installs a second copy under another package name, **Spoof package version** stops Play Store update offers, and **Custom new-message sound** swaps in a sound file you choose. You bring the original Messenger APK. This repository provides the patch code and a `.mpp` bundle.
 
@@ -283,7 +283,7 @@ On Windows, compare your file with `Get-FileHash -Algorithm SHA256 .\messenger.a
 
 ## Verification and build
 
-Development v0.23.1 passed 984 Android unit cases and 346 patch cases on October 12, 2026, with no skipped cases. The Android total combines a full run with passing reruns of the affected classes. Patch checks used the exact stock APKs for all 14 supported builds. Release lint reported no errors. The separate Android 16 settings preview exercised search, category filters, both themes, message log, reply editing and 200% text. Samsung and patched-Messenger acceptance for this layout remain unverified.
+Development v0.23.2 passed 996 Android unit cases and 348 patch cases on October 12, 2026, with no skipped cases in the combined results. These totals combine full runs with passing reruns of the affected classes. Patch checks used the exact stock APKs for all 14 supported builds. The frozen bundle applied all 54 patches and rebuilt both code families at a 1024 MB heap. Both generated compatibility profiles matched the recorded files. Reply privacy checks cover other chats and accounts, expiry and changed native control flow. Release lint reported no errors. The separate Android 16 settings preview exercised search, category filters, both themes, message log, reply editing and 200% text. Samsung acceptance for this layout and the reply privacy change remain unverified.
 
 The Galaxy S25 took each update in place with the same signing key as its installed Messenger and Facebook apps, keeping its original install date, its sign-in and 19 enabled controls. With the v0.5.0 patch code it passed voice calls, one-to-one notifications, silence for muted chats, facebook.com links opening the Facebook app, and a same-key update and rollback that kept all data. Turning switches on and off showed the expected change for Facebook shortcuts, stories and notes, the Meta AI button, the "Ask Meta AI" search button, People You May Know on the Notifications tab, external links, system emoji and the avatar sticker tab. A two-phone check in an end-to-end encrypted chat showed no typing indicator with the switch on and the usual one while paused, and messages still arrived. Restart Messenger refuses requests from other apps, while the long-press shortcut and the App tab button still restart into the signed-in chat list. At Android's largest font size the chat list, chats and settings stayed usable. The Galaxy S22 now runs a patched build as well.
 
@@ -386,10 +386,10 @@ While the public source is held, validate development separately and freeze its 
 
 ```powershell
 $heldHash = (Get-FileHash .\patches-bundle.json -Algorithm SHA256).Hash.ToLowerInvariant()
-$freeze = Join-Path $env:TEMP "hushmessenger-0.23.1"
+$freeze = Join-Path $env:TEMP "hushmessenger-0.23.2"
 .\gradlew.bat :patches:buildAndroid --no-daemon
 python scripts/check_release.py --development --held-index-sha256 $heldHash --freeze $freeze
-$bundle = Join-Path $freeze "patches-0.23.1.mpp"
+$bundle = Join-Path $freeze "patches-0.23.2.mpp"
 $bundleHash = (Get-FileHash $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
 ```
 
@@ -405,9 +405,9 @@ python scripts/verify_patch_heap.py --stock-dir .\private-apks --bundle $bundle 
 
 The check runs at most two builds at once. Each Java process has a 1024 MB heap and uses two processors. Each build runs in its own temporary folder with all patches selected. The check rechecks the frozen bundle's checksum, verifies the stock checksum before and after patching, inspects the output APK and compares the theme's class, surface and color-call counts with `CompatReport.java`. Failures include the subprocess exit code. It removes its temporary APKs and leaves the stock files unchanged. Use `--codes 346013440` to check one build.
 
-The output from main is `patches/build/libs/patches-0.23.1.mpp`. Dependency locks and SHA-256 checks are committed. Review both when changing a dependency. Clean builds from the same source produce the same bundle checksum.
+The output from main is `patches/build/libs/patches-0.23.2.mpp`. Dependency locks and SHA-256 checks are committed. Review both when changing a dependency. Clean builds from the same source produce the same bundle checksum.
 
-Recording a compatibility profile requires a real patch run. Run `:patches:test` first to compile the local validation tool. With Python 3.11 or newer on PATH and Android Build Tools available, run `CompatReport <apk> --save <profiles directory> <desktop.jar> <bundle.mpp>`. The reporter first checks discovery, then uses Desktop to apply every patch, including Material You, and rebuild a temporary unsigned APK at a 1024 MB heap. It parses the rebuilt manifest and resource table with `aapt2` and structurally validates every DEX. Failed or incomplete results leave the profile directory unchanged. A discovery-only PASS doesn't prove that the patcher can apply the bundle. For a new mapping, use the printed Kotlin to update the source and build the candidate bundle before recording it.
+Recording a compatibility profile requires a real patch run. Run `:patches:test` first to compile the local validation tool. With Python 3.11 or newer on PATH and Android Build Tools available, run `CompatReport <apk> --save <profiles directory> <desktop.jar> <bundle.mpp>`. The reporter checks discovery, then uses Desktop to apply every control, the installation helpers, Material You and Clone install. It rebuilds a temporary unsigned APK at a 1024 MB heap, parses its manifest and resources with `aapt2` and structurally validates every DEX. Spoof package version and Custom new-message sound are covered by the separate full-selection check above. Failed or incomplete results leave the profile directory unchanged. A discovery-only PASS doesn't prove that the patcher can apply the bundle. For a new mapping, use the printed Kotlin to update the source and build the candidate bundle before recording it.
 
 After changing patch metadata, run `:patches:generatePatchCatalog` and review `patches-list.json`. The normal `:patches:check` task checks the committed catalog against the built bundle and checks every control key against the extension and manifest. It fails on drift instead of rewriting the catalog.
 

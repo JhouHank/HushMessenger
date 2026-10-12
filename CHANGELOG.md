@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
 - Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
 
 ### Settings
@@ -13,6 +14,7 @@
 ### Checks
 
 - Completed the remaining attribution-upload checks using the released build's device evidence.
+- Retired the outstanding Messenger 580 installation checks. Current builds support Messenger 582 only.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
 
 ### New

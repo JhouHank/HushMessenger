@@ -136,7 +136,7 @@ hook people_search LX/ChB;->DOF(LX/EFG;Ljava/lang/Object;)LX/EHA;
 hook people_story Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V
 hook people_tab LX/HQU;->A01(LX/HQU;)V
 hook reels_badge LX/4Bi;->A09(LX/4Bi;)Z
-hook reply_read Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;-><init>(LX/5WM;LX/B0G;Ljava/lang/String;Ljava/lang/String;Z)V
+hook reply_read LX/9sW;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/594;LX/4sK;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/CdT;LX/5Ca;LX/593;LX/Cb1;LX/5td;LX/5Vf;LX/5O5;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/4sS;Ljava/lang/String;)V
 hook save_stories LX/NCw;->onClick(Landroid/view/View;)V
 hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;
 hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->onResume()V
