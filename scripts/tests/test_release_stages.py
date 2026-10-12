@@ -268,6 +268,12 @@ class ReleaseStages(unittest.TestCase):
         missing = self.run_stage(extra=["-Development"])
         self.assertNotEqual(0, missing.returncode)
         self.assertIn("requires a frozen", missing.stderr)
+        # .NET's $ also matches before a final newline, which would only fail after the whole test run.
+        trailing = self.run_stage(
+            extra=self.development_inputs(**{"-BundleSha256": self.bundle_hash + "\n"})
+        )
+        self.assertNotEqual(0, trailing.returncode)
+        self.assertIn("requires a frozen", trailing.stderr)
         (self.root / "gradle.properties").write_text("version=0.23.1\nchanged=true\n")
         dirty = self.run_stage(extra=self.development_inputs())
         self.assertNotEqual(0, dirty.returncode)

@@ -74,7 +74,7 @@ function Restore-Environment {
 trap { Restore-Environment; break }
 
 if ($Development -and $Stage -ne 'preflight') { throw '-Development is only available for the local preflight stage.' }
-if ($Development -and (-not $Bundle -or $BundleSha256 -notmatch '^[0-9a-f]{64}$' -or $HeldIndexSha256 -notmatch '^[0-9a-f]{64}$')) {
+if ($Development -and (-not $Bundle -or $BundleSha256 -notmatch '^[0-9a-f]{64}\z' -or $HeldIndexSha256 -notmatch '^[0-9a-f]{64}\z')) {
     throw '-Development requires a frozen -Bundle, its -BundleSha256 and the recorded -HeldIndexSha256.'
 }
 if (-not $Development -and ($Bundle -or $BundleSha256 -or $HeldIndexSha256)) { throw 'Frozen development inputs require -Development.' }
