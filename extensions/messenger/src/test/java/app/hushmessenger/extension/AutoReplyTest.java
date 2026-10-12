@@ -313,4 +313,23 @@ public class AutoReplyTest {
         now[0] -= 24L * 60 * 60 * 1000;
         assertTrue(AutoReply.answer("two", CHAT, null));
     }
+
+    /** Group messages with groups off, words no reply matches and a chat cooling down never take a place in the queue. */
+    @Test public void messagesThatCantBeAnsweredNeverCrowdOutOneThatCan() {
+        replies(false, "free", "Busy");
+        for (int i = 0; i < AutoReply.MAX_PENDING + 5; i++) {
+            AutoReply.received("are you free? " + i, GROUP, "g." + i);
+            AutoReply.received("hello " + i, CHAT, "c." + i);
+        }
+        assertEquals(0, AutoReply.pending());
+        assertTrue(queued.isEmpty());
+        notification(CHAT);
+        AutoReply.received("are you free?", CHAT, "c.free");
+        assertEquals(1, AutoReply.pending());
+        runQueued();
+        assertEquals("Busy", sent());
+        AutoReply.received("still free?", CHAT, "c.later");
+        assertEquals("The chat is cooling down", 0, AutoReply.pending());
+        assertTrue(queued.isEmpty());
+    }
 }

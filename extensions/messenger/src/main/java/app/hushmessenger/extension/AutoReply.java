@@ -96,8 +96,9 @@ public final class AutoReply {
     }
 
     /**
-     * The hook hands each incoming message here and returns at once; the answer runs on its own thread. A message whose
-     * id is already queued is the same message again, and past MAX_PENDING waiting messages a new one is skipped.
+     * The hook hands each incoming message here and returns at once; the answer runs on its own thread. A message that
+     * could never be answered isn't queued, a message whose id is already queued is the same message again, and past
+     * MAX_PENDING waiting messages a new one is skipped.
      */
     static void received(String text, String thread, String id) {
         if (text == null || thread == null || thread.isEmpty()) return;
@@ -106,14 +107,15 @@ public final class AutoReply {
             prefs.registerOnSharedPreferenceChangeListener(CHANGES);
             watched = prefs;
         }
-        if (seen(thread, id, clock.getAsLong())) return;
+        long now = clock.getAsLong();
+        String kept = MessageLog.clip(text, MAX_TEXT_CHARS);
+        if (!answerable(kept, thread, now) || seen(thread, id, now)) return;
         if (PENDING.incrementAndGet() > MAX_PENDING) {
             PENDING.decrementAndGet();
             android.util.Log.w("HushMessenger", "auto_reply: too many messages waiting, one was skipped");
             return;
         }
         long generation = GENERATION.get();
-        String kept = MessageLog.clip(text, MAX_TEXT_CHARS);
         try {
             scheduler.schedule(() -> run(kept, thread, id, generation, true), WAIT_MS);
         } catch (RuntimeException rejected) {
@@ -122,12 +124,27 @@ public final class AutoReply {
         }
     }
 
+    /**
+     * The cheap half of [attempt], checked before a message takes a place in the queue: on, a chat it may answer, not
+     * cooling down, and a reply that matches. A burst of messages that fail here can't crowd out one that passes. The
+     * queued run checks all of it again.
+     */
+    private static boolean answerable(String text, String thread, long now) {
+        SharedPreferences prefs = Settings.preferences;
+        if (prefs == null || !Settings.wouldUse(KEY)) return false;
+        if (!oneToOne(thread) && !prefs.getBoolean(GROUPS, false)) return false;
+        Long last = lastReply.get(thread);
+        if (last != null && now - last < COOLDOWN_MS && last <= now) return false;
+        List<Rule> rules = rules(prefs);
+        return !echoesAReply(rules, text) && match(rules, text) != null;
+    }
+
     /** One queued message. Dropped when anything changed since it was queued, and its slot is freed once it's done. */
     private static void run(String text, String thread, String id, long generation, boolean retry) {
         boolean waiting = false;
         try {
             if (generation != GENERATION.get()) return;
-            if (attempt(text, thread, id) == Outcome.NO_NOTIFICATION && retry) {
+            if (attempt(text, thread, id, generation) == Outcome.NO_NOTIFICATION && retry) {
                 scheduler.schedule(() -> run(text, thread, id, generation, false), RETRY_MS);
                 waiting = true;
             }
@@ -177,10 +194,10 @@ public final class AutoReply {
 
     /** Matches, checks the cooldown and sends. Returns whether a reply went out. Tests call it directly. */
     static boolean answer(String text, String thread, String id) {
-        return attempt(text, thread, id) == Outcome.SENT;
+        return attempt(text, thread, id, GENERATION.get()) == Outcome.SENT;
     }
 
-    private static Outcome attempt(String text, String thread, String id) {
+    private static Outcome attempt(String text, String thread, String id, long generation) {
         try {
             SharedPreferences prefs = Settings.preferences;
             Context context = Settings.appContext;
@@ -196,6 +213,8 @@ public final class AutoReply {
             if (lastReply.containsKey(thread)) return Outcome.SKIPPED;
             StatusBarNotification shown = ChatNotifications.find(context, thread);
             if (shown == null) return Outcome.NO_NOTIFICATION;
+            // A change while the rules were being read (an edited reply, the switch, Pause) drops this message too.
+            if (generation != GENERATION.get()) return Outcome.SKIPPED;
             // Taken before the send, so a second message in the same moment can't get its own reply.
             lastReply.put(thread, now);
             // The reply takes the notification down, so the message log gets its names now.
