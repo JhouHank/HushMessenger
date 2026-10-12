@@ -2,15 +2,20 @@ package app.hushmessenger.extension;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
@@ -37,6 +42,12 @@ public final class AutoReply {
     static final int MAX_RULES = 20;
     static final int MAX_WHEN_CHARS = 200;
     static final int MAX_REPLY_CHARS = 1_000;
+    /** At most this many messages wait for an answer at once. A burst past it is skipped, not queued. */
+    static final int MAX_PENDING = 20;
+    /** How much of a message the queue keeps for matching. */
+    static final int MAX_TEXT_CHARS = MessageLog.MAX_TEXT_CHARS;
+    /** Message ids remembered for coalescing, so the push and the sync copy of one message queue once. */
+    private static final int MAX_SEEN = 200;
 
     /** One reply: [when] holds words or phrases split by commas, and an empty one answers any message. */
     static final class Rule {
@@ -53,9 +64,30 @@ public final class AutoReply {
         thread.setDaemon(true);
         return thread;
     });
+
+    /** Runs [task] after [delayMs] off the caller's thread. Tests swap in one they run by hand. */
+    interface Scheduler {
+        void schedule(Runnable task, long delayMs);
+    }
+
+    static volatile Scheduler scheduler = (task, delayMs) -> WORKER.schedule(task, delayMs, TimeUnit.MILLISECONDS);
     /** When each chat last got an automatic reply, for the cooldown. Per process, so a restart starts fresh. */
     static final ConcurrentHashMap<String, Long> lastReply = new ConcurrentHashMap<>();
-    static volatile LongSupplier clock = System::currentTimeMillis;
+    /** Time since boot, so a wall clock set back can't hold a chat's cooldown. */
+    static volatile LongSupplier clock = SystemClock::elapsedRealtime;
+    /**
+     * Bumped whenever the switch, Pause, safe mode, the replies or the group choice change. Work queued before that is
+     * dropped when it runs, so turning the switch off and on, or editing a reply, can't answer an older message.
+     */
+    private static final AtomicLong GENERATION = new AtomicLong();
+    private static final AtomicInteger PENDING = new AtomicInteger();
+    /** Chat and message id of recent captures, oldest first. Guarded by itself. */
+    private static final LinkedHashMap<String, Long> SEEN = new LinkedHashMap<>();
+    private static volatile SharedPreferences watched;
+    private static final SharedPreferences.OnSharedPreferenceChangeListener CHANGES = (prefs, key) -> {
+        if (key == null || KEY.equals(key) || RULES.equals(key) || GROUPS.equals(key) || "paused".equals(key) ||
+            "safe_mode".equals(key)) GENERATION.incrementAndGet();
+    };
 
     /** The notification hook asks this before it reads a message: on, not paused, and at least one reply written. */
     static boolean wanted() {
@@ -63,31 +95,107 @@ public final class AutoReply {
         return prefs != null && Settings.wouldUse(KEY) && !rules(prefs).isEmpty();
     }
 
-    /** The hook hands each incoming message here and returns at once; the answer runs on its own thread. */
+    /**
+     * The hook hands each incoming message here and returns at once; the answer runs on its own thread. A message whose
+     * id is already queued is the same message again, and past MAX_PENDING waiting messages a new one is skipped.
+     */
     static void received(String text, String thread, String id) {
         if (text == null || thread == null || thread.isEmpty()) return;
-        WORKER.schedule(() -> answer(text, thread, id, true), WAIT_MS, TimeUnit.MILLISECONDS);
+        SharedPreferences prefs = Settings.preferences;
+        if (prefs != null && watched != prefs) {
+            prefs.registerOnSharedPreferenceChangeListener(CHANGES);
+            watched = prefs;
+        }
+        if (seen(thread, id, clock.getAsLong())) return;
+        if (PENDING.incrementAndGet() > MAX_PENDING) {
+            PENDING.decrementAndGet();
+            android.util.Log.w("HushMessenger", "auto_reply: too many messages waiting, one was skipped");
+            return;
+        }
+        long generation = GENERATION.get();
+        String kept = MessageLog.clip(text, MAX_TEXT_CHARS);
+        try {
+            scheduler.schedule(() -> run(kept, thread, id, generation, true), WAIT_MS);
+        } catch (RuntimeException rejected) {
+            PENDING.decrementAndGet();
+            Settings.hookFailedPrivately(KEY, "Can't queue the auto reply", rejected);
+        }
     }
 
+    /** One queued message. Dropped when anything changed since it was queued, and its slot is freed once it's done. */
+    private static void run(String text, String thread, String id, long generation, boolean retry) {
+        boolean waiting = false;
+        try {
+            if (generation != GENERATION.get()) return;
+            if (attempt(text, thread, id) == Outcome.NO_NOTIFICATION && retry) {
+                scheduler.schedule(() -> run(text, thread, id, generation, false), RETRY_MS);
+                waiting = true;
+            }
+        } catch (RuntimeException rejected) {
+            Settings.hookFailedPrivately(KEY, "Can't queue the auto reply", rejected);
+        } finally {
+            if (!waiting) PENDING.decrementAndGet();
+        }
+    }
+
+    /**
+     * Whether this chat's message id was queued within the last minute. A message without an id can't be matched, so it
+     * always counts as new.
+     */
+    private static boolean seen(String thread, String id, long now) {
+        if (id == null || id.isEmpty()) return false;
+        synchronized (SEEN) {
+            SEEN.values().removeIf(at -> now - at > MessageLog.DUPLICATE_WINDOW_MS || at > now);
+            String key = thread + ' ' + id;
+            if (SEEN.containsKey(key)) return true;
+            SEEN.put(key, now);
+            while (SEEN.size() > MAX_SEEN) {
+                Iterator<String> oldest = SEEN.keySet().iterator();
+                oldest.next();
+                oldest.remove();
+            }
+            return false;
+        }
+    }
+
+    /** Messages waiting for an answer right now. */
+    static int pending() {
+        return PENDING.get();
+    }
+
+    /** Forgets queued ids, cooldowns and waiting counts. Tests start each case from a clean queue with it. */
+    static void forgetQueued() {
+        synchronized (SEEN) {
+            SEEN.clear();
+        }
+        lastReply.clear();
+        PENDING.set(0);
+        GENERATION.incrementAndGet();
+    }
+
+    enum Outcome { SENT, SKIPPED, NO_NOTIFICATION }
+
     /** Matches, checks the cooldown and sends. Returns whether a reply went out. Tests call it directly. */
-    static boolean answer(String text, String thread, String id, boolean retry) {
+    static boolean answer(String text, String thread, String id) {
+        return attempt(text, thread, id) == Outcome.SENT;
+    }
+
+    private static Outcome attempt(String text, String thread, String id) {
         try {
             SharedPreferences prefs = Settings.preferences;
             Context context = Settings.appContext;
-            if (prefs == null || context == null || !Settings.wouldUse(KEY)) return false;
-            if (!oneToOne(thread) && !prefs.getBoolean(GROUPS, false)) return false;
+            if (prefs == null || context == null || !Settings.wouldUse(KEY)) return Outcome.SKIPPED;
+            if (!oneToOne(thread) && !prefs.getBoolean(GROUPS, false)) return Outcome.SKIPPED;
             List<Rule> rules = rules(prefs);
-            if (echoesAReply(rules, text)) return false;
+            if (echoesAReply(rules, text)) return Outcome.SKIPPED;
             Rule rule = match(rules, text);
-            if (rule == null) return false;
+            if (rule == null) return Outcome.SKIPPED;
             long now = clock.getAsLong();
-            Long last = lastReply.get(thread);
-            if (last != null && now - last < COOLDOWN_MS) return false;
+            // A time from the future can't be a cooldown, so it doesn't hold the chat back.
+            lastReply.values().removeIf(at -> now - at >= COOLDOWN_MS || at > now);
+            if (lastReply.containsKey(thread)) return Outcome.SKIPPED;
             StatusBarNotification shown = ChatNotifications.find(context, thread);
-            if (shown == null) {
-                if (retry) WORKER.schedule(() -> answer(text, thread, id, false), RETRY_MS, TimeUnit.MILLISECONDS);
-                return false;
-            }
+            if (shown == null) return Outcome.NO_NOTIFICATION;
             // Taken before the send, so a second message in the same moment can't get its own reply.
             lastReply.put(thread, now);
             // The reply takes the notification down, so the message log gets its names now.
@@ -95,13 +203,13 @@ public final class AutoReply {
             if (!ChatNotifications.reply(context, shown.getNotification(), rule.reply)) {
                 lastReply.remove(thread, now);
                 android.util.Log.w("HushMessenger", "auto_reply: the chat's notification has no Reply action");
-                return false;
+                return Outcome.SKIPPED;
             }
             Settings.enabled(KEY);
-            return true;
+            return Outcome.SENT;
         } catch (Throwable failure) {
             Settings.hookFailedPrivately(KEY, "Can't send the auto reply", failure);
-            return false;
+            return Outcome.SKIPPED;
         }
     }
 
