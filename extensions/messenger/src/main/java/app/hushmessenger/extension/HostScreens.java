@@ -178,6 +178,9 @@ public final class HostScreens {
         // After CrashGuard too: Bold and Italic sit in every text field's menu, so safe mode has to take them out.
         if (started && !failed && Settings.installed.contains(TextStyleActivity.KEY)
                 && context.getPackageName().equals(Application.getProcessName())) TextStyleActivity.watch();
+        // A failed start can't follow the switch, so entries an earlier run left on come out. Settings.installed may
+        // never have loaded here, and TextStyleActivity checks the manifest itself.
+        if (failed && context.getPackageName().equals(Application.getProcessName())) TextStyleActivity.turnOff(context);
     }
 
     /** The settings provider's authority is the package name plus this, on a clone install too. */

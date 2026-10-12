@@ -10,6 +10,7 @@ Development v0.23.3.
 - The message log's screen now stays out of the Recents preview on Android 12 and older too. Those versions can only do it by blocking screenshots, so screenshots of settings don't work while the log is open there. Android 13 and newer still allow them.
 - **Auto reply** drops a message it hasn't answered yet when you turn it off or pause, and when you edit your replies, so an older message can't get a new answer. One message delivered twice gets one answer, at most 20 messages wait at once, and a phone clock set back no longer stretches a chat's five-minute wait.
 - The People and Notifications tab switches work out their first answer outside the shared lock, so the first check can't hold up another part of HushMessenger that's starting at the same moment.
+- When HushMessenger's settings can't start, the **Bold and italic text** entries leave the selection menu instead of staying there from an earlier run.
 
 ### Settings
 

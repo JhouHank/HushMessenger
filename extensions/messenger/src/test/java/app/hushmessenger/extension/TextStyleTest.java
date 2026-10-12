@@ -164,6 +164,22 @@ public class TextStyleTest {
         assertEquals("Leaving safe mode brings them back", on, state(TextStyleActivity.BOLD));
     }
 
+    @Test public void aStartThatFailsTakesOutEntriesAnEarlierRunLeftOn() {
+        Settings.preferences.edit().putBoolean(TextStyleActivity.KEY, true).commit();
+        TextStyleActivity.watch();
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED, state(TextStyleActivity.BOLD));
+
+        // The next process can't start settings: a safe-mode flag stored as the wrong type makes CrashGuard throw.
+        Settings.preferences.edit().putString("safe_mode", "on").commit();
+        Settings.preferences = null;
+        CrashGuard.resetForTests();
+        HostScreens.applicationCreated(app);
+        assertFalse(Settings.enabled(TextStyleActivity.KEY));
+        assertTrue(HostScreens.failed);
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, state(TextStyleActivity.BOLD));
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, state(TextStyleActivity.ITALIC));
+    }
+
     @Test public void theSwitchSitsUnderConversationsAndStartsOff() {
         assertTrue(Settings.installed.contains(TextStyleActivity.KEY));
         String[] row = Arrays.stream(SettingsActivity.CONTROLS).filter(c -> c[0].equals(TextStyleActivity.KEY)).findFirst().orElseThrow();

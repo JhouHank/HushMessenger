@@ -207,17 +207,34 @@ public final class TextStyleActivity extends Activity {
      */
     static void sync(Context context) {
         try {
-            if (!present(context)) return;
-            int wanted = Settings.wouldUse(KEY) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
-            PackageManager packages = context.getPackageManager();
-            for (String entry : new String[] {BOLD, ITALIC}) {
-                ComponentName name = new ComponentName(context.getPackageName(), entry);
-                if (packages.getComponentEnabledSetting(name) != wanted)
-                    packages.setComponentEnabledSetting(name, wanted, PackageManager.DONT_KILL_APP);
-            }
+            set(context, Settings.wouldUse(KEY) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT);
         } catch (RuntimeException error) {
             Settings.hookFailed(KEY, "Can't update the Bold and Italic menu entries", error);
+        }
+    }
+
+    /**
+     * Settings couldn't start in this process, so the switch can't be read or followed. Entries an earlier run turned on
+     * go back to the manifest's disabled state until a start works, the same as off.
+     */
+    static void turnOff(Context context) {
+        work.execute(() -> {
+            try {
+                set(context, PackageManager.COMPONENT_ENABLED_STATE_DEFAULT);
+            } catch (RuntimeException error) {
+                android.util.Log.w("HushMessenger", "Can't take the Bold and Italic menu entries out", error);
+            }
+        });
+    }
+
+    private static void set(Context context, int wanted) {
+        if (!present(context)) return;
+        PackageManager packages = context.getPackageManager();
+        for (String entry : new String[] {BOLD, ITALIC}) {
+            ComponentName name = new ComponentName(context.getPackageName(), entry);
+            if (packages.getComponentEnabledSetting(name) != wanted)
+                packages.setComponentEnabledSetting(name, wanted, PackageManager.DONT_KILL_APP);
         }
     }
 
