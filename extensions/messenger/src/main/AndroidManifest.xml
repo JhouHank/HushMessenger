@@ -32,6 +32,7 @@
         <meta-data android:name="hush.feature.xhe_audio" android:value="true" />
         <meta-data android:name="hush.feature.disappearing_swipe" android:value="true" />
         <meta-data android:name="hush.feature.system_camera" android:value="true" />
+        <meta-data android:name="hush.feature.text_style" android:value="true" />
         <meta-data android:name="hush.feature.external_browser" android:value="true" />
         <meta-data android:name="hush.feature.bubbles" android:value="true" />
         <meta-data android:name="hush.feature.allow_screenshot" android:value="true" />
@@ -53,5 +54,20 @@
         <provider android:name="app.hushmessenger.extension.CameraProvider" android:authorities="${applicationId}.hush.camera" android:exported="false" android:grantUriPermissions="true" />
         <activity android:name="app.hushmessenger.extension.CameraActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
         <activity android:name="app.hushmessenger.extension.RestartActivity" android:exported="false" android:excludeFromRecents="true" android:noHistory="true" android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name="app.hushmessenger.extension.TextStyleActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity-alias android:name="app.hushmessenger.extension.BoldText" android:targetActivity="app.hushmessenger.extension.TextStyleActivity" android:label="Bold" android:exported="false" android:enabled="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="app.hushmessenger.extension.ItalicText" android:targetActivity="app.hushmessenger.extension.TextStyleActivity" android:label="Italic" android:exported="false" android:enabled="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

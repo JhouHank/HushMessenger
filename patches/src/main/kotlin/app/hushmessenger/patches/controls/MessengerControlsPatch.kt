@@ -545,6 +545,39 @@ val chatAnimationPatch = bytecodePatch(
     }
 }
 
+private var textStyleApplied = false
+
+private val textStyleResources = resourcePatch(description = "Record HushMessenger capability: $TEXT_STYLE") {
+    dependsOn(settingsResources)
+    execute {
+        textStyleApplied = false
+        document("AndroidManifest.xml").use { it.requireFeatureAbsent(TEXT_STYLE) }
+    }
+    finalize {
+        if (textStyleApplied) document("AndroidManifest.xml").use {
+            it.addFeature(TEXT_STYLE)
+            it.addTextStyle()
+        }
+    }
+}
+
+@Suppress("unused")
+val textStylePatch = bytecodePatch(
+    name = "Bold and italic text",
+    description = "Adds Bold and Italic to the menu that shows when you select words you typed. They're special Unicode letters, so they show on any phone, but screen readers may read them oddly. Starts off. Turn it on in HushMessenger settings > Controls.",
+    default = true,
+) {
+    category("Conversations")
+    compatibleWith(MessengerTarget.COMPATIBILITY)
+    dependsOn(settingsExtension, textStyleResources)
+    execute {
+        // Only the manifest changes. Recording it here lets a Root Mount install, which can't add the menu entries,
+        // show the switch as unavailable instead of hiding it.
+        recordControl(TEXT_STYLE)
+        textStyleApplied = true
+    }
+}
+
 private var menuRowApplied = false
 
 // Lets the settings screen mention the Menu tab row only on builds that have it.

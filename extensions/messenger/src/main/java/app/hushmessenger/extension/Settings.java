@@ -429,6 +429,10 @@ public final class Settings {
             Context context = appContext;
             return context == null || CameraActivity.captureIntent(context) != null;
         }
+        if (TextStyleActivity.KEY.equals(key)) {
+            Context context = appContext;
+            return context == null || TextStyleActivity.present(context);
+        }
         if (!"bubbles".equals(key)) return true;
         if (Build.VERSION.SDK_INT < 30) return false;
         if (!HostScreens.started) HostScreens.initializeLate();

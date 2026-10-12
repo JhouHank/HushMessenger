@@ -110,7 +110,8 @@ object CatalogTool {
             .map { it.groupValues[1] to it.groupValues[2] } +
             // Standalone patches that use recordControl directly instead of controlPatch:
             sequenceOf("material_you" to "Material You theme", "anonymous_stories" to "View stories anonymously",
-                "save_stories" to "Save any story", "chat_animation" to "Slide chats in and out")).toList()
+                "save_stories" to "Save any story", "chat_animation" to "Slide chats in and out",
+                "text_style" to "Bold and italic text")).toList()
         val uiKeys = Regex("""^\s*\{"([a-z_]+)",""", RegexOption.MULTILINE).findAll(uiSource)
             .map { it.groupValues[1] }.toList()
         val factory = DocumentBuilderFactory.newInstance().apply {

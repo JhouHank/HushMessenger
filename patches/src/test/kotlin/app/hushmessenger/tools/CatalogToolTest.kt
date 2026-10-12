@@ -212,7 +212,8 @@ class CatalogToolTest {
         val ui = root.resolve("extensions/messenger/src/main/java/app/hushmessenger/extension/SettingsActivity.java").readText()
         val manifest = root.resolve("extensions/messenger/src/main/AndroidManifest.xml").readText()
         val names = Regex("""controlPatch\("[a-z_]+",\s*"([^"]+)"""").findAll(patch)
-            .map { it.groupValues[1] }.toSet() + CatalogTool.NON_CONTROL_PATCHES + "Material You theme" + "View stories anonymously" + "Save any story" + "Slide chats in and out"
+            .map { it.groupValues[1] }.toSet() + CatalogTool.NON_CONTROL_PATCHES + "Material You theme" + "View stories anonymously" + "Save any story" + "Slide chats in and out" +
+            "Bold and italic text"
         CatalogTool.validateDefinitions(patch, ui, manifest, names)
         assertFailsWith<IllegalArgumentException> { CatalogTool.validateDefinitions(patch.replace("controlPatch(\"people\"", "controlPatch(\"changed\""), ui, manifest, names) }
         assertFailsWith<IllegalArgumentException> { CatalogTool.validateDefinitions(patch, ui.replace("{\"people\",", "{\"changed\","), manifest, names) }

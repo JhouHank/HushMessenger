@@ -207,6 +207,8 @@ public class CompatReport {
         PATCHES.put("View stories anonymously", List.of("anonymous_stories"));
         PATCHES.put("Save any story", List.of("save_stories"));
         PATCHES.put("Slide chats in and out", List.of("chat_animation", "chat_fragment", "chat_inbox", "chat_legacy"));
+        // Manifest only: the selection menu entries need nothing from Messenger's code.
+        PATCHES.put("Bold and italic text", List.of());
         PATCHES.put("Open settings from menu", List.of("menu_settings"));
     }
 
