@@ -6,15 +6,14 @@ Development v0.23.3.
 
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
 - Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
-- **Keep a message log** tells messages apart by Messenger's own message ID instead of their words. Two messages that say the same thing in one chat are both kept, and the second notification Messenger builds for one message is still dropped. A sender is only shown when the chat's notification makes it clear who sent it, so the same words from two people in a group stay unnamed rather than borrowing someone's name. Names that **Auto reply** hands over before answering stay with the message they came from. The ID only lives in memory and is never saved to the log.
+- **Keep a message log** tells messages apart by Messenger's own message ID instead of their words. Two messages that say the same thing in one chat are both kept, and the second notification Messenger builds for one message is still dropped. A message that arrives without an ID is matched by its words, the way the log worked before. A sender is only shown when the chat's notification makes it clear who sent it, so the same words from two people in a group stay unnamed rather than borrowing someone's name. Names that **Auto reply** hands over before answering stay with the message they came from. The ID only lives in memory and is never saved to the log.
 - The message log's screen now stays out of the Recents preview on Android 12 and older too. Those versions can only do it by blocking screenshots, so screenshots of settings don't work while the log is open there. Android 13 and newer still allow them.
-- **Auto reply** drops a message it hasn't answered yet when you turn it off or pause, and when you edit your replies, so an older message can't get a new answer. One message delivered twice gets one answer, at most 20 messages wait at once, and a phone clock set back no longer stretches a chat's five-minute wait.
-- The People and Notifications tab switches work out their first answer outside the shared lock, so the first check can't hold up another part of HushMessenger that's starting at the same moment.
+- **Auto reply** drops a message it hasn't answered yet when you turn it off or pause, and when you edit your replies, so an older message can't get a new answer. One message delivered twice gets one answer, at most 20 messages wait at once (messages it couldn't answer anyway don't count), and a phone clock set back no longer stretches a chat's five-minute wait.
 - When HushMessenger's settings can't start, the **Bold and italic text** entries leave the selection menu instead of staying there from an earlier run.
 
 ### Settings
 
-- Restoring a settings backup no longer turns **Auto reply** on, since backups don't include the replies. A backup with it off still turns it off, this phone's replies are kept, and the restore message says so. The restore message also puts a period after the count now.
+- Restoring a settings backup no longer turns **Auto reply** on, since backups don't include the replies. A backup with it off still turns it off. If a backup would have turned it on, the restore message says why it stayed off. The restore message also puts a period after the count now.
 - Auto replies keep their labels while you type, show how many replies are available and flag an unfinished reply before saving. Cancel leaves saved replies alone. Drafts, group choice and text selection survive a recreated settings screen.
 - Message log now explains an empty log, distinguishes a read failure from an empty result and offers retry. Clear log reports a failure if it can't remove the file or key. Saved message text can be selected. When an older log can't be read, it's set aside and new messages keep showing under a short notice with a Remove old log button.
 - Reply and message-log dialogs keep their actions reachable in short windows and large text, with matching keyboard, cutout and right-to-left spacing.
@@ -32,6 +31,7 @@ Development v0.23.3.
 - Completed the remaining attribution-upload checks using the released build's device evidence.
 - Retired the outstanding Messenger 580 installation checks. Current builds support Messenger 582 only.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
+- The Meta AI, People and Notifications tab switches and the emoji drawer switch no longer wait on settings to start while holding their own lock. Nothing took those locks in the other order, so there was no hang to fix.
 
 ### New
 
