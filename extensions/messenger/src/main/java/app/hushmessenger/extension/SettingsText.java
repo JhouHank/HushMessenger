@@ -93,7 +93,7 @@ final class SettingsText {
         ENGLISH.put("tagline", "Make Messenger yours.");
         ENGLISH.put("open", "Open");
         ENGLISH.put("open_messenger", "Open Messenger");
-        ENGLISH.put("reopen", "Apply inbox changes with App > Restart Messenger.");
+        ENGLISH.put("reopen", "Some changes apply after App > Restart Messenger.");
         ENGLISH.put("quick_access", "QUICK ACCESS");
         ENGLISH.put("access_help", "Long-press Messenger's home screen icon for Patch controls or Restart Messenger. You can also open HushMessenger settings from your app drawer.");
         ENGLISH.put("hide_drawer_icon", "Hide app drawer icon");
@@ -261,11 +261,11 @@ final class SettingsText {
         ENGLISH.put("message_log_empty_off", "Turn on Keep a message log in Controls to save new messages with notification text. Messages already in your chats aren't added.");
         ENGLISH.put("message_log_load_failed", "Couldn't open the message log");
         ENGLISH.put("message_log_load_help", "Try again. If a saved log is damaged, Clear log removes it so new messages can be saved.");
-        ENGLISH.put("message_log_clear_failed", "Couldn't clear the whole log");
         ENGLISH.put("message_log_set_aside", "An older log couldn't be read");
         ENGLISH.put("message_log_set_aside_help", "It was set aside so new messages keep saving. Nothing can open it now, so removing it doesn't lose anything below.");
         ENGLISH.put("message_log_set_aside_remove", "Remove old log");
         ENGLISH.put("message_log_set_aside_failed", "Couldn't remove the old log. Try again.");
+        ENGLISH.put("message_log_clear_failed", "Couldn't clear the whole log");
         ENGLISH.put("message_log_clear_help", "Some saved data or its key couldn't be removed. Try Clear log again.");
         ENGLISH.put("retry", "Try again");
         ENGLISH.put("message_log_unknown_thread", "Unknown chat");
