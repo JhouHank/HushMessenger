@@ -8,6 +8,9 @@ hook ad_events LX/6Lz;->A00(LX/6Ez;Lcom/facebook/auth/usersession/FbUserSession;
 hook ads LX/2I1;->D5H(LX/1jo;Lcom/google/common/collect/ImmutableList;Ljava/lang/String;)Lcom/google/common/collect/ImmutableList;
 hook ai_commands LX/7Pl;->A06(LX/7Pl;Lcom/facebook/messaging/model/threadkey/ThreadKey;)Ljava/util/List;
 hook ai_fab LX/6rJ;->render(LX/2Cf;)LX/1GT;
+hook ai_mention_rows LX/1yI;->A0R()Z
+hook ai_mention_rows LX/1yI;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z
+hook ai_mention_rows LX/1yI;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z
 hook ai_mentions LX/7Pw;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList$Builder;)V
 hook ai_mentions LX/7Py;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList$Builder;)V
 hook ai_mentions LX/7Pz;->A73(LX/Tbn;Lcom/google/common/collect/ImmutableList$Builder;)V

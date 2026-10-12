@@ -362,6 +362,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(AI_MENTIONS).addAll(findAiMentions(classes))
     found.getValue(AI_COMMANDS).addAll(findAiCommands(classes))
     found.getValue(AI_SEARCH_HINT).addAll(findAiSearchHint(classes))
+    found.getValue(AI_MENTION_ROWS).addAll(findAiMentionRows(classes))
     found.getValue(XHE_AUDIO).addAll(findXheAudio(classes))
     found.getValue(DISAPPEARING_SWIPE).addAll(findDisappearingSwipe(classes))
     found.getValue(ANALYTICS_UPLOADS).addAll(findAnalyticsUploads(classes) + findBoundUploadTasks(classes) + findXAnalyticsUploadTimers(classes))

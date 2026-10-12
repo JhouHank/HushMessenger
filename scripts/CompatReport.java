@@ -172,7 +172,7 @@ public class CompatReport {
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
         PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
-        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint"));
+        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide People tab", List.of("tab_people"));
@@ -2592,6 +2592,36 @@ public class CompatReport {
         return builders.size() == 1 ? builders : List.of();
     }
 
+    static final Set<Long> META_AI_ROW_FLAGS = Set.of(0x81063b011b2d8aL, 0x81063b01042d83L);
+    static final String CAPABILITIES = "Lcom/facebook/xapp/messaging/capability/vector/Capabilities;";
+    static final String FB_SESSION_TYPE = "Lcom/facebook/auth/usersession/FbUserSession;";
+
+    /**
+     * ai_mention_rows: the instance checks behind the Meta AI, imagine and imagine yourself rows of the newer @ list, told
+     * apart by parameters and the server flag each reads: ()Z reading both META_AI_ROW_FLAGS, (FbUserSession, ThreadKey,
+     * Capabilities, Z, Z)Z reading 0x81063b00402d51, (FbUserSession, ThreadKey, Capabilities)Z reading 0x81063b00f92d7f.
+     * Counted only when there is exactly one of each and all three share a class. Mirrors AiMentionRows.kt.
+     */
+    static List<Method> aiMentionRowChecks(List<ClassDef> classes) {
+        var rows = new TreeMap<String, List<Method>>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || AccessFlags.STATIC.isSet(method.getAccessFlags()) || !"Z".equals(method.getReturnType())) continue;
+            var params = new ArrayList<String>();
+            for (var p : method.getParameterTypes()) params.add(p.toString());
+            var flags = new HashSet<Long>();
+            for (var i : method.getImplementation().getInstructions())
+                if (i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag) flags.add(flag.getWideLiteral());
+            String row = null;
+            if (params.isEmpty() && flags.containsAll(META_AI_ROW_FLAGS)) row = "meta_ai";
+            else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES, "Z", "Z")) && flags.contains(0x81063b00402d51L)) row = "imagine";
+            else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES)) && flags.contains(0x81063b00f92d7fL)) row = "imagine_yourself";
+            if (row != null) rows.computeIfAbsent(row, k -> new ArrayList<>()).add(method);
+        }
+        if (rows.size() != 3 || rows.values().stream().anyMatch(m -> m.size() != 1)) return List.of();
+        var checks = rows.values().stream().map(m -> m.get(0)).toList();
+        return checks.stream().map(Method::getDefiningClass).distinct().count() == 1 ? checks : List.of();
+    }
+
     /**
      * xhe_audio: the no-argument call() that names its copies "orca_share_media" and ends one copy with
      * new FileOutputStream(File, Z), a static (InputStream, OutputStream)V copy, OutputStream.close() and Uri.fromFile on
@@ -2994,6 +3024,7 @@ public class CompatReport {
         found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
         found.get("ai_commands").addAll(aiCommandLists(classes));
         found.get("ai_search_hint").addAll(searchBarBuilders(classes));
+        found.get("ai_mention_rows").addAll(aiMentionRowChecks(classes));
         found.get("xhe_audio").addAll(shareCopies(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
         found.get("hide_read_receipts").addAll(chatSeenBroadcasts(classes));

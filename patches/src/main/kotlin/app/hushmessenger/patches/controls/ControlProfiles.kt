@@ -53,6 +53,11 @@ internal val BASE_PROFILE = ControlProfile(
         "ai_menu" to setOf("LX/WRi;->A00()Z", "LX/WRi;->A01()Z", "LX/WWJ;->A00()Z", "LX/WWJ;->A01()Z"),
         "ai_search" to setOf("LX/5WO;->A0A(LX/5WO;)Z", "LX/5WO;->A0B(LX/5WO;)Z"),
         "ai_search_chip" to setOf("LX/DDv;->render(LX/2Cg;)LX/1GU;"),
+        "ai_mention_rows" to setOf(
+            "LX/1yJ;->A0Q()Z",
+            "LX/1yJ;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
+            "LX/1yJ;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z",
+        ),
         "ai_search_hint" to setOf("LX/287;->A00(LX/1SN;LX/1vm;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Z)LX/1GU;"),
         "ai_sticker_cell" to setOf("LX/CoQ;->render(LX/2Cg;)LX/1GU;"),
         "ai_stickers" to setOf("LX/PAu;->A03(LX/PAu;)Z", "LX/PBK;->A07(LX/PBK;)Z"),
@@ -219,6 +224,11 @@ internal val PROFILE_346415706 = ControlProfile(
         "ai_menu" to setOf("LX/HEJ;->A00()Z", "LX/HEJ;->A01()Z", "LX/HPh;->A00()Z", "LX/HPh;->A01()Z"),
         "ai_search" to setOf("LX/5Uq;->A0A(LX/5Uq;)Z", "LX/5Uq;->A0B(LX/5Uq;)Z"),
         "ai_search_chip" to setOf("LX/DGV;->render(LX/2Cf;)LX/1GT;"),
+        "ai_mention_rows" to setOf(
+            "LX/1yI;->A0R()Z",
+            "LX/1yI;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
+            "LX/1yI;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z",
+        ),
         "ai_search_hint" to setOf("LX/286;->A00(LX/1SM;LX/1vl;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Z)LX/1GT;"),
         "ai_sticker_cell" to setOf("LX/EyW;->render(LX/2Cf;)LX/1GT;"),
         "ai_stickers" to setOf("LX/Uzq;->A03(LX/Uzq;)Z", "LX/V0Y;->A07(LX/V0Y;)Z"),
