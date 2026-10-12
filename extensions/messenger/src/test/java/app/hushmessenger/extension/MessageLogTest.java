@@ -193,28 +193,45 @@ public class MessageLogTest {
     @Test public void differentMessagesWithTheSameWordsAreAllKept() throws Exception {
         MessageLog.storeNow("ok", "GROUP:7", "mid.1");
         MessageLog.storeNow("ok", "GROUP:7", "mid.2");
-        // Without an id there's nothing to tell them apart by, so both stay rather than one being guessed away.
-        MessageLog.storeNow("ok", "GROUP:7");
-        MessageLog.storeNow("ok", "GROUP:7");
         // Long messages that only differ past the part the log keeps.
         String start = "x".repeat(MessageLog.MAX_TEXT_CHARS);
         MessageLog.storeNow(start + "one", "GROUP:7", "mid.3");
         MessageLog.storeNow(start + "two", "GROUP:7", "mid.4");
-        assertEquals(6, MessageLog.entries().size());
+        assertEquals(4, MessageLog.entries().size());
+    }
+
+    /**
+     * When the hook has no id for a capture, its words are all there is: it pairs with the same words in that chat, with
+     * or without an id, either way round. Different words or another chat stay separate.
+     */
+    @Test public void aCopyWithoutAnIdPairsWithTheSameWordsInItsChat() throws Exception {
+        MessageLog.storeNow("on my way", "ONE_TO_ONE:1:2");
+        MessageLog.storeNow("on my way", "ONE_TO_ONE:1:2", "mid.1");
+        MessageLog.storeNow("see you", "ONE_TO_ONE:1:2", "mid.2");
+        MessageLog.storeNow("see you", "ONE_TO_ONE:1:2");
+        MessageLog.storeNow("ok", "GROUP:7");
+        MessageLog.storeNow("ok", "GROUP:7");
+        MessageLog.storeNow("ok", "GROUP:8");
+        MessageLog.storeNow("okay", "GROUP:7");
+        List<MessageLog.Entry> entries = MessageLog.entries();
+        assertEquals(5, entries.size());
+        assertEquals("on my way", entries.get(4).text);
+        assertEquals("see you", entries.get(3).text);
+        assertEquals("GROUP:8", entries.get(1).thread);
     }
 
     @Test public void theSameIdAfterTheWindowIsANewCapture() {
         long start = 1_000;
-        assertFalse(MessageLog.repeated("t", "mid.1", start));
-        assertTrue(MessageLog.repeated("t", "mid.1", start + MessageLog.DUPLICATE_WINDOW_MS));
-        assertFalse(MessageLog.repeated("t", "mid.1", start + MessageLog.DUPLICATE_WINDOW_MS + 1));
+        assertFalse(MessageLog.repeated("t", "mid.1", "a", start));
+        assertTrue(MessageLog.repeated("t", "mid.1", "b", start + MessageLog.DUPLICATE_WINDOW_MS));
+        assertFalse(MessageLog.repeated("t", "mid.1", "a", start + MessageLog.DUPLICATE_WINDOW_MS + 1));
         // A clock moved back doesn't hide the next message behind a capture from the future.
-        assertFalse(MessageLog.repeated("t", "mid.2", 50_000));
-        assertFalse(MessageLog.repeated("t", "mid.2", 40_000));
-        // A capture with no id is never a repeat.
-        assertFalse(MessageLog.repeated("t", "", 40_000));
-        assertFalse(MessageLog.repeated("t", "", 40_000));
-        assertFalse(MessageLog.repeated("t", null, 40_000));
+        assertFalse(MessageLog.repeated("t", "mid.2", "c", 50_000));
+        assertFalse(MessageLog.repeated("t", "mid.2", "c", 40_000));
+        // Without an id the words decide, within the same window.
+        assertFalse(MessageLog.repeated("t", "", "d", 40_000));
+        assertTrue(MessageLog.repeated("t", null, "d", 40_000));
+        assertFalse(MessageLog.repeated("t", null, "d", 40_000 + MessageLog.DUPLICATE_WINDOW_MS + 1));
     }
 
     /** The hook hands each id over just before its message, and the sink takes it, so the next message can't reuse it. */
@@ -281,8 +298,47 @@ public class MessageLogTest {
             .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle("Ana").build();
         MessageLog.noteNames("ONE_TO_ONE:1:2", null, "hello", answered);
         MessageLog.noteNames("ONE_TO_ONE:1:2", "", "hello", answered);
+        synchronized (MessageLog.NOTED) {
+            assertTrue(MessageLog.NOTED.isEmpty());
+        }
         MessageLog.storeNow("hello", "ONE_TO_ONE:1:2");
         assertEquals("", MessageLog.entries().get(0).sender);
+    }
+
+    private static android.app.Notification answeredBy(String sender, String text) {
+        android.app.Notification.MessagingStyle style = new android.app.Notification.MessagingStyle(new android.app.Person.Builder().setName("Me").build())
+            .addMessage(text, 1, new android.app.Person.Builder().setName(sender).build());
+        return new android.app.Notification.Builder(Settings.appContext, "chats")
+            .setSmallIcon(android.R.drawable.sym_def_app_icon).setContentTitle(sender).setStyle(style).build();
+    }
+
+    /** Writing the message uses up Auto reply's note, so a write that fails tries again with the names it already had. */
+    @Test public void notedNamesSurviveAWriteThatFails() throws Exception {
+        String chat = "ADVANCED_CRYPTO_ONE_TO_ONE:9";
+        MessageLog.noteNames(chat, "mid.1", "ping test", answeredBy("Ana", "ping test"));
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { throw new java.io.IOException("disk full"); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.storeNow("ping test", chat, "mid.1");
+        MessageLog.vault = softwareVault;
+        MessageLog.storeNow("next one", chat, "mid.2");
+        List<MessageLog.Entry> entries = MessageLog.entries();
+        assertEquals(2, entries.size());
+        MessageLog.Entry retried = entries.stream().filter(entry -> "ping test".equals(entry.text)).findFirst().orElseThrow();
+        assertEquals("Ana", retried.sender);
+    }
+
+    @Test public void clearForgetsNamesNotedForMessagesNotWrittenYet() {
+        MessageLog.noteNames("ADVANCED_CRYPTO_ONE_TO_ONE:9", "mid.1", "ping test", answeredBy("Ana", "ping test"));
+        synchronized (MessageLog.NOTED) {
+            assertEquals(1, MessageLog.NOTED.size());
+        }
+        assertTrue(MessageLog.clear());
+        synchronized (MessageLog.NOTED) {
+            assertTrue(MessageLog.NOTED.isEmpty());
+        }
     }
 
     @Test public void namesAreNotNotedWhileTheLogIsOff() throws Exception {

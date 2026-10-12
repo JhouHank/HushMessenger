@@ -83,10 +83,10 @@ public final class MessageLog {
     /** Messages captured but not yet written, oldest first. Guarded by itself. */
     private static final ArrayDeque<Entry> PENDING = new ArrayDeque<>();
     private static boolean drainScheduled;
-    /** When each recent capture came in, by chat and message id, oldest first. Guarded by PENDING. */
+    /** When each recent capture came in, by chat and message id or a digest of its words, oldest first. Guarded by PENDING. */
     private static final LinkedHashMap<String, Long> RECENT = new LinkedHashMap<>();
     /** Sender and group name auto reply read before answering, by chat and message id. Guarded by itself. */
-    private static final LinkedHashMap<String, String[]> NOTED = new LinkedHashMap<>();
+    static final LinkedHashMap<String, String[]> NOTED = new LinkedHashMap<>();
 
     /**
      * One stored message. The thread is Messenger's key for the chat, used only to group and match entries. The sender
@@ -171,7 +171,7 @@ public final class MessageLog {
         Entry entry = new Entry(now, clip(thread == null ? "" : thread, MAX_THREAD_CHARS), clip(text, MAX_TEXT_CHARS), "", "",
             clip(id == null ? "" : id, MAX_ID_CHARS));
         synchronized (PENDING) {
-            if (repeated(entry.thread, entry.id, now)) return false;
+            if (repeated(entry.thread, entry.id, entry.text, now)) return false;
             if (PENDING.size() >= MAX_ENTRIES) PENDING.removeFirst();
             PENDING.addLast(entry);
             if (drainScheduled) return false;
@@ -183,18 +183,31 @@ public final class MessageLog {
     /**
      * Whether this chat had the same message id captured within DUPLICATE_WINDOW_MS, which means it's the second
      * notification Messenger built for one message. Otherwise remembers this capture and returns false. Keeps its record
-     * across Clear, so the second half of a message that came in before a Clear can't land after it. A capture without an
-     * id is always kept: matching on its text could drop a different message that happens to say the same thing.
+     * across Clear, so the second half of a message that came in before a Clear can't land after it.
+     *
+     * A capture the hook had no id for falls back to its words: it repeats any capture in the chat with the same text, and
+     * a later capture with an id repeats it. So one copy of a message that arrives without an id still pairs with the
+     * other, at the cost of two same-worded messages, one of them without an id, being kept once.
      */
-    static boolean repeated(String thread, String id, long now) {
-        if (id == null || id.isEmpty()) return false;
+    static boolean repeated(String thread, String id, String text, long now) {
+        boolean hasId = id != null && !id.isEmpty();
+        // Only a digest of the words is held, and only for the window.
+        String words = text == null ? "" : Integer.toHexString(text.hashCode()) + ':' + text.length();
+        String byId = thread + '\u0000' + id;
+        String loose = thread + '\u0001' + words;
+        String withId = thread + '\u0002' + words;
         synchronized (PENDING) {
             // A clock moved back leaves times in the future, and those can't vouch for anything either.
             RECENT.values().removeIf(at -> now - at > DUPLICATE_WINDOW_MS || at > now);
-            String key = thread + '\u0000' + id;
-            if (RECENT.containsKey(key)) return true;
-            RECENT.put(key, now);
-            while (RECENT.size() > MAX_ENTRIES) {
+            if (hasId ? RECENT.containsKey(byId) || RECENT.containsKey(loose)
+                    : RECENT.containsKey(loose) || RECENT.containsKey(withId)) return true;
+            if (hasId) {
+                RECENT.put(byId, now);
+                RECENT.put(withId, now);
+            } else {
+                RECENT.put(loose, now);
+            }
+            while (RECENT.size() > 2 * MAX_ENTRIES) {
                 Iterator<String> oldest = RECENT.keySet().iterator();
                 oldest.next();
                 oldest.remove();
@@ -249,16 +262,21 @@ public final class MessageLog {
             if (!Settings.wouldUse(KEY)) return;
             Context context = Settings.appContext;
             if (context == null) return;
+            List<Entry> retry = batch;
             try {
                 List<Entry> entries = load(context);
-                for (Entry entry : batch) entries.add(named(context, entry));
+                List<Entry> withNames = new ArrayList<>(batch.size());
+                for (Entry entry : batch) withNames.add(named(context, entry));
+                // Naming uses up Auto reply's notes, so a failed write retries these with their names.
+                retry = withNames;
+                entries.addAll(withNames);
                 prune(entries, System.currentTimeMillis());
                 save(context, entries);
                 Settings.activeAt.put(KEY, System.currentTimeMillis());
             } catch (Throwable failure) {
                 // Back in front of the queue, so the next notification's write tries them again. The cap still holds.
                 synchronized (PENDING) {
-                    for (int i = batch.size() - 1; i >= 0; i--) PENDING.addFirst(batch.get(i));
+                    for (int i = retry.size() - 1; i >= 0; i--) PENDING.addFirst(retry.get(i));
                     while (PENDING.size() > MAX_ENTRIES) PENDING.removeFirst();
                 }
                 Settings.hookFailedPrivately(KEY, "Can't keep the message log", failure);
@@ -293,7 +311,7 @@ public final class MessageLog {
             }
             if (sender == null && chat == null) return entry;
             return new Entry(entry.time, entry.thread, entry.text, clip(sender == null ? "" : sender, MAX_NAME_CHARS),
-                clip(chat == null || chat.equals(sender) ? "" : chat, MAX_NAME_CHARS));
+                clip(chat == null || chat.equals(sender) ? "" : chat, MAX_NAME_CHARS), entry.id);
         } catch (RuntimeException unreadable) {
             return entry;
         }
@@ -386,6 +404,10 @@ public final class MessageLog {
         synchronized (LOCK) {
             synchronized (PENDING) {
                 PENDING.clear();
+            }
+            // Names Auto reply noted for messages not written yet go with them.
+            synchronized (NOTED) {
+                NOTED.clear();
             }
             if (context != null) {
                 for (String name : new String[] {FILE, FILE + ".tmp", DAMAGED}) {
