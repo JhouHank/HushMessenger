@@ -23,6 +23,7 @@ import static org.robolectric.Shadows.shadowOf;
 @Config(sdk = {28, 36})
 public class TextStyleTest {
     Application app;
+    private java.util.concurrent.Executor realWork;
 
     @Before public void reset() {
         app = RuntimeEnvironment.getApplication();
@@ -30,7 +31,15 @@ public class TextStyleTest {
         Settings.preferences.edit().clear().commit();
         Settings.activeAt.clear();
         CrashGuard.resetForTests();
+        realWork = TextStyleActivity.work;
         TextStyleActivity.work = Runnable::run;
+    }
+
+    /** A failed-start case hands HostScreens this test's app, so later tests mustn't start settings against it. */
+    @org.junit.After public void forgetApplication() {
+        TextStyleActivity.work = realWork;
+        HostScreens.applicationCreated(null);
+        Settings.initialize(app);
     }
 
     private static String points(int... points) { return new String(points, 0, points.length); }

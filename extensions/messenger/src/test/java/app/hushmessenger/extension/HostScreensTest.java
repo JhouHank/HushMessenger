@@ -37,9 +37,15 @@ public class HostScreensTest {
         Settings.preferences.edit().clear().commit();
         CrashGuard.resetForTests();
         HostScreens.shortcutWork = Runnable::run;
+        // A failed start takes the Bold and Italic entries out on this executor, so it runs inline here too.
+        realTextStyleWork = TextStyleActivity.work;
+        TextStyleActivity.work = Runnable::run;
     }
 
+    private java.util.concurrent.Executor realTextStyleWork;
+
     @After public void forgetApplication() {
+        TextStyleActivity.work = realTextStyleWork;
         HostScreens.applicationCreated(null);
         Settings.initialize(RuntimeEnvironment.getApplication());
     }
