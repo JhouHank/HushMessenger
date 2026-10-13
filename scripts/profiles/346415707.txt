@@ -143,6 +143,7 @@ hook people_list_end LX/2I1;->A02()Z
 hook people_search LX/ChB;->DOF(LX/EFG;Ljava/lang/Object;)LX/EHA;
 hook people_story Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V
 hook people_tab LX/HQU;->A01(LX/HQU;)V
+hook pinned_chats LX/2nZ;->A00(Lcom/facebook/auth/usersession/FbUserSession;)I
 hook reels_badge LX/4Bi;->A09(LX/4Bi;)Z
 hook reply_read LX/9sW;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/594;LX/4sK;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/CdT;LX/5Ca;LX/593;LX/Cb1;LX/5td;LX/5Vf;LX/5O5;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/4sS;Ljava/lang/String;)V
 hook save_stories LX/NCw;->onClick(Landroid/view/View;)V

@@ -66,6 +66,7 @@ The screenshots below show the current development settings, with grouped contro
 | Hide stories and notes | Hides the row of stories and notes above your chats. |
 | Hide inbox tabs | Hides the Home and Channels tabs inside the inbox. |
 | Hide Mark as read | Takes Mark as read out of the menu you get when you press and hold a chat, so you can't mark one read by accident. Mark as unread stays. |
+| Pin more chats | Raises Messenger's limit of three pinned chats to 20, so more of them can stay at the top of your chat list. Experimental, since Messenger's servers may still hold you to three. |
 | Hide People tab | Hides the People tab in the bottom bar. Restart Messenger to see it go. |
 | Hide Notifications tab | Hides the Notifications tab in the bottom bar. Restart Messenger to see it go. |
 | Hide Facebook shortcuts | Removes Facebook toolbar, profile and sharing shortcuts, and the "Also from Meta" and "Subscriptions" sections in the Menu tab. |

@@ -343,6 +343,22 @@ public final class Settings {
             return healthReport;
         }
     }
+
+    static final String PINNED_CHATS = "pinned_chats";
+    /** How many chats can be pinned with the switch on. Messenger's own limit is three. */
+    static final int PINNED_CHAT_LIMIT = 20;
+    /**
+     * Asked each time Messenger reads how many chats can be pinned. With the switch on the answer is 20, or Messenger's
+     * own number if that's ever higher. Off, Pause and safe mode give Messenger's number back.
+     */
+    public static int pinnedChatLimit(int stock) {
+        try {
+            return enabled(PINNED_CHATS) ? Math.max(stock, PINNED_CHAT_LIMIT) : stock;
+        } catch (RuntimeException error) {
+            hookFailed(PINNED_CHATS, "Can't check the pinned chat limit", error);
+            return stock;
+        }
+    }
     /** Asked each time a chat's swipe up for disappearing messages could start; true keeps the gesture from starting. */
     public static boolean blockDisappearingSwipe() { return enabled("disappearing_swipe"); }
     /** Messenger's own original-upload check allows 25 MB, so a bigger video keeps its re-encode. */

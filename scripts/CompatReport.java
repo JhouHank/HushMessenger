@@ -172,6 +172,7 @@ public class CompatReport {
         PATCHES.put("Hide stories and notes", List.of("stories"));
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
         PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
+        PATCHES.put("Pin more chats", List.of("pinned_chats"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
         PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
@@ -3199,6 +3200,34 @@ public class CompatReport {
         return focus.size() == 1 ? focus : List.of();
     }
 
+    /**
+     * pinned_chats: the one static (FbUserSession)I getter that loads the pinned chat limit's config id once, has no
+     * branch or handler, and ends by returning the int its last call answered. Mirrors PinnedChats.kt.
+     */
+    static List<Method> pinnedChatLimit(List<ClassDef> classes) {
+        var found = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || !AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !"I".equals(method.getReturnType()) || method.getParameterTypes().size() != 1 ||
+                !"Lcom/facebook/auth/usersession/FbUserSession;".equals(method.getParameterTypes().get(0).toString())) continue;
+            var code = instructions(method);
+            int loads = 0, returns = 0;
+            boolean jumps = method.getImplementation().getTryBlocks().iterator().hasNext();
+            for (var i : code) {
+                if (i.getOpcode() == Opcode.CONST_WIDE && ((WideLiteralInstruction) i).getWideLiteral() == 0x8205c50002109fL) loads++;
+                if (i.getOpcode() == Opcode.RETURN || i.getOpcode() == Opcode.RETURN_VOID || i.getOpcode() == Opcode.RETURN_OBJECT ||
+                    i.getOpcode() == Opcode.RETURN_WIDE) returns++;
+                if (i instanceof OffsetInstruction) jumps = true;
+            }
+            int last = code.size() - 1;
+            if (loads != 1 || returns != 1 || jumps || last < 2 || code.get(last).getOpcode() != Opcode.RETURN ||
+                code.get(last - 1).getOpcode() != Opcode.MOVE_RESULT || register(code.get(last)) != register(code.get(last - 1))) continue;
+            if (code.get(last - 2) instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference read &&
+                "I".equals(read.getReturnType())) found.add(method);
+        }
+        return found.size() == 1 ? found : List.of();
+    }
+
     static Map<String, List<Method>> findControls(List<ClassDef> classes) {
         var found = new LinkedHashMap<String, List<Method>>();
         for (var key : CONTROL_KEYS) found.put(key, new ArrayList<>());
@@ -3223,6 +3252,7 @@ public class CompatReport {
         found.get("attribution_uploads").addAll(attributionUploads(classes));
         found.get("ad_events").addAll(adEvents(classes));
         found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));
+        found.get("pinned_chats").addAll(pinnedChatLimit(classes));
         found.get("text_style").addAll(textStyleField(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));
