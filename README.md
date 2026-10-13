@@ -112,7 +112,7 @@ The **Controls** tab has **All**, **Inbox**, **Chats** and **More** filters. Use
 | Hide Mark as read | Starts off. Hides Mark as read in the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays. |
 | Hide People tab | Starts off. Hides the People tab in the bar at the bottom. Restart Messenger to see it go. |
 | Hide Notifications tab | Starts off. Hides the Notifications tab in the bar at the bottom. Restart Messenger to see it go. |
-| Hide Facebook shortcuts | Removes Facebook toolbar, profile and sharing shortcuts, and the "Also from Meta" section in the Menu tab (Muse, Subscriptions, Facebook Reels and the rest). |
+| Hide Facebook shortcuts | Removes Facebook toolbar, profile and sharing shortcuts, and the "Also from Meta" and "Subscriptions" sections in the Menu tab (Muse, Facebook Reels, Facebook Plus, Meta Verified, Meta One and the rest). |
 | Hide Meta AI | Hides the floating button, toolbar button, AI menu entries and the Meta AI tab some accounts get in the bottom bar, plus the "Ask Meta AI" button in search and the AI agent behind it. The search bar's "Ask Meta AI or search" hint goes back to the plain one. Typing @ in a chat no longer suggests Meta AI or its imagine entries (AI commands go too, and a community's AI in community chats), but the people in the chat still come up. People, message and group results still show, and existing AI chats stay available. The tab changes after **Restart Messenger**. |
 | Hide Chat Moments | Removes Chat Moments from the menu. |
 | Hide Reels badge | Hides the Reels notification badge. |

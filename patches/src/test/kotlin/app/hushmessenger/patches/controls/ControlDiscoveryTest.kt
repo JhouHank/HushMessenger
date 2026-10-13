@@ -324,6 +324,25 @@ class ControlDiscoveryTest {
         validateControls(found, setOf(TAB_PEOPLE, TAB_NOTIFICATIONS, "ai_tab"))
     }
 
+    // 582's Menu tab gives Meta's subscriptions (Facebook Plus, Meta Verified, Meta One) a section of their own next to
+    // Also from Meta. Both are Facebook shortcuts. The tab's own sections, built by the same class, aren't.
+    @Test fun theMenuTabsMetaSectionsAreFacebookShortcutGates() {
+        val section = { name: String, plugin: String ->
+            fixtureMethod("LX/WRg;->$name()Z", """
+                new-instance v0, Lcom/facebook/messaging/navigation/plugins/drawerfoldersections/$plugin;
+                const/4 v0, 0x1
+                return v0
+            """.trimIndent())
+        }
+        val drawer = fixtureClass("LX/WRg;", listOf(
+            section("A02", "fbshortcutsfoldersection/FacebookShortcutsFolderSection"),
+            section("A05", "subscriptionsfoldersection/SubscriptionsFolderSection"),
+            section("A04", "settingsfoldersection/SettingsDrawerFolderSectionImplementation"),
+        ))
+        val found = findControls(listOf(drawer))
+        assertEquals(setOf("LX/WRg;->A02()Z", "LX/WRg;->A05()Z"), found.getValue("facebook").map { it.hookId() }.toSet())
+    }
+
     // Both chat menu builders gate Mark as read by its plugin name. Mark as unread has the same shape and its own name.
     @Test fun markAsReadIsBothChatMenuGatesAndNotMarkAsUnread() {
         val unread = fixtureMethod("LX/MKS;->A0G()Z",

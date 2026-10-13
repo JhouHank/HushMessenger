@@ -122,7 +122,7 @@ internal val BASE_PROFILE = ControlProfile(
             "LX/Gfr;->A00()Z", "LX/Gfz;->A02()Z", "LX/Gg0;->A01()Z", "LX/Gg2;->A02()Z", "LX/Gg4;->A02()Z",
             "LX/Gg9;->A03()Z", "LX/GgA;->A03()Z", "LX/GgC;->A01()Z", "LX/GgD;->A01()Z", "LX/GgF;->A06()Z",
             "LX/GgG;->A06()Z", "LX/GgH;->A06()Z", "LX/MJh;->A04()Z", "LX/MJp;->A06()Z", "LX/MK8;->A06()Z",
-            "LX/WRg;->A02()Z",
+            "LX/WRg;->A02()Z", "LX/WRg;->A05()Z",
         ),
         "font_by_name" to setOf("LX/N6z;->A00(Landroid/content/Context;Ljava/lang/String;I)Landroid/graphics/Typeface;"),
         "font_input" to setOf(
@@ -292,7 +292,7 @@ internal val PROFILE_346415706 = ControlProfile(
         "emoji_typeface" to setOf("LX/1Nt;->A00()Landroid/graphics/Typeface;"),
         "event_prompts" to setOf("LX/HEZ;->A08()Z", "LX/HEZ;->A09()Z"),
         "facebook" to setOf(
-            "LX/2QA;->A0D()Z", "LX/3FJ;->A00()Z", "LX/3pE;->A00()Z", "LX/HEI;->A02()Z", "LX/HLa;->A06()Z",
+            "LX/2QA;->A0D()Z", "LX/3FJ;->A00()Z", "LX/3pE;->A00()Z", "LX/HEI;->A02()Z", "LX/HEI;->A05()Z", "LX/HLa;->A06()Z",
             "LX/HVV;->A02()Z", "LX/JNi;->A04()Z", "LX/JO2;->A06()Z", "LX/JOQ;->A06()Z", "LX/JOi;->A00()Z",
             "LX/JOq;->A02()Z", "LX/JOr;->A01()Z", "LX/JOt;->A02()Z", "LX/JOv;->A02()Z", "LX/JP0;->A03()Z",
             "LX/JP1;->A03()Z", "LX/JP3;->A01()Z", "LX/JP4;->A01()Z", "LX/JP6;->A06()Z", "LX/JP7;->A06()Z",

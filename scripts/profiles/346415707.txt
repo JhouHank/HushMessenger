@@ -84,6 +84,7 @@ hook facebook LX/2QA;->A0D()Z
 hook facebook LX/3FJ;->A00()Z
 hook facebook LX/3pE;->A00()Z
 hook facebook LX/HEI;->A02()Z
+hook facebook LX/HEI;->A05()Z
 hook facebook LX/HLa;->A06()Z
 hook facebook LX/HVV;->A02()Z
 hook facebook LX/JNi;->A04()Z

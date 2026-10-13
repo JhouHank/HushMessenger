@@ -519,7 +519,7 @@
         },
         {
             "name": "Hide Facebook shortcuts",
-            "description": "Hides Facebook buttons, profile and sharing shortcuts, and Also from Meta in the Menu tab. Handy if you only use Messenger. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Hides Facebook buttons, profile and sharing shortcuts, and the Also from Meta and Subscriptions sections in the Menu tab. Handy if you only use Messenger. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Navigation",
             "dependencies": [
