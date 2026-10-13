@@ -138,6 +138,8 @@ final class SettingsText {
         ENGLISH.put("camera_unsupported", "This install has no screen for opening the phone's camera app, so the chat camera stays Messenger's own. Root Mount installs can't add one. Your choice is saved.");
         ENGLISH.put("text_style_unsupported", "This install has no Bold and Italic entries for the text menu. Root Mount installs can't add them. Your choice is saved.");
         ENGLISH.put("text_style_read_only", "Bold and Italic only work on text you're typing.");
+        ENGLISH.put("text_style_bold_none", "Bold only changes the letters A to Z (accents are fine) and digits. Letters from other alphabets stay as they are.");
+        ENGLISH.put("text_style_italic_none", "Italic only changes the letters A to Z (accents are fine). Digits and letters from other alphabets stay as they are.");
         ENGLISH.put("bubble_stock", "Stock");
         ENGLISH.put("bubble_chat_heads", "Chat heads");
         ENGLISH.put("bubble_native", "Native Bubbles");

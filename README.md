@@ -105,7 +105,7 @@ The screenshots below show the current development settings, with grouped contro
 | Unlock app icons | Every icon in Messenger's App icon setting becomes selectable without a subscription. |
 | Material You theme | In dark mode on Android 12 and newer, Messenger takes the accent color from your wallpaper. A **Pure black dark mode** switch sits under Appearance. |
 | Use your own font | Replaces Meta's font with your phone's, or with a .ttf or .otf file you pick, with size and position adjustments. Restart Messenger after a change. |
-| Bold and italic text | Adds Bold and Italic to the text selection menu. On a Samsung phone, turn them on once under **Manage apps** in that menu. |
+| Bold and italic text | Adds Bold and Italic to the text selection menu. They change the letters A to Z, accented ones included, and Bold changes digits too. Other alphabets stay as they are. On a Samsung phone, turn them on once under **Manage apps** in that menu. |
 | Open settings from menu | Adds the HushMessenger row to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or the Menu tab's title open settings. Always on. |
 
 ### Patches without a switch
