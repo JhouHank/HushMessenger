@@ -3,6 +3,7 @@ package app.hushmessenger.extension;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -12,7 +13,9 @@ import android.widget.EditText;
 import android.widget.TextView;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -382,6 +385,79 @@ public class CustomFontSettingsTest {
                 ((TextView) root.findViewWithTag("font_file_status")).getText().toString());
             assertEquals(View.VISIBLE, root.findViewWithTag("font_phone").getVisibility());
         }
+    }
+
+    /**
+     * Android takes a commit into memory before the disk answers. A size, a move, the phone's font or a new file whose save
+     * fails or throws leaves the picked name, its copy and the size as they were and says so, and a later save of anything
+     * else doesn't keep the change.
+     */
+    @Test public void aSaveTheDiskRefusesLeavesTheFontAsItWas() throws Exception {
+        OwnFontTest.pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        byte[] rubik = FontFileTest.font(FontFileTest.STATIC_FONT);
+        SharedPreferences prefs = Settings.preferences;
+        AtomicReference<String> refusal = new AtomicReference<>();
+        Settings.preferences = refusing(prefs, refusal);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            View root = activity.getWindow().getDecorView();
+            TextView size = root.findViewWithTag("font_size_value"), status = root.findViewWithTag("font_file_status");
+            for (String way : new String[] {"false", "throw"}) {
+                refusal.set(way);
+                root.findViewWithTag("font_size_larger").performClick();
+                assertFalse(way, prefs.contains(OwnFont.SCALE_KEY));
+                assertEquals("Text size 100%", size.getText().toString());
+                assertEquals("Couldn't save that change, so your font stays as it was. Try again.", ShadowToast.getTextOfLatestToast());
+                root.findViewWithTag("font_shift_down").performClick();
+                assertFalse(way, prefs.contains(OwnFont.SHIFT_KEY));
+
+                root.findViewWithTag("font_phone").performClick();
+                assertEquals(way, "Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
+                assertArrayEquals(rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
+                assertEquals("Couldn't go back to your phone's font. Try again.", ShadowToast.getTextOfLatestToast());
+                assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.", status.getText().toString());
+
+                Uri other = Uri.parse("content://fonts/picked/NotoSansKhmer-VF.ttf");
+                Shadows.shadowOf(activity.getContentResolver()).registerInputStream(other,
+                    new ByteArrayInputStream(FontFileTest.font(FontFileTest.VARIABLE_FONT)));
+                activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(other));
+                awaitToast("Couldn't save a copy of that font.");
+                assertEquals(way, "Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
+                assertArrayEquals(rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
+                assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.", status.getText().toString());
+            }
+        } finally {
+            Settings.preferences = prefs;
+        }
+        assertTrue(prefs.edit().putBoolean("check_updates", false).commit());
+        assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
+        assertFalse(prefs.contains(OwnFont.SCALE_KEY));
+        assertFalse(prefs.contains(OwnFont.SHIFT_KEY));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.",
+                ((TextView) root.findViewWithTag("font_file_status")).getText().toString());
+            assertEquals("Text size 100%", ((TextView) root.findViewWithTag("font_size_value")).getText().toString());
+        }
+    }
+
+    /** [prefs] whose commits, while [refusal] names a way, change memory as Android's do and then return false or throw. */
+    private static SharedPreferences refusing(SharedPreferences prefs, AtomicReference<String> refusal) {
+        ClassLoader loader = CustomFontSettingsTest.class.getClassLoader();
+        return (SharedPreferences) Proxy.newProxyInstance(loader, new Class<?>[] {SharedPreferences.class}, (proxy, method, args) -> {
+            Object result = method.invoke(prefs, args);
+            if (!method.getName().equals("edit")) return result;
+            SharedPreferences.Editor editor = (SharedPreferences.Editor) result;
+            return Proxy.newProxyInstance(loader, new Class<?>[] {SharedPreferences.Editor.class}, (editProxy, editMethod, editArgs) -> {
+                Object edited = editMethod.invoke(editor, editArgs);
+                String way = refusal.get();
+                if (editMethod.getName().equals("commit") && way != null) {
+                    if (way.equals("throw")) throw new IllegalStateException("injected commit failure");
+                    return false;
+                }
+                return edited == editor ? editProxy : edited;
+            });
+        });
     }
 
     @Test public void aPickedNameIsOneShortLineWithNothingHidden() {

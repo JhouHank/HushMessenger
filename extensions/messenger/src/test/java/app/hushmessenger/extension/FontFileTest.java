@@ -287,7 +287,8 @@ public class FontFileTest {
         assertEquals(Arrays.asList("check", "save, the copy before still in place"), said);
         assertArrayEquals(rubik, Files.readAllBytes(target.toPath()));
 
-        // A name that won't save, or whose saving throws, leaves the copy before where it was.
+        // A name that won't save, or whose saving throws, leaves the copy before where it was. Android takes a commit into
+        // memory before the disk answers, so the old name is put back either way.
         File again = existingCopy();
         AtomicInteger undone = new AtomicInteger();
         for (boolean throwing : new boolean[]{false, true}) {
@@ -310,7 +311,7 @@ public class FontFileTest {
             }
             assertUntouched(again);
         }
-        assertEquals("a name that never saved was put back", 0, undone.get());
+        assertEquals("a name that didn't save was left in memory", 2, undone.get());
     }
 
     /**

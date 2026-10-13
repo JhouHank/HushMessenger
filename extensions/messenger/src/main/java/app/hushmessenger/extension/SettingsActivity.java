@@ -786,9 +786,11 @@ public final class SettingsActivity extends Activity {
         int now = size ? OwnFont.scale(prefs) : OwnFont.shift(prefs);
         int next = size ? Math.max(FontFile.SCALE_LEAST, Math.min(FontFile.SCALE_MOST, now + step))
             : Math.max(-FontFile.SHIFT_MOST, Math.min(FontFile.SHIFT_MOST, now + step));
-        if (next == now || !prefs.edit().putInt(key, next).commit()) return;
+        if (next == now) return;
+        boolean saved = OwnFont.save(prefs, key, next);
         refreshFontFile();
-        feedback(text.get("font_adjust_saved", size ? fontSizeText(next) : fontShiftText(next)), Toast.LENGTH_SHORT);
+        feedback(saved ? text.get("font_adjust_saved", size ? fontSizeText(next) : fontShiftText(next)) : text.get("font_adjust_failed"),
+            Toast.LENGTH_SHORT);
     }
 
     private String fontSizeText(int scale) {
@@ -866,7 +868,7 @@ public final class SettingsActivity extends Activity {
 
     static String copyFont(Context app, SharedPreferences prefs, android.net.Uri uri, SettingsText words) {
         String name = fontName(app, uri);
-        String before = prefs.getString(OwnFont.NAME_KEY, "");
+        Object before = prefs.getAll().get(OwnFont.NAME_KEY);
         try {
             java.io.InputStream input;
             try {
@@ -877,7 +879,7 @@ public final class SettingsActivity extends Activity {
             }
             FontFile.copy(input, FontFile.file(app), OwnFont.fileCheck, new FontFile.Choice() {
                 @Override public boolean save() { return prefs.edit().putString(OwnFont.NAME_KEY, name).commit(); }
-                @Override public void undo() { prefs.edit().putString(OwnFont.NAME_KEY, before).commit(); }
+                @Override public void undo() { OwnFont.restore(prefs, OwnFont.NAME_KEY, before); }
             });
             return words.get("font_file_set", name);
         } catch (FontFile.Refused refused) {
@@ -941,10 +943,13 @@ public final class SettingsActivity extends Activity {
         toast.show();
     }
 
-    /** Saves the phone's font as the choice, then removes the copy, so the name never points at a deleted file. */
+    /**
+     * Saves the phone's font as the choice, then removes the copy, so the name never points at a deleted file. A save that
+     * fails keeps the picked name and its copy together.
+     */
     private void usePhoneFont() {
         if (fontBusy.get()) return;
-        boolean saved = Settings.preferences.edit().putString(OwnFont.NAME_KEY, "").commit();
+        boolean saved = OwnFont.save(Settings.preferences, OwnFont.NAME_KEY, "");
         java.io.File copy = FontFile.file(this);
         if (saved && copy.exists() && !copy.delete()) android.util.Log.i("HushMessenger", "The font file copy couldn't be removed");
         if (saved) FontFile.dropAdjusted(copy.getParentFile(), null);

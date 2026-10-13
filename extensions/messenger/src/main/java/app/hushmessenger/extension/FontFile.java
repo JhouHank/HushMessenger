@@ -65,7 +65,8 @@ final class FontFile {
 
     /**
      * The saved name that goes with the copy. save runs after the checks and before the rename, and undo puts the old name
-     * back when the rename then fails. A throw from save counts as a name that didn't save.
+     * back when save fails or the rename then does. A throw from save counts as a name that didn't save. Android takes a
+     * commit into memory before the disk answers, so a failed save can still have changed the name in use.
      */
     interface Choice {
         boolean save();
@@ -126,15 +127,14 @@ final class FontFile {
             } catch (RuntimeException failure) {
                 saved = false;
             }
-            if (!saved) throw new Refused(Refusal.NOT_SAVED, "The font file's name couldn't be saved");
+            if (!saved) {
+                undo(choice);
+                throw new Refused(Refusal.NOT_SAVED, "The font file's name couldn't be saved");
+            }
             try {
                 moveIn(partial, target);
             } catch (Refused refused) {
-                try {
-                    choice.undo();
-                } catch (RuntimeException ignored) {
-                    // Picking again mends a name that points at the old copy.
-                }
+                undo(choice);
                 throw refused;
             }
             kept = true;
@@ -145,6 +145,14 @@ final class FontFile {
                 // Every byte wanted was read, or the copy was already turned down.
             }
             if (!kept) partial.delete();
+        }
+    }
+
+    private static void undo(Choice choice) {
+        try {
+            choice.undo();
+        } catch (RuntimeException ignored) {
+            // Picking again mends a name that points at the old copy.
         }
     }
 
