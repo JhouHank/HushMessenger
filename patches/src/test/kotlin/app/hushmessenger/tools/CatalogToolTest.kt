@@ -214,7 +214,7 @@ class CatalogToolTest {
         val names = Regex("""controlPatch\("[a-z_]+",\s*"([^"]+)"""").findAll(patch)
             .map { it.groupValues[1] }.toSet() + CatalogTool.NON_CONTROL_PATCHES + "Material You theme" + "View stories anonymously" + "Save any story" + "Slide chats in and out" +
             "Bold and italic text"
-        CatalogTool.validateDefinitions(patch, ui, manifest, names)
+        assertTrue("people" in CatalogTool.validateDefinitions(patch, ui, manifest, names))
         assertFailsWith<IllegalArgumentException> { CatalogTool.validateDefinitions(patch.replace("controlPatch(\"people\"", "controlPatch(\"changed\""), ui, manifest, names) }
         assertFailsWith<IllegalArgumentException> { CatalogTool.validateDefinitions(patch, ui.replace("{\"people\",", "{\"changed\","), manifest, names) }
         assertFailsWith<IllegalArgumentException> { CatalogTool.validateDefinitions(patch, ui, manifest.replace("hush.feature.people", "hush.feature.changed"), names) }
@@ -243,5 +243,71 @@ class CatalogToolTest {
         assertFailsWith<IllegalArgumentException> {
             CatalogTool.catalog("1", setOf(bytecodePatch("Untitled") { stringOption("bare", "a", null, null, null, false) }))
         }
+    }
+
+    private fun dex(vararg classes: com.android.tools.smali.dexlib2.iface.ClassDef): ByteArray {
+        val store = MemoryDataStore()
+        DexPool.writeTo(store, ImmutableDexFile(Opcodes.getDefault(), classes.toList()))
+        return store.data.copyOf().also { store.close() }
+    }
+
+    private val logoCall = "Lapp/hushmessenger/extension/Settings;->logoLongPressed(Landroid/content/Context;)V"
+
+    /** Patch code naming one extension method and two control keys, as the built patches' hook code does. */
+    private fun patcherDex(vararg strings: String) = dex(fixtureClass("Lapp/hushmessenger/patches/Fixture;", listOf(
+        fixtureMethod("Lapp/hushmessenger/patches/Fixture;->hook()V",
+            strings.joinToString("\n") { "const-string v0, \"$it\"" } + "\nreturn-void", 1))))
+
+    private fun extensionDex(method: String = "logoLongPressed", vararg keys: String) = dex(fixtureClass(
+        "Lapp/hushmessenger/extension/Settings;", listOf(fixtureMethod(
+            "Lapp/hushmessenger/extension/Settings;->$method(Landroid/content/Context;)V",
+            keys.joinToString("\n") { "const-string v0, \"$it\"" } + "\nreturn-void", 2))))
+
+    /**
+     * A structurally sound extension still has to be this bundle's: one with nothing of HushMessenger's, one missing a
+     * method the hooks call and an older one missing a current control are all turned down.
+     */
+    @Test fun thePackagedExtensionMustHaveWhatThePatchesCall() {
+        val keys = setOf("people", "ads")
+        val patcher = patcherDex("invoke-static/range {p1 .. p1}, $logoCall", "people", "ads")
+        val extension = extensionDex("logoLongPressed", "people", "ads")
+        for (data in listOf(patcher, extension)) assertTrue(CatalogTool.validateDex(data) > 0)
+        // The method reference and its class.
+        assertEquals(2, CatalogTool.validateExtensionContract(patcher, extension, keys))
+        val unrelated = assertFailsWith<IllegalArgumentException> { CatalogTool.validateExtensionContract(patcher, patcher, keys) }
+        assertEquals("The extension has no Lapp/hushmessenger/extension/Settings;", unrelated.message)
+        val missing = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.validateExtensionContract(patcher, extensionDex("settingsOpened", "people", "ads"), keys)
+        }
+        assertEquals("The extension has no $logoCall", missing.message)
+        val older = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.validateExtensionContract(patcher, extensionDex("logoLongPressed", "people"), keys)
+        }
+        assertEquals("The extension has no ads control", older.message)
+        val stale = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.validateExtensionContract(patcherDex("invoke-static/range {p1 .. p1}, $logoCall", "people"), extension, keys)
+        }
+        assertEquals("The patcher DEX has no ads control", stale.message)
+        val nothing = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.validateExtensionContract(patcherDex("people", "ads"), extension, keys)
+        }
+        assertEquals("The patcher DEX names no extension code", nothing.message)
+    }
+
+    @Test fun everyPatchClassInTheJarIsInThePatcherDex() {
+        val patcher = patcherDex("people")
+        CatalogTool.validatePatcherClasses(listOf("app/hushmessenger/patches/Fixture.class"), patcher)
+        assertFailsWith<IllegalArgumentException> {
+            CatalogTool.validatePatcherClasses(listOf("app/hushmessenger/patches/Fixture.class", "app/hushmessenger/patches/Newer.class"), patcher)
+        }
+        assertFailsWith<IllegalArgumentException> { CatalogTool.validatePatcherClasses(emptyList(), patcher) }
+    }
+
+    /** A run that refuses its bundle, however early, leaves no success receipt from an earlier run behind. */
+    @Test fun aRefusedBundleLeavesNoReceipt(@TempDir temporary: Path) {
+        val receipt = temporary.resolve("catalog-evidence.json").toFile()
+        receipt.writeText("{\"dexValidated\":true}\n")
+        assertFails { CatalogTool.main(arrayOf("check", temporary.resolve("missing.mpp").toString(), temporary.toString(), receipt.path)) }
+        assertFalse(receipt.exists())
     }
 }
