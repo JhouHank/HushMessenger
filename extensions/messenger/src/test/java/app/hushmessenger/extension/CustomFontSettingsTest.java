@@ -680,12 +680,16 @@ public class CustomFontSettingsTest {
             }
             // Choose waits too, and the row says why, instead of opening the picker only to turn the file down.
             assertFalse(root.findViewWithTag("font_file").isEnabled());
-            assertEquals(new SettingsText(java.util.Locale.US).get("font_file_stuck"),
-                ((TextView) root.findViewWithTag("font_file_status")).getText().toString());
+            String waiting = new SettingsText(java.util.Locale.US).get("font_file_stuck");
+            TextView status = root.findViewWithTag("font_file_status");
+            // Which font is in use still comes first.
+            assertTrue(status.getText().toString(), status.getText().toString().startsWith("None chosen"));
+            assertTrue(status.getText().toString(), status.getText().toString().endsWith(" " + waiting));
             release.countDown();
             for (Thread thread : stuck) thread.join(10_000);
             Shadows.shadowOf(Looper.getMainLooper()).idle();
             assertTrue("a stopped copy that gives up frees Choose", root.findViewWithTag("font_file").isEnabled());
+            assertFalse(status.getText().toString().contains(waiting));
             Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
             resolver.registerInputStream(rubik, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
@@ -722,6 +726,39 @@ public class CustomFontSettingsTest {
         }
     }
 
+    /** The deadline can come while the copy saves. Nobody tapped anything, so the save finishes without a "finishing" toast. */
+    @Test public void theDeadlineLetsASavingCopyFinishQuietly() throws Exception {
+        SharedPreferences prefs = Settings.preferences;
+        CountDownLatch disk = new CountDownLatch(1);
+        List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
+        Settings.preferences = slow(prefs, disk, savedOn);
+        Uri uri = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
+        Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver())
+            .registerInputStream(uri, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
+            java.lang.reflect.Field current = SettingsActivity.class.getDeclaredField("fontJob");
+            current.setAccessible(true);
+            Object job = current.get(null);
+            assertNotNull(job);
+            long wait = System.currentTimeMillis() + 10_000;
+            while (savedOn.isEmpty() && System.currentTimeMillis() < wait) Thread.sleep(10);
+            assertFalse("the copy reached its save", savedOn.isEmpty());
+            int toasts = ShadowToast.shownToastCount();
+            java.lang.reflect.Field deadline = job.getClass().getDeclaredField("deadline");
+            deadline.setAccessible(true);
+            ((Runnable) deadline.get(job)).run();
+            assertEquals(toasts, ShadowToast.shownToastCount());
+            disk.countDown();
+            awaitToast("Font set to Rubik-Regular.ttf");
+            assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
+        } finally {
+            disk.countDown();
+            Settings.preferences = prefs;
+        }
+    }
+
     /**
      * A copy can finish, turned down here, just as the deadline fires. The deadline then has nothing to stop, so the copy's
      * own answer is what shows, not "took too long".
@@ -744,9 +781,9 @@ public class CustomFontSettingsTest {
             assertFalse(thread.isAlive());
             int toasts = ShadowToast.shownToastCount();
             // The copy is done but its answer hasn't reached the main thread yet when the deadline runs.
-            java.lang.reflect.Method stop = job.getClass().getDeclaredMethod("stop", String.class);
-            stop.setAccessible(true);
-            stop.invoke(job, "font_file_timeout");
+            java.lang.reflect.Field deadline = job.getClass().getDeclaredField("deadline");
+            deadline.setAccessible(true);
+            ((Runnable) deadline.get(job)).run();
             assertEquals(toasts, ShadowToast.shownToastCount());
             Shadows.shadowOf(Looper.getMainLooper()).idle();
             assertEquals(new SettingsText(java.util.Locale.US).get("font_file_not_font"), ShadowToast.getTextOfLatestToast());

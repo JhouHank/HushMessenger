@@ -886,10 +886,11 @@ public final class SettingsActivity extends Activity {
         boolean stuck = !busy && fontSlots.availablePermits() == 0;
         // With the switch off nothing here is in use yet, so the line says what turning it on would do.
         String status = busy ? text.get("font_file_copying")
-            : stuck ? text.get("font_file_stuck")
             : name.isEmpty() ? text.get(on ? "font_file_none" : "font_file_none_off", FontFile.MAX_MEGABYTES)
             : !copy ? text.get("font_file_missing", name)
             : text.get(on ? "font_file_using" : "font_file_picked_off", name);
+        // Stuck copies don't change which font is in use, so the line still says that first.
+        if (stuck) status = status + " " + text.get("font_file_stuck");
         if (!status.contentEquals(fontStatus.getText())) fontStatus.setText(status);
         fontChoose.setEnabled(!busy && !saving && !stuck);
         fontStop.setVisibility(busy ? View.VISIBLE : View.GONE);
@@ -951,7 +952,7 @@ public final class SettingsActivity extends Activity {
         final java.util.concurrent.atomic.AtomicInteger state = new java.util.concurrent.atomic.AtomicInteger(RUNNING);
         final android.os.CancellationSignal cancellation = new android.os.CancellationSignal();
         final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-        final Runnable deadline = () -> stop("font_file_timeout");
+        final Runnable deadline = () -> stop("font_file_timeout", false);
         final Context app;
         final SharedPreferences prefs;
         final android.net.Uri uri;
@@ -1003,11 +1004,16 @@ public final class SettingsActivity extends Activity {
             return state.get() == STOPPED;
         }
 
-        /** On the main thread, from the Stop button or the deadline. A copy already saving finishes and says how it went. */
+        /** The Stop button. */
         void stop(String status) {
+            stop(status, true);
+        }
+
+        /** On the main thread, from the Stop button or the deadline. A copy already saving finishes and says how it went. */
+        void stop(String status, boolean tapped) {
             if (!state.compareAndSet(RUNNING, STOPPED)) {
-                // Saving can't be taken back, so say it's finishing rather than leave the tap unanswered.
-                if (state.get() == SAVING) sayFont(app, shownFontPage(), words.get("font_file_finishing"), Toast.LENGTH_SHORT);
+                // Saving can't be taken back. A tap hears it's finishing; the deadline lets it finish without a word.
+                if (tapped && state.get() == SAVING) sayFont(app, shownFontPage(), words.get("font_file_finishing"), Toast.LENGTH_SHORT);
                 return;
             }
             handler.removeCallbacks(deadline);
