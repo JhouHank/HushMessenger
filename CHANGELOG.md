@@ -4,6 +4,7 @@
 
 Development v0.23.3.
 
+- With **Hide Meta AI** on, typing @ in a chat no longer suggests Meta AI or its imagine entries. Messenger had started building that list a newer way that went around the switch. Silent and the rest of the list stay.
 - New **Hide Mark as read** switch. It takes Mark as read out of the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays where it is. Like every switch it starts off.
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
 - Release checks record stage timings. A local development preflight checks a frozen bundle while keeping the public feed held, with separate receipts that can't advance a public release.
