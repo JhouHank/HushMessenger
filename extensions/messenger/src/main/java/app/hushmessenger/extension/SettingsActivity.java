@@ -95,8 +95,11 @@ public final class SettingsActivity extends Activity {
         thread.setDaemon(true);
         return thread;
     });
-    /** Saves tapped and not yet back on the main thread, and what the latest finished one had to say. Main thread only. */
-    private static int fontWrites;
+    /**
+     * Saves tapped and not yet back on the main thread, how many of them put the phone's font back, and what the latest
+     * finished one had to say. Main thread only.
+     */
+    private static int fontWrites, phoneFontWrites;
     private static String fontWriteMessage;
     private static java.lang.ref.WeakReference<SettingsActivity> fontPage = new java.lang.ref.WeakReference<>(null);
     private TextView fontStatus, fontSize, fontShift;
@@ -814,6 +817,8 @@ public final class SettingsActivity extends Activity {
         writeFont(getApplicationContext(), () -> {
             boolean size = OwnFont.SCALE_KEY.equals(key);
             synchronized (FontFile.LOCK) {
+                // The phone's font went back in first, so there's no picked file left to size.
+                if (prefs.getString(OwnFont.NAME_KEY, "").isEmpty()) return null;
                 int now = size ? OwnFont.scale(prefs) : OwnFont.shift(prefs);
                 int next = size ? Math.max(FontFile.SCALE_LEAST, Math.min(FontFile.SCALE_MOST, now + step))
                     : Math.max(-FontFile.SHIFT_MOST, Math.min(FontFile.SHIFT_MOST, now + step));
@@ -821,15 +826,17 @@ public final class SettingsActivity extends Activity {
                 if (!OwnFont.save(prefs, key, next)) throw new IllegalStateException("Not saved");
                 return words.get("font_adjust_saved", size ? fontSizeText(words, next) : fontShiftText(words, next));
             }
-        }, words.get("font_adjust_failed"), Toast.LENGTH_SHORT);
+        }, words.get("font_adjust_failed"), Toast.LENGTH_SHORT, false);
     }
 
     /**
      * Runs [save] on the font save thread and comes back to whichever page shows the rows then. [save] answers what to say,
      * or null for nothing, and a throw says [failed] at once. Otherwise only the last of a run of taps says its result.
+     * [phone] marks the save that puts the phone's font back, which holds the size and move buttons until it's done.
      */
-    private void writeFont(Context app, java.util.concurrent.Callable<String> save, String failed, int length) {
+    private void writeFont(Context app, java.util.concurrent.Callable<String> save, String failed, int length, boolean phone) {
         fontWrites++;
+        if (phone) phoneFontWrites++;
         refreshFontFile();
         android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
         FONT_WRITES.execute(() -> {
@@ -847,9 +854,9 @@ public final class SettingsActivity extends Activity {
             boolean saved = ok;
             main.post(() -> {
                 fontWrites--;
+                if (phone) phoneFontWrites--;
                 if (said != null) fontWriteMessage = said;
-                SettingsActivity page = fontPage.get();
-                if (page != null && page.isDestroyed()) page = null;
+                SettingsActivity page = shownFontPage();
                 if (page != null) page.refreshFontFile();
                 if ((!saved || fontWrites == 0) && fontWriteMessage != null) {
                     sayFont(app, page, fontWriteMessage, length);
@@ -874,14 +881,17 @@ public final class SettingsActivity extends Activity {
         String name = Settings.preferences.getString(OwnFont.NAME_KEY, "");
         boolean copy = FontFile.file(this).isFile(), busy = fontJob != null, on = Settings.preferences.getBoolean(OwnFont.KEY, false);
         // A file swap waits for queued saves, and a queued phone font save would remove what it picked.
-        boolean saving = fontWrites > 0;
+        boolean saving = fontWrites > 0, reverting = phoneFontWrites > 0;
+        // Two stopped copies still waiting on their files hold both slots, so a third can't start until one gives up.
+        boolean stuck = !busy && fontSlots.availablePermits() == 0;
         // With the switch off nothing here is in use yet, so the line says what turning it on would do.
         String status = busy ? text.get("font_file_copying")
+            : stuck ? text.get("font_file_stuck")
             : name.isEmpty() ? text.get(on ? "font_file_none" : "font_file_none_off", FontFile.MAX_MEGABYTES)
             : !copy ? text.get("font_file_missing", name)
             : text.get(on ? "font_file_using" : "font_file_picked_off", name);
         if (!status.contentEquals(fontStatus.getText())) fontStatus.setText(status);
-        fontChoose.setEnabled(!busy && !saving);
+        fontChoose.setEnabled(!busy && !saving && !stuck);
         fontStop.setVisibility(busy ? View.VISIBLE : View.GONE);
         fontPhone.setEnabled(!busy && !saving);
         // A copy no name points at still gets a way out.
@@ -893,10 +903,10 @@ public final class SettingsActivity extends Activity {
         String size = fontSizeText(text, scale), place = fontShiftText(text, shift);
         if (!size.contentEquals(fontSize.getText())) fontSize.setText(size);
         if (!place.contentEquals(fontShift.getText())) fontShift.setText(place);
-        fontSmaller.setEnabled(!busy && scale > FontFile.SCALE_LEAST);
-        fontLarger.setEnabled(!busy && scale < FontFile.SCALE_MOST);
-        fontUp.setEnabled(!busy && shift > -FontFile.SHIFT_MOST);
-        fontDown.setEnabled(!busy && shift < FontFile.SHIFT_MOST);
+        fontSmaller.setEnabled(!busy && !reverting && scale > FontFile.SCALE_LEAST);
+        fontLarger.setEnabled(!busy && !reverting && scale < FontFile.SCALE_MOST);
+        fontUp.setEnabled(!busy && !reverting && shift > -FontFile.SHIFT_MOST);
+        fontDown.setEnabled(!busy && !reverting && shift < FontFile.SHIFT_MOST);
     }
 
     private void pickFontFile() {
@@ -919,7 +929,17 @@ public final class SettingsActivity extends Activity {
         fontJob = job;
         refreshFontFile();
         job.handler.postDelayed(job.deadline, Math.max(1, fontTimeoutMillis));
-        job.worker.start();
+        try {
+            job.worker.start();
+        } catch (RuntimeException | OutOfMemoryError error) {
+            // No thread, so nothing will hand the slot back but this.
+            android.util.Log.w("HushMessenger", "Can't start the font copy: " + error.getClass().getSimpleName());
+            job.handler.removeCallbacks(job.deadline);
+            fontJob = null;
+            fontSlots.release();
+            refreshFontFile();
+            feedback(text.get("font_file_busy"), Toast.LENGTH_LONG);
+        }
     }
 
     /**
@@ -927,7 +947,7 @@ public final class SettingsActivity extends Activity {
      * Stop button, and a stopped copy never saves: the name and file change only from RUNNING, and a stop ends RUNNING.
      */
     private static final class FontJob implements Runnable {
-        static final int RUNNING = 0, SAVING = 1, STOPPED = 2;
+        static final int RUNNING = 0, SAVING = 1, STOPPED = 2, FINISHED = 3;
         final java.util.concurrent.atomic.AtomicInteger state = new java.util.concurrent.atomic.AtomicInteger(RUNNING);
         final android.os.CancellationSignal cancellation = new android.os.CancellationSignal();
         final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -949,23 +969,29 @@ public final class SettingsActivity extends Activity {
         }
 
         @Override public void run() {
-            String message;
+            String message = null;
             try {
                 message = copyFont(this);
             } catch (RuntimeException | LinkageError error) {
                 android.util.Log.e("HushMessenger", "Can't copy the font file: " + error.getClass().getSimpleName());
-                message = words.get("font_file_not_saved");
             } finally {
+                // In finally, so even an error this can't catch frees the slot and the page.
                 input = null;
+                // Done: a deadline or Stop from here on can't stand in for the copy's own answer.
+                if (!state.compareAndSet(RUNNING, FINISHED)) state.compareAndSet(SAVING, FINISHED);
                 fontSlots.release();
+                String said = message != null ? message : words.get("font_file_not_saved");
+                handler.post(() -> {
+                    handler.removeCallbacks(deadline);
+                    if (fontJob == this) fontJob = null;
+                    // A stopped copy said so when it stopped, and saved nothing after. Its slot is free again, though.
+                    if (state.get() != STOPPED) fontDone(app, said);
+                    else {
+                        SettingsActivity page = shownFontPage();
+                        if (page != null) page.refreshFontFile();
+                    }
+                });
             }
-            String said = message;
-            handler.post(() -> {
-                handler.removeCallbacks(deadline);
-                if (fontJob == this) fontJob = null;
-                // A stopped copy said so when it stopped, and saved nothing after.
-                if (state.get() != STOPPED) fontDone(app, said);
-            });
         }
 
         /** Whether the copy may save its name and file now. Once it may, a stop no longer takes it back. */
@@ -979,7 +1005,11 @@ public final class SettingsActivity extends Activity {
 
         /** On the main thread, from the Stop button or the deadline. A copy already saving finishes and says how it went. */
         void stop(String status) {
-            if (!state.compareAndSet(RUNNING, STOPPED)) return;
+            if (!state.compareAndSet(RUNNING, STOPPED)) {
+                // Saving can't be taken back, so say it's finishing rather than leave the tap unanswered.
+                if (state.get() == SAVING) sayFont(app, shownFontPage(), words.get("font_file_finishing"), Toast.LENGTH_SHORT);
+                return;
+            }
             handler.removeCallbacks(deadline);
             if (fontJob == this) fontJob = null;
             worker.interrupt();
@@ -1097,10 +1127,15 @@ public final class SettingsActivity extends Activity {
 
     /** Back on the main thread: the page showing the rows now, which may be a newer one than started the copy. */
     private static void fontDone(Context app, String message) {
-        SettingsActivity page = fontPage.get();
-        if (page != null && page.isDestroyed()) page = null;
+        SettingsActivity page = shownFontPage();
         if (page != null) page.refreshFontFile();
         sayFont(app, page, message, Toast.LENGTH_LONG);
+    }
+
+    /** The page showing the font rows now, if one is open. */
+    private static SettingsActivity shownFontPage() {
+        SettingsActivity page = fontPage.get();
+        return page != null && page.isDestroyed() ? null : page;
     }
 
     /** On [page] when one shows the rows, or a toast of its own once settings have closed. */
@@ -1131,7 +1166,7 @@ public final class SettingsActivity extends Activity {
             }
             FontFile.dropAdjusted(copy.getParentFile(), null);
             return set;
-        }, text.get("font_phone_failed"), Toast.LENGTH_LONG);
+        }, text.get("font_phone_failed"), Toast.LENGTH_LONG, true);
     }
 
     private void openNotificationSettings(String action) {

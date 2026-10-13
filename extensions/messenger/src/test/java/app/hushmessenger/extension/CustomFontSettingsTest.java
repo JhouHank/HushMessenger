@@ -659,10 +659,13 @@ public class CustomFontSettingsTest {
                 resolver.registerInputStreamSupplier(uri, () -> {
                     stuck.add(Thread.currentThread());
                     reached.countDown();
-                    try {
-                        release.await(20, TimeUnit.SECONDS);
-                    } catch (InterruptedException ignored) {
-                        // Stopping can't end a provider's open.
+                    // Stopping can't end a provider's open: it waits through the interrupt.
+                    while (true) {
+                        try {
+                            if (release.await(20, TimeUnit.SECONDS)) break;
+                        } catch (InterruptedException ignored) {
+                            // Keeps waiting.
+                        }
                     }
                     return new ByteArrayInputStream(new byte[0]);
                 });
@@ -675,15 +678,111 @@ public class CustomFontSettingsTest {
                 assertTrue(reached.await(10, TimeUnit.SECONDS));
                 root.findViewWithTag("font_file_stop").performClick();
             }
+            // Choose waits too, and the row says why, instead of opening the picker only to turn the file down.
+            assertFalse(root.findViewWithTag("font_file").isEnabled());
+            assertEquals(new SettingsText(java.util.Locale.US).get("font_file_stuck"),
+                ((TextView) root.findViewWithTag("font_file_status")).getText().toString());
             release.countDown();
             for (Thread thread : stuck) thread.join(10_000);
             Shadows.shadowOf(Looper.getMainLooper()).idle();
+            assertTrue("a stopped copy that gives up frees Choose", root.findViewWithTag("font_file").isEnabled());
             Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
             resolver.registerInputStream(rubik, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
             awaitToast("Font set to Rubik-Regular.ttf");
         } finally {
             release.countDown();
+        }
+    }
+
+    /** Stop while the copy saves can't take it back, so the tap hears it's finishing and the result follows. */
+    @Test public void stopWhileSavingSaysItsFinishing() throws Exception {
+        SharedPreferences prefs = Settings.preferences;
+        CountDownLatch disk = new CountDownLatch(1);
+        List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
+        Settings.preferences = slow(prefs, disk, savedOn);
+        Uri uri = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
+        Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver())
+            .registerInputStream(uri, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            View root = activity.getWindow().getDecorView();
+            activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (savedOn.isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(10);
+            assertFalse("the copy reached its save", savedOn.isEmpty());
+            root.findViewWithTag("font_file_stop").performClick();
+            assertEquals("It's already saving the font, so it'll finish in a moment.", ShadowToast.getTextOfLatestToast());
+            disk.countDown();
+            awaitToast("Font set to Rubik-Regular.ttf");
+            assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
+        } finally {
+            disk.countDown();
+            Settings.preferences = prefs;
+        }
+    }
+
+    /**
+     * A copy can finish, turned down here, just as the deadline fires. The deadline then has nothing to stop, so the copy's
+     * own answer is what shows, not "took too long".
+     */
+    @Test public void aCopyThatEndsAsTheDeadlineFiresStillSaysWhy() throws Exception {
+        Uri uri = Uri.parse("content://fonts/picked/notes.ttf");
+        Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver())
+            .registerInputStream(uri, new ByteArrayInputStream("these are notes, not a font".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
+            java.lang.reflect.Field current = SettingsActivity.class.getDeclaredField("fontJob");
+            current.setAccessible(true);
+            Object job = current.get(null);
+            assertNotNull(job);
+            java.lang.reflect.Field worker = job.getClass().getDeclaredField("worker");
+            worker.setAccessible(true);
+            Thread thread = (Thread) worker.get(job);
+            thread.join(10_000);
+            assertFalse(thread.isAlive());
+            int toasts = ShadowToast.shownToastCount();
+            // The copy is done but its answer hasn't reached the main thread yet when the deadline runs.
+            java.lang.reflect.Method stop = job.getClass().getDeclaredMethod("stop", String.class);
+            stop.setAccessible(true);
+            stop.invoke(job, "font_file_timeout");
+            assertEquals(toasts, ShadowToast.shownToastCount());
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            assertEquals(new SettingsText(java.util.Locale.US).get("font_file_not_font"), ShadowToast.getTextOfLatestToast());
+            assertEquals(toasts + 1, ShadowToast.shownToastCount());
+        }
+    }
+
+    /**
+     * Putting the phone's font back removes the picked file, so the size and move buttons wait for it, and a step that
+     * slips in behind it saves nothing and doesn't talk over its result.
+     */
+    @Test public void theSizeButtonsWaitForThePhoneFont() throws Exception {
+        OwnFontTest.pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        SharedPreferences prefs = Settings.preferences;
+        CountDownLatch disk = new CountDownLatch(1);
+        List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
+        Settings.preferences = slow(prefs, disk, savedOn);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            String[] steps = {"font_size_smaller", "font_size_larger", "font_shift_up", "font_shift_down"};
+            assertTrue(root.findViewWithTag("font_size_larger").isEnabled());
+            int toasts = ShadowToast.shownToastCount();
+            root.findViewWithTag("font_phone").performClick();
+            for (String step : steps) assertFalse(step, root.findViewWithTag(step).isEnabled());
+            // performClick runs the listener even on a disabled button, like a tap that lands as it greys out.
+            root.findViewWithTag("font_size_larger").performClick();
+            disk.countDown();
+            settle();
+            assertEquals("", prefs.getString(OwnFont.NAME_KEY, null));
+            assertFalse("the step after it saved nothing", prefs.contains(OwnFont.SCALE_KEY));
+            assertEquals("Back to your phone's font. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+            assertEquals(toasts + 1, ShadowToast.shownToastCount());
+            assertEquals(View.GONE, root.findViewWithTag("font_adjust").getVisibility());
+        } finally {
+            disk.countDown();
+            Settings.preferences = prefs;
         }
     }
 

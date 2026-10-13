@@ -348,6 +348,8 @@ final class SettingsText {
         ENGLISH.put("font_file_stop", "Stop copying");
         ENGLISH.put("font_file_stopped", "Stopped copying. Your font didn't change.");
         ENGLISH.put("font_file_timeout", "That file took too long to copy, so it was stopped. Your font didn't change.");
+        ENGLISH.put("font_file_finishing", "It's already saving the font, so it'll finish in a moment.");
+        ENGLISH.put("font_file_stuck", "Earlier copies are still waiting on their files. You can choose another one once they give up.");
         ENGLISH.put("font_phone_set", "Back to your phone's font. Restart Messenger to see it.");
         ENGLISH.put("font_phone_failed", "Couldn't go back to your phone's font. Try again.");
         ENGLISH.put("font_size", "Text size %1$d%%");

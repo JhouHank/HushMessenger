@@ -65,10 +65,16 @@ final class OwnFont {
         }
     }
 
+    /** Every type a preference can hold, so an old value of a type these keys don't use still goes back as it was. */
+    @SuppressWarnings("unchecked")
     private static SharedPreferences.Editor put(SharedPreferences.Editor edit, String key, Object value) {
         if (value == null) return edit.remove(key);
         if (value instanceof Integer) return edit.putInt(key, (Integer) value);
-        return edit.putString(key, (String) value);
+        if (value instanceof Boolean) return edit.putBoolean(key, (Boolean) value);
+        if (value instanceof Long) return edit.putLong(key, (Long) value);
+        if (value instanceof Float) return edit.putFloat(key, (Float) value);
+        if (value instanceof java.util.Set) return edit.putStringSet(key, (java.util.Set<String>) value);
+        return edit.putString(key, String.valueOf(value));
     }
 
     /** The phone's sans-serif and its named weights, the families {@link #isPhoneTypeface} knows. */
