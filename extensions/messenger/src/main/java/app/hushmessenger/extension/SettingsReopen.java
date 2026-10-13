@@ -89,6 +89,11 @@ final class SettingsReopen {
                 // A settings screen that is already up is where the restart meant to go.
                 if (page == null || activity instanceof SettingsActivity || activity instanceof RestartActivity) return;
                 Intent settings = HostScreens.intentFor(activity, HostScreens.SETTINGS).putExtra(EXTRA, page);
+                // Android keeps the settings task across the restart, with the screen the restart was asked from still
+                // in it. Opened from the app drawer, that screen's intent names the launcher alias, so this one would be
+                // stacked on top and Back would show the older copy. Emptying the task first leaves one settings screen.
+                // A Root Mount install's settings are a document task inside the stock host, which is left as it is.
+                if (!HostScreens.hosted(activity)) settings.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 activity.startActivity(settings);
             } catch (RuntimeException | LinkageError error) {
                 // Messenger's first screen is a fine place to land; the restart itself already worked.
