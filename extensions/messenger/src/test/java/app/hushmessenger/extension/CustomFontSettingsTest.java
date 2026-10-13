@@ -412,8 +412,9 @@ public class CustomFontSettingsTest {
         byte[] rubik = FontFileTest.font(FontFileTest.STATIC_FONT);
         SharedPreferences prefs = Settings.preferences;
         AtomicReference<String> refusal = new AtomicReference<>();
-        Settings.preferences = refusing(prefs, refusal);
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // After setup: the screen's own Settings.initialize would put the real preferences back.
+            Settings.preferences = refusing(prefs, refusal);
             SettingsActivity activity = screen.get();
             View root = activity.getWindow().getDecorView();
             TextView size = root.findViewWithTag("font_size_value"), status = root.findViewWithTag("font_file_status");
@@ -501,8 +502,9 @@ public class CustomFontSettingsTest {
         SharedPreferences prefs = Settings.preferences;
         CountDownLatch disk = new CountDownLatch(1);
         List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
-        Settings.preferences = slow(prefs, disk, savedOn);
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // After setup: the screen's own Settings.initialize would put the real preferences back.
+            Settings.preferences = slow(prefs, disk, savedOn);
             View root = screen.get().getWindow().getDecorView();
             View larger = root.findViewWithTag("font_size_larger");
             int toasts = ShadowToast.shownToastCount();
@@ -704,11 +706,12 @@ public class CustomFontSettingsTest {
         SharedPreferences prefs = Settings.preferences;
         CountDownLatch disk = new CountDownLatch(1);
         List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
-        Settings.preferences = slow(prefs, disk, savedOn);
         Uri uri = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
         Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver())
             .registerInputStream(uri, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // After setup: the screen's own Settings.initialize would put the real preferences back.
+            Settings.preferences = slow(prefs, disk, savedOn);
             SettingsActivity activity = screen.get();
             View root = activity.getWindow().getDecorView();
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
@@ -731,11 +734,12 @@ public class CustomFontSettingsTest {
         SharedPreferences prefs = Settings.preferences;
         CountDownLatch disk = new CountDownLatch(1);
         List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
-        Settings.preferences = slow(prefs, disk, savedOn);
         Uri uri = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
         Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver())
             .registerInputStream(uri, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // After setup: the screen's own Settings.initialize would put the real preferences back.
+            Settings.preferences = slow(prefs, disk, savedOn);
             SettingsActivity activity = screen.get();
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
             java.lang.reflect.Field current = SettingsActivity.class.getDeclaredField("fontJob");
@@ -800,8 +804,9 @@ public class CustomFontSettingsTest {
         SharedPreferences prefs = Settings.preferences;
         CountDownLatch disk = new CountDownLatch(1);
         List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
-        Settings.preferences = slow(prefs, disk, savedOn);
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // After setup: the screen's own Settings.initialize would put the real preferences back.
+            Settings.preferences = slow(prefs, disk, savedOn);
             View root = screen.get().getWindow().getDecorView();
             String[] steps = {"font_size_smaller", "font_size_larger", "font_shift_up", "font_shift_down"};
             assertTrue(root.findViewWithTag("font_size_larger").isEnabled());
