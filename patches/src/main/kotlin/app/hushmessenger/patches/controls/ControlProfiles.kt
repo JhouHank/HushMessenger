@@ -151,6 +151,7 @@ internal val BASE_PROFILE = ControlProfile(
             "LX/0bI;->A0N(Ljava/lang/String;)V",
             "LX/0bI;->A0R(LX/0gz;LX/0gP;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;[BIJ)LX/0in;",
         ),
+        "nearby_scans" to setOf("Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;->A04(Landroid/content/Context;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;J)V"),
         "original_photo" to setOf(
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B",
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V",
@@ -326,6 +327,7 @@ internal val PROFILE_346415706 = ControlProfile(
             "LX/0bI;->A0N(Ljava/lang/String;)V",
             "LX/0bI;->A0R(LX/0gz;LX/0gP;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;[BIJ)LX/0in;",
         ),
+        "nearby_scans" to setOf("Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;->A04(Landroid/content/Context;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;J)V"),
         "original_photo" to setOf(
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B",
             "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V",

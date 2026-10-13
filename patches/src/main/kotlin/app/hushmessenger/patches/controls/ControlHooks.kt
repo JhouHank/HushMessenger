@@ -374,6 +374,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(AD_EVENTS).addAll(findAdEvents(classes))
     found.getValue(MQTT_TELEMETRY).addAll(findMqttTelemetry(classes))
     found.getValue(PINNED_CHATS).addAll(findPinnedChatLimit(classes))
+    found.getValue(NEARBY_SCANS).addAll(findNearbyScans(classes))
     found.getValue(TEXT_STYLE).addAll(findTextStyleField(classes))
     found.getValue(MESSAGE_LOG).addAll(findMessageLogHook(classes))
     found.getValue(AUTO_REPLY).addAll(findMessageLogHook(classes))

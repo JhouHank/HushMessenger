@@ -78,6 +78,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     AD_EVENTS to setOf(SYNTHETIC_INBOX_VISIBILITY, SYNTHETIC_AD_ENTRY),
     MQTT_TELEMETRY to setOf(SYNTHETIC_MQTT_PUBLISH, SYNTHETIC_MQTT_KEEPALIVE),
     PINNED_CHATS to setOf(SYNTHETIC_PINNED_CHAT_LIMIT),
+    NEARBY_SCANS to setOf(SYNTHETIC_NEARBY_SCAN_SCHEDULER),
     TEXT_STYLE to setOf(SYNTHETIC_TEXT_FIELD_FOCUS),
     MESSAGE_LOG to setOf(newMessageNotificationCtor("LX/5qJ;", "LX/5Yc;")),
     AUTO_REPLY to setOf(newMessageNotificationCtor("LX/5qJ;", "LX/5Yc;")),

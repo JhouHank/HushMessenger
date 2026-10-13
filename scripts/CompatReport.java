@@ -201,6 +201,7 @@ public class CompatReport {
         PATCHES.put("Stop ad attribution uploads", List.of("attribution_uploads"));
         PATCHES.put("Stop inbox and ad link logging", List.of("ad_events"));
         PATCHES.put("Stop MQTT logging", List.of("mqtt_telemetry"));
+        PATCHES.put("Stop nearby scans", List.of("nearby_scans"));
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
@@ -3228,6 +3229,52 @@ public class CompatReport {
         return found.size() == 1 ? found : List.of();
     }
 
+    static boolean calls(Method method, String owner) {
+        for (var i : instructions(method))
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call &&
+                owner.equals(call.getDefiningClass())) return true;
+        return false;
+    }
+
+    /**
+     * nearby_scans: the foreground location controller's one static (Context, FbUserSession, controller, J)V that names
+     * the task it queues, taken only while the app's single WifiManager.startScan sits in the class that scheduler
+     * instantiates and its single BluetoothLeScanner.startScan sits in a class holding the BleScanOperation that queued
+     * class drives. Mirrors NearbyScans.kt.
+     */
+    static List<Method> nearbyScans(List<ClassDef> classes) {
+        final String controller = "Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;";
+        final String operation = "Lcom/facebook/blescan/BleScanOperation;";
+        var schedulers = new ArrayList<Method>();
+        var wifi = new ArrayList<ClassDef>();
+        var bluetooth = new ArrayList<ClassDef>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null) continue;
+            if (controller.equals(cls.getType()) && AccessFlags.STATIC.isSet(method.getAccessFlags()) && "V".equals(method.getReturnType())) {
+                var params = new ArrayList<String>();
+                for (var t : method.getParameterTypes()) params.add(t.toString());
+                if (params.equals(List.of("Landroid/content/Context;", "Lcom/facebook/auth/usersession/FbUserSession;", controller, "J")) &&
+                    literals(method).contains("ForegroundLocationFrameworkController_scheduleRequestLocationWithDelay")) schedulers.add(method);
+            }
+            for (var i : instructions(method)) {
+                if (!(i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call) ||
+                    !"startScan".equals(call.getName())) continue;
+                if ("Landroid/net/wifi/WifiManager;".equals(call.getDefiningClass())) wifi.add(cls);
+                if ("Landroid/bluetooth/le/BluetoothLeScanner;".equals(call.getDefiningClass())) bluetooth.add(cls);
+            }
+        }
+        if (schedulers.size() != 1 || wifi.size() != 1 || bluetooth.size() != 1) return List.of();
+        boolean queued = false;
+        for (var i : instructions(schedulers.get(0)))
+            if (i.getOpcode() == Opcode.NEW_INSTANCE && ((ReferenceInstruction) i).getReference() instanceof TypeReference type &&
+                type.getType().equals(wifi.get(0).getType())) queued = true;
+        boolean holdsOperation = false;
+        for (var field : bluetooth.get(0).getFields()) if (operation.equals(field.getType())) holdsOperation = true;
+        boolean drives = false;
+        for (var method : wifi.get(0).getMethods()) if (calls(method, operation)) drives = true;
+        return queued && holdsOperation && drives ? schedulers : List.of();
+    }
+
     static Map<String, List<Method>> findControls(List<ClassDef> classes) {
         var found = new LinkedHashMap<String, List<Method>>();
         for (var key : CONTROL_KEYS) found.put(key, new ArrayList<>());
@@ -3253,6 +3300,7 @@ public class CompatReport {
         found.get("ad_events").addAll(adEvents(classes));
         found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));
         found.get("pinned_chats").addAll(pinnedChatLimit(classes));
+        found.get("nearby_scans").addAll(nearbyScans(classes));
         found.get("text_style").addAll(textStyleField(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));

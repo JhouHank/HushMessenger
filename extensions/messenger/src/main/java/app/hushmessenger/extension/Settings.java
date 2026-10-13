@@ -343,6 +343,11 @@ public final class Settings {
             return healthReport;
         }
     }
+    /**
+     * Asked each time Messenger is about to queue its foreground location task, the one that requests a location and
+     * starts its Wi-Fi and Bluetooth scans. True keeps the task from being queued.
+     */
+    public static boolean stopNearbyScans() { return enabled("nearby_scans"); }
 
     static final String PINNED_CHATS = "pinned_chats";
     /** How many chats can be pinned with the switch on. Messenger's own limit is three. */

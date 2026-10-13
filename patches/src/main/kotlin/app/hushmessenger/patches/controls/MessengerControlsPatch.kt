@@ -158,6 +158,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             AD_EVENTS -> method.validateAdEvent()
             MQTT_TELEMETRY -> method.validateMqttTelemetry()
             PINNED_CHATS -> method.validatePinnedChatLimit()
+            NEARBY_SCANS -> method.validateNearbyScans()
             TEXT_STYLE -> method.validateTextStyleField()
             MESSAGE_LOG, AUTO_REPLY -> method.validateMessageLog()
             "original_photo" -> method.validateOriginalPhoto()
@@ -216,6 +217,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             AD_EVENTS -> method.injectAdEvent()
             MQTT_TELEMETRY -> method.injectMqttTelemetry()
             PINNED_CHATS -> method.injectPinnedChatLimit()
+            NEARBY_SCANS -> method.injectNearbyScans()
             TEXT_STYLE -> method.injectTextStyleField()
             MESSAGE_LOG -> method.injectMessageLog()
             AUTO_REPLY -> method.injectAutoReply()
@@ -414,6 +416,9 @@ val stopAdEventsPatch = controlPatch("ad_events", "Stop inbox and ad link loggin
 @Suppress("unused")
 val stopMqttLoggingPatch = controlPatch("mqtt_telemetry", "Stop MQTT logging",
     "Drops the health reports and push logging Messenger's MQTT client sends. Messenger 582 sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working.", "Privacy")
+@Suppress("unused")
+val stopNearbyScansPatch = controlPatch("nearby_scans", "Stop nearby scans",
+    "While it's open, Messenger can keep checking your location and scanning for nearby Wi-Fi networks and Bluetooth devices. This stops those checks and scans.", "Privacy")
 @Suppress("unused")
 val allowScreenshotPatch = controlPatch("allow_screenshot", "Allow screenshots", "Lets you screenshot protected chat media, such as view-once photos and Quicksnap, and stops screenshot notices. It doesn't add replay or saving.", "Privacy", "allow_screenshot", "screenshot_viewers")
 @Suppress("unused")
