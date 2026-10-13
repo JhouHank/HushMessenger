@@ -87,7 +87,7 @@ The screenshots below show the current development settings, with grouped contro
 | Stop ad attribution uploads | Stops the job that sends your advertising ID and ad tracking setting to Meta. |
 | Stop inbox and ad link logging | Stops the reports about which part of your chat list was on screen and which ad opened a chat. |
 | Stop MQTT logging | Drops the health reports and push logging Messenger's MQTT client sends. Messages and calls keep working. |
-| Stop nearby scans | While it's open, Messenger can keep checking your location and scanning for nearby Wi-Fi networks and Bluetooth devices. This stops those checks and scans. |
+| Stop nearby scans | Stops Messenger from reading the list of Wi-Fi networks around you. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices. |
 | Keep a message log | Saves a copy of each message that raised a notification, encrypted chats included, so an unsend can't take it back. It stays on your phone, encrypted. **View log** and **Clear log** sit under the switch. |
 | Auto reply | Answers messages with a reply you write, for certain words or for any message. One reply per chat every five minutes, and group chats only when you allow it. |
 | Hide read receipts | Opening a chat no longer sends Seen. The chat stays unread on your phone until you reply or mark it read. Group chats haven't been checked. |

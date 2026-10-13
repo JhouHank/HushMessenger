@@ -131,6 +131,7 @@ hook moments LX/WRi;->A05()Z
 hook moments LX/WWJ;->A05()Z
 hook mqtt_telemetry LX/0bI;->A0N(Ljava/lang/String;)V
 hook mqtt_telemetry LX/0bI;->A0R(LX/0gz;LX/0gP;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;[BIJ)LX/0in;
+hook nearby_scans LX/1fX;->A03(Z)Ljava/util/ArrayList;
 hook nearby_scans Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;->A04(Landroid/content/Context;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;J)V
 hook original_photo Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B
 hook original_photo Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V

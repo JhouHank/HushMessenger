@@ -418,7 +418,7 @@ val stopMqttLoggingPatch = controlPatch("mqtt_telemetry", "Stop MQTT logging",
     "Drops the health reports and push logging Messenger's MQTT client sends. Messenger 582 sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working.", "Privacy")
 @Suppress("unused")
 val stopNearbyScansPatch = controlPatch("nearby_scans", "Stop nearby scans",
-    "While it's open, Messenger can keep checking your location and scanning for nearby Wi-Fi networks and Bluetooth devices. This stops those checks and scans.", "Privacy")
+    "Stops Messenger from reading the list of Wi-Fi networks around you. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices.", "Privacy")
 @Suppress("unused")
 val allowScreenshotPatch = controlPatch("allow_screenshot", "Allow screenshots", "Lets you screenshot protected chat media, such as view-once photos and Quicksnap, and stops screenshot notices. It doesn't add replay or saving.", "Privacy", "allow_screenshot", "screenshot_viewers")
 @Suppress("unused")

@@ -3238,9 +3238,10 @@ public class CompatReport {
 
     /**
      * nearby_scans: the foreground location controller's one static (Context, FbUserSession, controller, J)V that names
-     * the task it queues, taken only while the app's single WifiManager.startScan sits in the class that scheduler
-     * instantiates and its single BluetoothLeScanner.startScan sits in a class holding the BleScanOperation that queued
-     * class drives. Mirrors NearbyScans.kt.
+     * the task it queues, and the app's one reader of WifiManager.getScanResults. Both are taken only while the app's
+     * single WifiManager.startScan sits in the class that scheduler instantiates, its single BluetoothLeScanner.startScan
+     * sits in a class holding the BleScanOperation that queued class drives, and the reader has the shape
+     * scanResultReader checks. Mirrors NearbyScans.kt.
      */
     static List<Method> nearbyScans(List<ClassDef> classes) {
         final String controller = "Lcom/facebook/location/foreground/ForegroundLocationFrameworkController;";
@@ -3248,6 +3249,7 @@ public class CompatReport {
         var schedulers = new ArrayList<Method>();
         var wifi = new ArrayList<ClassDef>();
         var bluetooth = new ArrayList<ClassDef>();
+        var readers = new ArrayList<Method>();
         for (var cls : classes) for (var method : cls.getMethods()) {
             if (method.getImplementation() == null) continue;
             if (controller.equals(cls.getType()) && AccessFlags.STATIC.isSet(method.getAccessFlags()) && "V".equals(method.getReturnType())) {
@@ -3257,13 +3259,14 @@ public class CompatReport {
                     literals(method).contains("ForegroundLocationFrameworkController_scheduleRequestLocationWithDelay")) schedulers.add(method);
             }
             for (var i : instructions(method)) {
-                if (!(i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call) ||
-                    !"startScan".equals(call.getName())) continue;
+                if (!(i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call)) continue;
+                if (readsScanResults(call)) readers.add(method);
+                if (!"startScan".equals(call.getName())) continue;
                 if ("Landroid/net/wifi/WifiManager;".equals(call.getDefiningClass())) wifi.add(cls);
                 if ("Landroid/bluetooth/le/BluetoothLeScanner;".equals(call.getDefiningClass())) bluetooth.add(cls);
             }
         }
-        if (schedulers.size() != 1 || wifi.size() != 1 || bluetooth.size() != 1) return List.of();
+        if (schedulers.size() != 1 || wifi.size() != 1 || bluetooth.size() != 1 || readers.size() != 1 || !scanResultReader(readers.get(0))) return List.of();
         boolean queued = false;
         for (var i : instructions(schedulers.get(0)))
             if (i.getOpcode() == Opcode.NEW_INSTANCE && ((ReferenceInstruction) i).getReference() instanceof TypeReference type &&
@@ -3272,7 +3275,32 @@ public class CompatReport {
         for (var field : bluetooth.get(0).getFields()) if (operation.equals(field.getType())) holdsOperation = true;
         boolean drives = false;
         for (var method : wifi.get(0).getMethods()) if (calls(method, operation)) drives = true;
-        return queued && holdsOperation && drives ? schedulers : List.of();
+        return queued && holdsOperation && drives ? List.of(schedulers.get(0), readers.get(0)) : List.of();
+    }
+
+    static boolean readsScanResults(MethodReference call) {
+        return "Landroid/net/wifi/WifiManager;".equals(call.getDefiningClass()) && "getScanResults".equals(call.getName());
+    }
+
+    /**
+     * The scan-result reader's shape: an instance (Z)ArrayList with one getScanResults call that also returns a register
+     * it loads with null, the answer it gives when Messenger may not read the list.
+     */
+    static boolean scanResultReader(Method method) {
+        if (AccessFlags.STATIC.isSet(method.getAccessFlags()) || !"Ljava/util/ArrayList;".equals(method.getReturnType())) return false;
+        var params = new ArrayList<String>();
+        for (var t : method.getParameterTypes()) params.add(t.toString());
+        if (!params.equals(List.of("Z"))) return false;
+        var nulls = new HashSet<Integer>();
+        var reads = 0;
+        for (var i : instructions(method)) {
+            if (i.getOpcode() == Opcode.CONST_4 && ((NarrowLiteralInstruction) i).getNarrowLiteral() == 0) nulls.add(((OneRegisterInstruction) i).getRegisterA());
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call && readsScanResults(call)) reads++;
+        }
+        if (reads != 1) return false;
+        for (var i : instructions(method))
+            if (i.getOpcode() == Opcode.RETURN_OBJECT && nulls.contains(((OneRegisterInstruction) i).getRegisterA())) return true;
+        return false;
     }
 
     static Map<String, List<Method>> findControls(List<ClassDef> classes) {
