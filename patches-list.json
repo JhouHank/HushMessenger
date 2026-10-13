@@ -2813,7 +2813,7 @@
         },
         {
             "name": "Stop nearby scans",
-            "description": "While it's open, Messenger can keep checking your location and scanning for nearby Wi-Fi networks and Bluetooth devices. This stops those checks and scans. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Stops Messenger from reading the list of Wi-Fi networks around you. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Privacy",
             "dependencies": [
