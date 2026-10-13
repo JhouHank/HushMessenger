@@ -236,7 +236,10 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 method.parameterTypes == listOf(BUBBLE_SESSION) && instructions.any {
                     it.opcode == Opcode.CONST_WIDE && (it as? WideLiteralInstruction)?.wideLiteral?.let { flag -> flag in BUBBLE_ROLLOUTS } == true
                 }) add("bubble_mode")
-            if (method.returnType == "Z" && strings.containsAll(setOf("iab_skipped_reason", "user_prefers_external"))) add("browser")
+            // 583 dropped the skip-reason logging, so its check is the launcher's one (Uri, session) boolean
+            if (method.returnType == "Z" && (strings.containsAll(setOf("iab_skipped_reason", "user_prefers_external")) ||
+                    cls.type == BROWSER_LAUNCHER && !AccessFlags.STATIC.isSet(method.accessFlags) &&
+                    method.parameterTypes == listOf("Landroid/net/Uri;", BUBBLE_SESSION))) add("browser")
             if (method.returnType == "Z" && AccessFlags.STATIC.isSet(method.accessFlags) && method.isPeopleSectionShape() &&
                 refs.any { it.toString() in peopleJewelKeys } && refs.any { it.toString() == activeProfile.preferenceGetter }) add("people_jewel")
             if (AccessFlags.STATIC.isSet(method.accessFlags) && method.returnType == "V" && method.parameterTypes == listOf(cls.type) &&
@@ -263,7 +266,8 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 refs.any { it.toString() == "Landroid/view/Window;->addFlags(I)V" }) add("allow_screenshot")
             if (cls.type == MEDIA_TRANSCODER && method.hookId().let { it == TRANSCODE_IMAGE || it == TRANSCODE_IMAGE_ASYNC }) add("original_photo")
             if (method.isVideoTranscode(strings)) add(ORIGINAL_VIDEO)
-            if (method.returnType == "V" && method.parameterTypes.size == 3 &&
+            // 583's handler is static and also takes the extras Map.
+            if (method.returnType == "V" && method.parameterTypes.size in 3..4 &&
                 method.parameterTypes[0] == "Landroid/content/Intent;" &&
                 strings.any { "ACTION_REVOKE_MESSAGE" in it }) add("keep_unsent")
             // Both unsent hooks call the wrapper's own message id getter, so the wrapper that holds them has to have one.
@@ -612,22 +616,31 @@ internal fun MutableMethod.injectSubtabs() {
     addInstructions(3, "invoke-static {v0}, $SETTINGS->showSubtabs(Z)Z\nmove-result v0")
 }
 
+internal const val BROWSER_LAUNCHER = "Lcom/facebook/messaging/browser/util/MessengerBrowserLauncher;"
+
+/**
+ * How each tested build reads the external-browser preference, keyed by the check's register count: the register that
+ * holds the false default, and the branch taken on the result. 582 skips ahead when it's off; 583 returns when it's on.
+ */
+internal val BROWSER_PREFERENCE_SHAPES = mapOf(9 to (3 to Opcode.IF_EQZ), 8 to (2 to Opcode.IF_NEZ))
+
 internal fun MutableMethod.validateBrowserPreference(): Int {
     val instructions = implementation!!.instructions
     val key = activeProfile.browserPreferenceIndex
     val getter = instructions.getOrNull(key + 1) as? FiveRegisterInstruction
+    val (default, branch) = BROWSER_PREFERENCE_SHAPES[implementation!!.registerCount] ?: (-1 to null)
     if (AccessFlags.STATIC.isSet(accessFlags) ||
         parameterTypes != listOf("Landroid/net/Uri;", "Lcom/facebook/auth/usersession/FbUserSession;") ||
         returnType != "Z" || instructions.getOrNull(key)?.opcode != Opcode.SGET_OBJECT ||
         (instructions[key] as? OneRegisterInstruction)?.registerA != 0 ||
         instructions.getOrNull(key + 1)?.opcode != Opcode.INVOKE_INTERFACE ||
-        getter?.registerCount != 3 || getter.registerC != 1 || getter.registerD != 0 || getter.registerE != 3 ||
+        getter?.registerCount != 3 || getter.registerC != 1 || getter.registerD != 0 || getter.registerE != default ||
         (instructions.getOrNull(key) as? ReferenceInstruction)?.reference.toString() != activeProfile.browserPreferenceKey ||
         (instructions.getOrNull(key + 1) as? ReferenceInstruction)?.reference.toString() != activeProfile.preferenceGetter ||
         instructions.getOrNull(key + 2)?.opcode != Opcode.MOVE_RESULT ||
         (instructions[key + 2] as? OneRegisterInstruction)?.registerA != 0 ||
-        instructions.getOrNull(key + 3)?.opcode != Opcode.IF_EQZ ||
-        (instructions[key + 3] as? OneRegisterInstruction)?.registerA != 0 || implementation!!.registerCount != 9) {
+        branch == null || instructions.getOrNull(key + 3)?.opcode != branch ||
+        (instructions[key + 3] as? OneRegisterInstruction)?.registerA != 0) {
         throw PatchException("Messenger controls: external-browser preference no longer matches the tested build")
     }
     return key + 3
@@ -635,7 +648,7 @@ internal fun MutableMethod.validateBrowserPreference(): Int {
 
 internal fun MutableMethod.injectBrowserPreference() {
     val branch = validateBrowserPreference()
-    // p1 is Uri (v7). Use the same stock preference branch, preserving surrounding handling.
+    // p1 is the Uri. Both builds branch on v0 being true as "open it outside", so the stock branch takes the answer.
     addInstructions(branch, "invoke-static {v0, p1}, $SETTINGS->preferExternalBrowser(ZLandroid/net/Uri;)Z\nmove-result v0")
 }
 
@@ -689,8 +702,11 @@ internal fun ClassDef.isRowWrapper(): Boolean =
 internal fun ClassDef.hasMessageIdGetter(): Boolean = messageIdGetterName.isNotEmpty() &&
     methods.any { it.name == messageIdGetterName && it.returnType == "Ljava/lang/String;" && it.parameterTypes == listOf("I") }
 
-/** The Notifications tab's server flag ID. Meta renumbers it with each release; this is 582's. */
-private val PEOPLE_SERVER_FLAGS = setOf(72344188615734930L)
+/** The Notifications tab's server flag ID. Meta renumbers it with each release; these are 582's and 583's. */
+private val PEOPLE_SERVER_FLAGS = setOf(72344188615734930L, 72344188615735036L)
+
+/** The register holding the section check's false default, by its register count: 582 has ten, 583 eight. */
+internal val PEOPLE_SECTION_DEFAULTS = mapOf(10 to 5, 8 to 3)
 
 /**
  * Where the Notifications tab loads its server flag: the method's only constant with one of those values, at 17,
@@ -706,8 +722,8 @@ private fun Method.isPeopleSectionShape() = parameterTypes.map(CharSequence::toS
 /**
  * The Notifications tab reads its stock "section hidden" preference into v0 and branches on it. A hidden
  * section is still shown when a server flag (v0, three instructions after its constant) is on; both branches
- * land on the final false return. The false value lives in v5 of the ten-register body, which logs a skipped
- * impression under a monitor after the server branch.
+ * land on the final false return. The false value lives in v5 of 582's ten-register body (v3 of 583's eight), which
+ * logs a skipped impression under a monitor after the server branch.
  */
 internal fun MutableMethod.validatePeopleSection() {
     val code = implementation!!.instructions.toList()
@@ -717,9 +733,8 @@ internal fun MutableMethod.validatePeopleSection() {
     val at = code.peopleFlagIndex()
     val flag = code.getOrNull(at)
     val last = code.lastIndex
-    val no = 5
-    if (!AccessFlags.STATIC.isSet(accessFlags) || returnType != "Z" || !isPeopleSectionShape() ||
-        implementation!!.registerCount != 10 ||
+    val no = PEOPLE_SECTION_DEFAULTS[implementation!!.registerCount] ?: -1
+    if (!AccessFlags.STATIC.isSet(accessFlags) || returnType != "Z" || !isPeopleSectionShape() || no < 0 ||
         flag?.opcode != Opcode.CONST_WIDE || (flag as? OneRegisterInstruction)?.registerA != 0 ||
         code.getOrNull(at + 1)?.opcode != Opcode.INVOKE_STATIC ||
         (code[at + 1] as? ReferenceInstruction)?.reference.toString() != activeProfile.peopleFlagCheck ||
@@ -1093,24 +1108,32 @@ internal fun MutableMethod.injectMenuFolderClick(folderItemType: String) {
     """.trimIndent())
 }
 
-internal fun MutableMethod.validateKeepUnsent() {
+/**
+ * Returns the parameter register number of the Intent: p1 of 582's instance handler, or p0 of 583's static one, which
+ * also takes the extras Map. The hook reads it with a plain invoke, so it has to be in reach.
+ */
+internal fun MutableMethod.validateKeepUnsent(): Int {
     validateScratch()
     if (returnType != "V") throw PatchException("Messenger controls: keep_unsent hook must return void")
     if (parameterTypes.getOrNull(0) != "Landroid/content/Intent;")
         throw PatchException("Messenger controls: keep_unsent hook first param must be Intent")
-    // The hook reads the Intent from p1 with a plain invoke, so this has to be an instance method with p1 in reach.
-    if (AccessFlags.STATIC.isSet(accessFlags) || parameterRegister(1) > 15)
-        throw PatchException("Messenger controls: keep_unsent hook must be an instance method with its Intent at v15 or below")
+    val static = AccessFlags.STATIC.isSet(accessFlags)
+    if (static && (parameterTypes.size != 4 || parameterTypes[3] != "Ljava/util/Map;"))
+        throw PatchException("Messenger controls: a static keep_unsent hook must be the (Intent, session, String, Map) handler")
+    val intent = if (static) 0 else 1
+    if (parameterRegister(intent) > 15)
+        throw PatchException("Messenger controls: keep_unsent hook must have its Intent at v15 or below")
+    return intent
 }
 
 internal fun MutableMethod.injectKeepUnsent() {
-    validateKeepUnsent()
+    val intent = validateKeepUnsent()
     addInstructionsWithLabels(0, """
         invoke-static {}, $SETTINGS->keepUnsent()Z
         move-result v0
         if-eqz v0, :stock_behavior
         const-string v0, "messenger_message_id"
-        invoke-virtual {p1, v0}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
+        invoke-virtual {p$intent, v0}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
         move-result-object v0
         invoke-static {v0}, $SETTINGS->recordUnsent(Ljava/lang/String;)V
         return-void

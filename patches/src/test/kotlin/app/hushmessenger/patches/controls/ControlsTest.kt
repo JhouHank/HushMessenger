@@ -126,6 +126,25 @@ class ControlsTest {
         assertFailsWith<PatchException> { revoke(19).validateKeepUnsent() }
     }
 
+    /** 583 handles the revoke in a static (Intent, session, String, Map) method, so its Intent is p0. */
+    @Test fun the583StaticRevokeHandlerReadsItsIntentFromP0() {
+        val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
+        val map = "Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/util/Map;"
+        fun handler(types: String, registers: Int = 11) =
+            fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", "return-void", registers, static)
+        assertEquals(0, handler(map).validateKeepUnsent())
+        assertFailsWith<PatchException> { handler("Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/lang/Object;").validateKeepUnsent() }
+        // p0 lands on v15 with 19 registers and on v16 with 20, where a plain invoke can't reach it.
+        handler(map, 19).validateKeepUnsent()
+        assertFailsWith<PatchException> { handler(map, 20).validateKeepUnsent() }
+        val method = handler(map)
+        method.injectKeepUnsent()
+        val read = method.implementation!!.instructions.single {
+            (it as? ReferenceInstruction)?.reference?.toString() == "Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;"
+        } as FiveRegisterInstruction
+        assertEquals(method.parameterRegister(0), read.registerC)
+    }
+
     @Test fun settingsHaveALauncherEntryAndAPrivateProviderWithoutChangingHostPermissions() {
         val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(
             """<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name="stock.Activity" android:permission="stock.permission" /></application></manifest>""".toByteArray(),

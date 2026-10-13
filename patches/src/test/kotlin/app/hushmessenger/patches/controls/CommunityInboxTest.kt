@@ -109,6 +109,33 @@ class CommunityInboxTest {
         assertNull(findCommunityInbox(live))
     }
 
+    @Test fun messenger583FoldsTheChannelCheckInAndReadsTheListOneEarlier() {
+        val contract = assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true)))
+        // The identity names no separate channel check.
+        val stock = SYNTHETIC_PROFILE.nativeCommunityInbox.split('|')
+        assertEquals((stock.take(8) + stock.drop(9)).joinToString("|"), contract.identity)
+        val render = contract.render as MutableMethod
+        assertEquals(63, render.communityReadSite(contract.capturedScope))
+        // The inline check must compare the key's type with the channel, then the announcement channel, and nothing else.
+        val kind = "Lcom/facebook/messaging/model/threadkey/ThreadKey;->kind:LX/KeyKind;"
+        fun inline(first: String, second: String, register: Int = 1) = """
+            iget-object v1, p0, $kind
+            sget-object v0, LX/KeyKind;->$first:LX/KeyKind;
+            if-eq v$register, v0, :yes
+            sget-object v0, LX/KeyKind;->$second:LX/KeyKind;
+            if-eq v1, v0, :yes
+            const/4 v0, 0x0
+            return v0
+            :yes
+            const/4 v0, 0x1
+            return v0
+        """.trimIndent()
+        assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement"))))
+        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("announcement", "channel"))))
+        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "channel"))))
+        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", register = 2))))
+    }
+
     @Test fun everySupportedBuildsRecordedIdsConnectThroughTheClosure() {
         for (profile in controlProfiles.values.toSet()) {
             activeProfile = profile

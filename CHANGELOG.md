@@ -5,6 +5,7 @@
 Development v0.23.3.
 
 - Compatibility profiles now match their generated form exactly, so the profile checks pass without changing any hooks.
+- The compatibility report finds every switch's hooks in Messenger 583.0.0.29.95. Meta renumbered several server flags and moved a few checks around, and the patches now recognize both builds' versions of each. 583 isn't a supported build yet. That waits on its recorded profiles and a full test pass.
 
 - Long-press the Messenger logo at the top of Chats to open HushMessenger settings. It's a way in from inside Messenger even when your launcher has no long-press menu, and it works while changes are paused. It comes with **Open settings from menu**. Messenger's own long press on the logo still runs first.
 - The README is much shorter and sticks to installing and using the patches. The Messenger internals audit and the version history it used to carry are still in the repository history, last at commit 3cf54ff.

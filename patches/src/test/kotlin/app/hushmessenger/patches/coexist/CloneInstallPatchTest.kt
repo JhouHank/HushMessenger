@@ -390,6 +390,24 @@ class CloneInstallPatchTest {
         assertEquals(checkBefore.filterIndexed { i, _ -> i != 6 }, replaced.filterIndexed { i, _ -> i != 6 })
     }
 
+    @Test fun messenger583sBackupLookupTakesMessengersNameFromTheStringPool() {
+        val pooled = LOOKUP_BODY.replace("const-string v0, \"com.facebook.orca\"", "const/16 v0, 0x51\ninvoke-static {v0}, $POOL\nmove-result-object v0")
+        val pools = ownNamePoolKeys(listOf(fixtureClass("LX/000;", listOf(stringPool()))))
+        // Without the pool's keys it no longer names Messenger, and the pool's other key names another app.
+        assertFalse(backupLookup(pooled).isBackupLookup())
+        assertFalse(backupLookup(pooled.replace("0x51", "0x50")).isBackupLookup(pools))
+        assertFailsWith<PatchException> { applyCloneSites(backupLookup(pooled), attachmentCheck(), COPY) }
+        val lookup = backupLookup(pooled)
+        val check = attachmentCheck()
+        assertEquals(setOf("LX/E6y;-><init>()V", "LX/4M6;->A00(Ljava/lang/String;)Z"),
+            findCloneSites(listOf(fixtureClass("LX/E6y;", listOf(lookup)), fixtureClass("LX/4M6;", listOf(check))), pools))
+        val before = lookup.code()
+        applyCloneSites(lookup, check, COPY, pools = pools)
+        assertEquals(7 to "com.facebook.orca", lookup.loads(5))
+        assertEquals(before.take(5), lookup.code().take(5))
+        assertEquals(before.drop(5), lookup.code().drop(6))
+    }
+
     @Test fun aChangedLookupOrCheckStopsThePatchBeforeEitherChanges() {
         val readTwice = LOOKUP_BODY.replace("move-result-object v7\n", "move-result-object v7\n" +
             "invoke-virtual {v4}, Landroid/content/Context;->getPackageName()Ljava/lang/String;\nmove-result-object v6\n")

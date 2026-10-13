@@ -26,9 +26,11 @@ internal fun communityStub(id: String, body: String = "const/4 v0, 0x0\nreturn v
  * Wiring for 582's closure: the session capture in slot 2, an $onThreadInViewport capture before the trailing flag,
  * a session-gated block before the second read, that read into v1, and a 13-argument sink that takes the callback
  * after the list. A supported build's profile gets the IDs its record in scripts/profiles holds, not the compiled
- * profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line.
+ * profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line. [shape583]
+ * reads the list one instruction earlier and folds the channel check into the community check, as 583 does; [anyBody]
+ * replaces that inline check.
  */
-internal fun communityInboxFixture(): List<MutableClass> {
+internal fun communityInboxFixture(shape583: Boolean = false, anyBody: String? = null): List<MutableClass> {
     val code = controlProfiles.entries.firstOrNull { it.value === activeProfile }?.key
     val record = code?.let { Files.readAllLines(Path.of("../scripts/profiles/$it.txt")) }
     val ids = (record?.single { it.startsWith("nativeCommunityInbox ") }?.substringAfter(' ') ?: SYNTHETIC_PROFILE.nativeCommunityInbox).split('|')
@@ -82,7 +84,7 @@ internal fun communityInboxFixture(): List<MutableClass> {
         6 to "invoke-virtual {v0}, Ljava/util/AbstractCollection;->isEmpty()Z",
         8 to "if-nez v0, :empty", 27 to "iget-object v1, v4, $closure->\$threadTypeFilter:$scope",
         32 to "const-string v0, \"searchBarSection\"",
-        64 to "iget-object v1, v4, $closure->\$inboxUnitItems:$IMMUTABLE_LIST",
+        (if (shape583) 63 else 64) to "iget-object v1, v4, $closure->\$inboxUnitItems:$IMMUTABLE_LIST",
         70 to "iget-object v0, v4, $closure->\$onThreadInViewport:Lkotlin/jvm/functions/Function1;",
         75 to "move-object/from16 v17, v1", 76 to "move-object/from16 v18, v0",
         77 to "invoke-static/range {v6 .. v18}, LX/Section;->build(LX/Session;LX/Scope;LX/Observer;LX/Binder;LX/Header;LX/Footer;LX/Loading;LX/Theme;LX/Publisher;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;)LX/Section;",
@@ -112,7 +114,18 @@ internal fun communityInboxFixture(): List<MutableClass> {
         const/4 p0, 0x0
         return p0
     """.trimIndent(), 1, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)
-    val any = fixtureMethod(anyId, """
+    val any = fixtureMethod(anyId, anyBody ?: if (shape583) """
+        iget-object v1, p0, $TK->kind:$KEY_KIND
+        sget-object v0, $KEY_KIND->channel:$KEY_KIND
+        if-eq v1, v0, :yes
+        sget-object v0, $KEY_KIND->announcement:$KEY_KIND
+        if-eq v1, v0, :yes
+        const/4 v0, 0x0
+        return v0
+        :yes
+        const/4 v0, 0x1
+        return v0
+    """.trimIndent() else """
         invoke-virtual {p0}, $channelId
         move-result v0
         if-nez v0, :yes
@@ -184,7 +197,7 @@ internal fun communityInboxFixture(): List<MutableClass> {
         fixtureClass("Lcom/facebook/messaging/msys/threadlist/plugins/core/itemsupplier/ThreadListItemSupplierImplementation;",
             extraFields = listOf(fixtureField("Lcom/facebook/messaging/msys/threadlist/plugins/core/itemsupplier/ThreadListItemSupplierImplementation;", "config", CONFIG))),
         fixtureClass(row, extraFields = listOf(fixtureField(row, summaryField.substringAfter("->").substringBefore(':'), TS))),
-        fixtureClass(joined.definingClass, listOf(joined)), fixtureClass(TK, listOf(nullable, any, channel),
+        fixtureClass(joined.definingClass, listOf(joined)), fixtureClass(TK, listOfNotNull(nullable, any, channel.takeUnless { shape583 }),
             extraFields = listOf(fixtureField(TK, "kind", KEY_KIND))),
         fixtureClass("LX/SubscriptionLabel;", listOf(fixtureMethod("LX/SubscriptionLabel;->label()V",
             "const-string v0, \"thread.isSubscribed\"\niget-boolean v0, v1, $TS->A2N:Z\nreturn-void"))),

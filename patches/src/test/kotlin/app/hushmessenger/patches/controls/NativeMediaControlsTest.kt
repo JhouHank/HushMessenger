@@ -93,12 +93,12 @@ internal fun screenshotViewerFixture(id: String, quickSize: Int = 438, resumeTai
 
 internal fun aiStickerCellFixture(
     id: String = activeProfile.hooks.getValue("ai_sticker_cell").single(),
-    label: Int = GENERATE_AI_LABEL,
-    sourceCount: Int = AI_CELL_SOURCES,
+    label: Int = aiCells.single { it.render == id }.label,
+    sourceCount: Int = aiCells.single { it.render == id }.sources,
 ): List<MutableClass> {
     val type = id.substringBefore("->")
     val superclass = aiCells.single { it.type == type }.superclass
-    val size = AI_CELL_SIZE
+    val size = aiCells.single { it.type == type }.size
     val render = fixtureMethod(id, "const/4 v0, 0x0\n" + List(size - 2) { "nop" }.joinToString("\n") + "\nreturn-object v0", AI_CELL_REGISTERS)
     render.implementation!!.run {
         for (at in listOf(1, 3, 5, 7)) addCatch(newLabelForIndex(at), newLabelForIndex(at + 1), newLabelForIndex(size - 1))
@@ -136,7 +136,7 @@ class NativeMediaControlsTest {
     @Test fun allMappingsReplaceOnlyTheFourCallsAndRetainTheirMasksAndLifecycle() {
         for (profile in controlProfiles.values.toSet()) {
             activeProfile = profile
-            for (size in listOf(438, 441)) {
+            for (size in listOf(438, 441, 450)) {
                 val methods = profile.hooks.getValue("screenshot_viewers").map { screenshotViewerFixture(it, size) }
                 for (method in methods) {
                     val before = method.implementation!!.instructions.toList()
@@ -195,16 +195,24 @@ class NativeMediaControlsTest {
         assertEquals(listOf(9), screenshotViewerFixture("$EPHEMERAL_VIEWER->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;").screenshotViewerSites())
         val quick = "$QUICKSNAP_VIEWER->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;"
         assertEquals(listOf(32), screenshotViewerFixture(quick, 441).screenshotViewerSites())
+        // Messenger 583 runs it to 450 with the same guarded prefix.
+        assertEquals(listOf(32), screenshotViewerFixture(quick, 450).screenshotViewerSites())
         assertFailsWith<PatchException> { screenshotViewerFixture(quick, 444).screenshotViewerSites() }
     }
 
-    @Test fun eachAiCellNeedsTheLabelAndAllFiveSources() {
+    @Test fun eachAiCellNeedsItsOwnLabelAndAllItsSources() {
         for (cell in aiCells) {
             assertEquals(listOf(cell.render), findAiStickerCells(aiStickerCellFixture(cell.render)).map { it.hookId() })
-            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = 4)).isEmpty())
-            // An older release's label for the same row.
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources - 1)).isEmpty())
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources + 1)).isEmpty())
+            // An older release's label for the same row, and the other build's.
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f140511)).isEmpty())
+            val other = if (cell.label == GENERATE_AI_LABEL) GENERATE_AI_LABEL_583 else GENERATE_AI_LABEL
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = other)).isEmpty())
         }
+        // Messenger 583 offers its own label from four renders, and its cell render is one instruction shorter.
+        val cell583 = aiCells.single { it.type == "LX/F0Y;" }
+        assertEquals(Triple(GENERATE_AI_LABEL_583, 4, 104), Triple(cell583.label, cell583.sources, cell583.size))
     }
 
     @Test fun paymentWindowsCleanupAndWrongProfileDialogNeverBecomeViewerHooks() {
@@ -243,7 +251,7 @@ class NativeMediaControlsTest {
             val after = method.implementation!!.instructions.toList()
             assertEquals(before, after.drop(10))
             assertEquals("${method.definingClass}->A00:I", (after[1] as ReferenceInstruction).reference.toString())
-            assertEquals(GENERATE_AI_LABEL, (after[2] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(aiCells.single { it.render == method.hookId() }.label, (after[2] as NarrowLiteralInstruction).narrowLiteral)
             assertEquals(10, after.branchTarget(3))
             assertEquals(10, after.branchTarget(7))
             assertEquals(Opcode.IF_NE, after[3].opcode)
