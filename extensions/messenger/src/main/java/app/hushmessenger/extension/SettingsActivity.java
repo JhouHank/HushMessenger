@@ -1504,12 +1504,14 @@ public final class SettingsActivity extends Activity {
 
     /** A panel that opens a page: text [id]'s title in the accent color over its "_help" line, read out as one button. */
     private LinearLayout linkPanel(String tag, String id, Runnable open) {
+        // A row with no "_help" text is its title alone, like Support.
+        boolean help = SettingsText.ENGLISH.containsKey(id + "_help");
         LinearLayout panel = ui.panel();
         panel.setTag(tag);
         panel.setClickable(true);
         panel.setFocusable(true);
         panel.setBackground(ui.interactive(ui.surface, ui.line, 12));
-        panel.setContentDescription(text.get(id) + ". " + text.get(id + "_help"));
+        panel.setContentDescription(help ? text.get(id) + ". " + text.get(id + "_help") : text.get(id));
         panel.setAccessibilityDelegate(new View.AccessibilityDelegate() {
             @Override public void onInitializeAccessibilityNodeInfo(View host, android.view.accessibility.AccessibilityNodeInfo info) {
                 super.onInitializeAccessibilityNodeInfo(host, info);
@@ -1518,7 +1520,7 @@ public final class SettingsActivity extends Activity {
             }
         });
         ui.add(panel, ui.text(text.get(id), 16, ui.accent, true), 0);
-        ui.add(panel, ui.text(text.get(id + "_help"), 14, ui.muted, false), 4);
+        if (help) ui.add(panel, ui.text(text.get(id + "_help"), 14, ui.muted, false), 4);
         panel.setOnClickListener(view -> open.run());
         return panel;
     }

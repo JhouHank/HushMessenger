@@ -175,7 +175,6 @@ final class SettingsText {
         ENGLISH.put("no_browser", "No web browser found on this phone");
         ENGLISH.put("page_blocked", "Your phone didn't allow opening that page");
         ENGLISH.put("support", "Support HushMessenger");
-        ENGLISH.put("support_help", "Buy me a coffee on Ko-fi");
         ENGLISH.put("report", "Report a problem");
         ENGLISH.put("report_help", "Opens a public GitHub report with your versions and the switches you have on filled in. Look it over and add what happened.");
         ENGLISH.put("restart_waiting_one", "%d change waits for a restart");

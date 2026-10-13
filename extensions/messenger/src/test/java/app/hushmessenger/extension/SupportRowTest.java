@@ -56,7 +56,9 @@ public class SupportRowTest {
             View root = screen.get().getWindow().getDecorView();
             root.findViewWithTag("tab_app").performClick();
             View support = root.findViewWithTag("support");
-            assertEquals("Support HushMessenger. Buy me a coffee on Ko-fi", support.getContentDescription().toString());
+            // The row is its title alone, with no line of text under it.
+            assertEquals("Support HushMessenger", support.getContentDescription().toString());
+            assertEquals(1, ((android.view.ViewGroup) support).getChildCount());
             assertTrue(support.isFocusable());
             support.performClick();
             Intent opened = Shadows.shadowOf(screen.get()).getNextStartedActivity();
