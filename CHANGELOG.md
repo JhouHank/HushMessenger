@@ -4,6 +4,9 @@
 
 Development v0.23.3.
 
+- The third-party patch catalog no longer offers v0.0.8 as a prerelease. Its stable import still serves v0.23.0 with verified metadata.
+- Added build guidance for native checks on an ARM-translated Android 12L emulator and for verifying the framework's low-RAM classification. Stock and patched comparisons keep separate app data and signing keys.
+
 - Compatibility profiles now match their generated form exactly, so the profile checks pass without changing any hooks.
 - The compatibility report finds every switch's hooks in Messenger 583.0.0.29.95. Meta renumbered several server flags and moved a few checks around, and the patches now recognize both builds' versions of each. 583 isn't a supported build yet. That waits on its recorded profiles and a full test pass.
 
