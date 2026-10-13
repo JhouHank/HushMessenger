@@ -24,9 +24,9 @@ Development v0.23.3.
 
 ### Settings
 
-- When a change needs Messenger to restart (inbox options, the Meta AI and bottom tabs, the old emoji drawer, bubbles or your font), a bar at the top of settings says how many are waiting and has a **Restart Messenger** button. Switch something back and it goes away. After a restart from settings, settings open again on the page you were on.
-- New **Report a problem** row just above **Support HushMessenger**. It opens a new GitHub issue with your HushMessenger and Messenger versions, phone model, Android version and the switches that are on already filled in, plus two questions for you to answer. Nothing about your account or chats goes in.
-- New **Quick setups** on the App tab: **Quiet** hides ads, promotions, suggested people and growth prompts, **Privacy** stops the usage, advertising ID and logging uploads, and **Back to defaults** turns every control off. Each is one tap and says how many settings it changed. Pause and the theme stay as they are.
+- When a change needs Messenger to restart (the Meta AI and bottom tabs, the old emoji drawer, bubbles or your font), a bar at the top of settings says how many are waiting and has a **Restart Messenger** button. Switch something back and it goes away. After a restart from settings, settings open again on the page you were on.
+- New **Report a problem** row just above **Support HushMessenger**. It opens a new GitHub issue with your HushMessenger and Messenger versions, phone model, Android version and the switches that are on already filled in, plus two questions for you to answer. Nothing about your account or chats goes in, and the row says the report is public so you can look it over first.
+- New **Quick setups** on the App tab: **Quiet** hides ads, promotions, suggested people and growth prompts, **Privacy** stops the uploads that tell Meta how you use Messenger, your advertising ID included, and **Back to defaults** turns every control off. Each is one tap and says how many settings it changed. Pause and the theme stay as they are.
 - Search finds every word you type, in any order, and ignores accents. "receipts read" finds **Hide read receipts**.
 - Settings have a more compact header, filled page navigation and grouped controls. Message log, auto replies and restart use matching panels and buttons in both themes. Reply and log actions share the bottom of the screen and still scroll into reach in short windows.
 - Font size and position values stay readable at large text sizes, with their adjustment buttons on a separate row.

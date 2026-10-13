@@ -165,8 +165,13 @@ public class RestartActivity extends Activity {
     }
 
     void completeRestart(Intent launch, boolean saved) {
-        if (isFinishing() || isDestroyed()) return;
+        // Every way out but the relaunch leaves this process running, so the next start mustn't open settings.
+        if (isFinishing() || isDestroyed()) {
+            SettingsReopen.forget(Settings.preferences);
+            return;
+        }
         if (!saved) {
+            SettingsReopen.forget(Settings.preferences);
             fail("restart_save_failed");
             return;
         }
@@ -176,6 +181,7 @@ public class RestartActivity extends Activity {
             exitProcess();
         } catch (android.content.ActivityNotFoundException | SecurityException error) {
             Log.e("HushMessenger", "Couldn't restart Messenger", error);
+            SettingsReopen.forget(Settings.preferences);
             fail("restart_unavailable");
         }
     }

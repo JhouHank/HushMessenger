@@ -14,8 +14,9 @@ import android.util.Log;
  * into the settings store with the time, as a one-shot marker, in the same commit that saves the choices before the
  * relaunch. The first screen the next process shows takes the marker: it's cleared first, so a page that fails to
  * open isn't tried again on every start, and only a marker younger than MAX_AGE_MS opens settings. One left by a
- * restart that never finished, or a phone switched off, is dropped. The time is the phone's time since it booted,
- * which a clock change can't move. A restart from the home screen shortcut carries no page, so it lands in Messenger.
+ * restart that never finished, or a phone switched off, is dropped, and the restart screen clears its own when it gives
+ * up without relaunching. The time is the phone's time since it booted, which a clock change can't move. A restart from
+ * the home screen shortcut carries no page and clears any older marker, so it lands in Messenger.
  */
 final class SettingsReopen {
     /** The extra carrying the page, on the restart screen's intent and on the settings intent it reopens. */
@@ -32,9 +33,17 @@ final class SettingsReopen {
         return "app".equals(requested) ? "app" : "controls";
     }
 
-    /** Adds the marker for [page] at [now] to [edit], or nothing for a restart that didn't come from settings. */
+    /**
+     * Adds the marker for [page] at [now] to [edit]. A restart that didn't come from settings removes any marker instead,
+     * so an older one can't send it there.
+     */
     static SharedPreferences.Editor remember(SharedPreferences.Editor edit, String page, long now) {
-        return page == null ? edit : edit.putString(PAGE_KEY, page(page)).putLong(TIME_KEY, now);
+        return page == null ? edit.remove(PAGE_KEY).remove(TIME_KEY) : edit.putString(PAGE_KEY, page(page)).putLong(TIME_KEY, now);
+    }
+
+    /** Drops the marker, for a restart that stopped before Messenger relaunched. */
+    static void forget(SharedPreferences prefs) {
+        if (prefs != null && (prefs.contains(PAGE_KEY) || prefs.contains(TIME_KEY))) prefs.edit().remove(PAGE_KEY).remove(TIME_KEY).apply();
     }
 
     /**

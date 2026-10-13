@@ -488,12 +488,16 @@ public final class SettingsActivity extends Activity {
         ui.add(header, restartRow, 12);
     }
 
-    /** Choices Messenger reads only as it starts, as saved now. Font choices count only while the font switch is on. */
+    /**
+     * Choices Messenger reads only as it starts, as they'd apply now: Pause, safe mode and a phone that can't run bubbles
+     * count as Stock. Font choices count only while the font is in use.
+     */
     private java.util.Map<String, Object> readAtStart() {
         java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
         SharedPreferences prefs = Settings.preferences;
-        if (Settings.installed.contains("bubbles")) values.put("bubbles", Settings.selectedBubbleMode());
-        if (Settings.installed.contains(OwnFont.KEY) && prefs.getBoolean(OwnFont.KEY, false)) {
+        if (Settings.installed.contains("bubbles")) values.put("bubbles",
+            Settings.available("bubbles") && Settings.wouldUse("bubbles") ? Settings.selectedBubbleMode() : "stock");
+        if (Settings.installed.contains(OwnFont.KEY) && Settings.wouldUse(OwnFont.KEY)) {
             // The copy's size and time too, so a new file under the same name still counts.
             java.io.File copy = FontFile.file(this);
             values.put(OwnFont.NAME_KEY, prefs.getString(OwnFont.NAME_KEY, "") + "\n" + copy.length() + "\n" + copy.lastModified());
@@ -1313,15 +1317,19 @@ public final class SettingsActivity extends Activity {
      * the restart row follow from refreshChoices, the same as after a tap on each switch.
      */
     private void applyQuickSetup(String name) {
-        java.util.Map<String, Boolean> changes = QuickSetups.changes(QuickSetups.values(name), Settings.preferences,
-            key -> Settings.installed.contains(key) && Settings.available(key));
+        java.util.Map<String, Boolean> values = QuickSetups.values(name);
+        // Turning a control off never needs this phone to run it, so Back to defaults also clears one it can't.
+        java.util.function.Predicate<String> settable = "defaults".equals(name) ? Settings.installed::contains
+            : key -> Settings.installed.contains(key) && Settings.available(key);
+        java.util.Map<String, Boolean> changes = QuickSetups.changes(values, Settings.preferences, settable);
         if (!changes.isEmpty()) {
             SharedPreferences.Editor edit = Settings.preferences.edit();
             for (java.util.Map.Entry<String, Boolean> change : changes.entrySet()) edit.putBoolean(change.getKey(), change.getValue());
             edit.apply();
         }
         refreshChoices();
-        feedback(changes.isEmpty() ? text.get("quick_unchanged") : text.count("quick_changed", changes.size()), Toast.LENGTH_SHORT);
+        feedback(!changes.isEmpty() ? text.count("quick_changed", changes.size())
+            : text.get(QuickSetups.anySettable(values, settable) ? "quick_unchanged" : "quick_missing"), Toast.LENGTH_SHORT);
     }
 
     private void copySetup() {

@@ -41,8 +41,17 @@ final class QuickSetups {
     }
 
     /**
-     * The controls among [values] that would change: ones [settable] allows and that are saved as something else. A
-     * control whose patch isn't in this bundle, or that this phone can't run, is left alone, the same as its switch.
+     * Whether [settable] allows any control [values] touches. Nothing changing then means it was already set; otherwise
+     * none of the choice's switches are in this bundle.
+     */
+    static boolean anySettable(Map<String, Boolean> values, Predicate<String> settable) {
+        for (String key : values.keySet()) if (settable.test(key)) return true;
+        return false;
+    }
+
+    /**
+     * The controls among [values] that would change: ones [settable] allows and that are saved as something else. The
+     * settings leave a control whose patch isn't in this bundle alone, and only turn on one this phone can run.
      */
     static Map<String, Boolean> changes(Map<String, Boolean> values, SharedPreferences prefs, Predicate<String> settable) {
         Map<String, Boolean> changes = new LinkedHashMap<>();

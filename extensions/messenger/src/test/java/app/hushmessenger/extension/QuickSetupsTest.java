@@ -117,6 +117,42 @@ public class QuickSetupsTest {
         }
     }
 
+    private static void installedFeatures(String... keys) throws Exception {
+        var app = RuntimeEnvironment.getApplication();
+        var info = app.getPackageManager().getPackageInfo(app.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+        info.applicationInfo.metaData = new android.os.Bundle();
+        for (String key : keys) info.applicationInfo.metaData.putBoolean("hush.feature." + key, true);
+        org.robolectric.Shadows.shadowOf(app.getPackageManager()).installPackage(info);
+        Settings.initialize(app);
+    }
+
+    @Test public void aChoiceWithNoneOfItsSwitchesInTheBundleSaysSoInsteadOfAlreadySet() throws Exception {
+        installedFeatures("ads", "bubbles");
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            root.findViewWithTag("tab_app").performClick();
+            root.findViewWithTag("quick_privacy").performClick();
+            assertEquals("Those switches aren't in this bundle, so nothing changed.", ShadowToast.getTextOfLatestToast());
+            root.findViewWithTag("quick_quiet").performClick();
+            assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
+            root.findViewWithTag("quick_quiet").performClick();
+            assertEquals("Nothing to change. Those settings were already set.", ShadowToast.getTextOfLatestToast());
+        }
+    }
+
+    /** Bubbles can't run on Android 9, but one saved on, say from a restored file, still goes off with the rest. */
+    @Test public void backToDefaultsAlsoTurnsOffAControlThisPhoneCantRun() throws Exception {
+        installedFeatures("ads", "bubbles");
+        Settings.preferences.edit().putBoolean("bubbles", true).commit();
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            root.findViewWithTag("tab_app").performClick();
+            root.findViewWithTag("quick_defaults").performClick();
+            assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
+            assertFalse(Settings.preferences.getBoolean("bubbles", true));
+        }
+    }
+
     @Test public void withNoControlsInstalledThereAreNoQuickSetups() throws Exception {
         var app = RuntimeEnvironment.getApplication();
         var info = app.getPackageManager().getPackageInfo(app.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
