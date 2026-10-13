@@ -55,6 +55,7 @@ Development v0.23.3.
 
 ### Checks
 
+- The repository description now points to the README for supported Messenger builds instead of advertising a retired version and patch count.
 - Completed the remaining attribution-upload checks using the released build's device evidence.
 - Retired the outstanding Messenger 580 installation checks. Current builds support Messenger 582 only.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
