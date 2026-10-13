@@ -55,6 +55,8 @@ internal val BASE_PROFILE = ControlProfile(
         "ai_search_chip" to setOf("LX/DDv;->render(LX/2Cg;)LX/1GU;"),
         "ai_mention_rows" to setOf(
             "LX/1yJ;->A0Q()Z",
+            "LX/1yJ;->A12(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
+            "LX/1yJ;->A13(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
             "LX/1yJ;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
             "LX/1yJ;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z",
         ),
@@ -226,6 +228,8 @@ internal val PROFILE_346415706 = ControlProfile(
         "ai_search_chip" to setOf("LX/DGV;->render(LX/2Cf;)LX/1GT;"),
         "ai_mention_rows" to setOf(
             "LX/1yI;->A0R()Z",
+            "LX/1yI;->A12(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
+            "LX/1yI;->A13(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
             "LX/1yI;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z",
             "LX/1yI;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z",
         ),

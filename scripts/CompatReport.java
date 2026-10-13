@@ -2593,15 +2593,37 @@ public class CompatReport {
     }
 
     static final Set<Long> META_AI_ROW_FLAGS = Set.of(0x81063b011b2d8aL, 0x81063b01042d83L);
+    static final Set<Long> META_AI_CHAT_FLAGS = Set.of(0x81063b011b2d8aL, 0x81063b00042d40L);
     static final String CAPABILITIES = "Lcom/facebook/xapp/messaging/capability/vector/Capabilities;";
     static final String FB_SESSION_TYPE = "Lcom/facebook/auth/usersession/FbUserSession;";
 
     /**
      * ai_mention_rows: the instance checks behind the Meta AI, imagine and imagine yourself rows of the newer @ list, told
-     * apart by parameters and the server flag each reads: ()Z reading both META_AI_ROW_FLAGS, (FbUserSession, ThreadKey,
-     * Capabilities, Z, Z)Z reading 0x81063b00402d51, (FbUserSession, ThreadKey, Capabilities)Z reading 0x81063b00f92d7f.
-     * Counted only when there is exactly one of each and all three share a class. Mirrors AiMentionRows.kt.
+     * apart by parameters and the server flag each reads: ()Z reading both META_AI_ROW_FLAGS (community channels),
+     * (FbUserSession, Capabilities)Z reading both META_AI_CHAT_FLAGS (regular chats), (FbUserSession, Capabilities)Z with
+     * no flag that checks a capability and defers to a same-class (FbUserSession)Z reading 0x81063b00052d41 (encrypted
+     * chats), (FbUserSession, ThreadKey, Capabilities, Z, Z)Z reading 0x81063b00402d51 and (FbUserSession, ThreadKey,
+     * Capabilities)Z reading 0x81063b00f92d7f. Counted only when there is exactly one of each and all five share a class.
+     * Mirrors AiMentionRows.kt.
      */
+    static boolean defersToEncryptedCheck(ClassDef cls, Method method) {
+        var calls = new ArrayList<MethodReference>();
+        for (var i : method.getImplementation().getInstructions())
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr) calls.add(mr);
+        if (calls.stream().noneMatch(c -> (CAPABILITIES + "->A00(I)Z").equals(c.toString()))) return false;
+        var siblings = calls.stream().filter(c -> c.getDefiningClass().equals(cls.getType()) && "Z".equals(c.getReturnType()) &&
+            c.getParameterTypes().size() == 1 && FB_SESSION_TYPE.equals(c.getParameterTypes().get(0).toString())).toList();
+        if (siblings.size() != 1) return false;
+        for (var other : cls.getMethods()) {
+            if (!other.getName().equals(siblings.get(0).getName()) || other.getImplementation() == null ||
+                !"Z".equals(other.getReturnType()) || other.getParameterTypes().size() != 1 ||
+                !FB_SESSION_TYPE.equals(other.getParameterTypes().get(0).toString())) continue;
+            for (var i : other.getImplementation().getInstructions())
+                if (i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag && flag.getWideLiteral() == 0x81063b00052d41L) return true;
+        }
+        return false;
+    }
+
     static List<Method> aiMentionRowChecks(List<ClassDef> classes) {
         var rows = new TreeMap<String, List<Method>>();
         for (var cls : classes) for (var method : cls.getMethods()) {
@@ -2613,11 +2635,13 @@ public class CompatReport {
                 if (i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag) flags.add(flag.getWideLiteral());
             String row = null;
             if (params.isEmpty() && flags.containsAll(META_AI_ROW_FLAGS)) row = "meta_ai";
+            else if (params.equals(List.of(FB_SESSION_TYPE, CAPABILITIES)) && flags.containsAll(META_AI_CHAT_FLAGS)) row = "meta_ai_chats";
+            else if (params.equals(List.of(FB_SESSION_TYPE, CAPABILITIES)) && flags.isEmpty() && defersToEncryptedCheck(cls, method)) row = "meta_ai_encrypted";
             else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES, "Z", "Z")) && flags.contains(0x81063b00402d51L)) row = "imagine";
             else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES)) && flags.contains(0x81063b00f92d7fL)) row = "imagine_yourself";
             if (row != null) rows.computeIfAbsent(row, k -> new ArrayList<>()).add(method);
         }
-        if (rows.size() != 3 || rows.values().stream().anyMatch(m -> m.size() != 1)) return List.of();
+        if (rows.size() != 5 || rows.values().stream().anyMatch(m -> m.size() != 1)) return List.of();
         var checks = rows.values().stream().map(m -> m.get(0)).toList();
         return checks.stream().map(Method::getDefiningClass).distinct().count() == 1 ? checks : List.of();
     }

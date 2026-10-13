@@ -11,6 +11,8 @@ hook ai_fab LX/6sQ;->render(LX/2Cg;)LX/1GU;
 hook ai_mention_rows LX/1yJ;->A0Q()Z
 hook ai_mention_rows LX/1yJ;->A0w(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z
 hook ai_mention_rows LX/1yJ;->A0y(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;ZZ)Z
+hook ai_mention_rows LX/1yJ;->A12(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z
+hook ai_mention_rows LX/1yJ;->A13(Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;)Z
 hook ai_mentions LX/7R3;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList$Builder;)V
 hook ai_mentions LX/7R5;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList$Builder;)V
 hook ai_mentions LX/7R6;->A73(LX/Tae;Lcom/google/common/collect/ImmutableList$Builder;)V
