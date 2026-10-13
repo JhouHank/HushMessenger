@@ -240,6 +240,27 @@ public class MessageLogTest {
         assertEquals(2, entries.stream().filter(entry -> entry.text.equals("yes")).count());
     }
 
+    /** "Aa" and "BB" share String.hashCode() and length, and they're still two messages, with or without ids. */
+    @Test public void wordsThatShareAHashAreStillDifferentMessages() throws Exception {
+        assertEquals("Aa".hashCode(), "BB".hashCode());
+        assertFalse(MessageLog.repeated("t", "", "Aa", 1_000));
+        assertFalse(MessageLog.repeated("t", "", "BB", 1_001));
+        assertFalse(MessageLog.repeated("u", "mid.1", "Aa", 1_000));
+        assertFalse(MessageLog.repeated("u", null, "BB", 1_001));
+        // The real second copies still pair, once each.
+        assertTrue(MessageLog.repeated("t", null, "Aa", 1_002));
+        assertTrue(MessageLog.repeated("t", null, "BB", 1_003));
+        assertTrue(MessageLog.repeated("u", null, "Aa", 1_004));
+        assertFalse(MessageLog.repeated("u", null, "Aa", 1_005));
+
+        MessageLog.forgetCaptures();
+        MessageLog.storeNow("Aa", "GROUP:7");
+        MessageLog.storeNow("BB", "GROUP:7");
+        MessageLog.storeNow("Aa", "GROUP:8", "mid.2");
+        MessageLog.storeNow("BB", "GROUP:8");
+        assertEquals(4, MessageLog.entries().size());
+    }
+
     @Test public void theSameIdAfterTheWindowIsANewCapture() {
         long start = 1_000;
         assertFalse(MessageLog.repeated("t", "mid.1", "a", start));
