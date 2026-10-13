@@ -123,14 +123,15 @@ internal fun logoLongPressSite(sites: List<Method>, title: TabTitle = CHATS_TAB_
  * Makes a long press on the Messenger logo at the top of Chats, or on the Menu tab's title, open HushMessenger settings
  * too. A build that doesn't have exactly one handler of the tested shape for that title keeps it as it was, the patcher
  * log says why, and the patch that asked still applies everything else. The handler is checked before its class is
- * requested for editing.
+ * requested for editing. True when the call went in.
  */
-internal fun BytecodePatchContext.hookLogoLongPress(sites: List<Method> = logoLongPressSites, title: TabTitle = CHATS_TAB_TITLE) {
-    val site = logoLongPressSite(sites, title) ?: return
+internal fun BytecodePatchContext.hookLogoLongPress(sites: List<Method> = logoLongPressSites, title: TabTitle = CHATS_TAB_TITLE): Boolean {
+    val site = logoLongPressSite(sites, title) ?: return false
     val target = runCatching { mutableClassDefBy(site.definingClass).methods.single { it.hookId() == site.hookId() } }
         .getOrElse {
             skipLogoLongPress("${site.hookId()} isn't in this APK", title)
-            return
+            return false
         }
     target.injectLogoLongPress()
+    return true
 }

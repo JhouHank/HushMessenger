@@ -30,6 +30,7 @@ Development v0.23.3.
 - Search finds every word you type, in any order, and ignores accents. "receipts read" finds **Hide read receipts**.
 - Settings have a more compact header, filled page navigation and grouped controls. Message log, auto replies and restart use matching panels and buttons in both themes. Reply and log actions share the bottom of the screen and still scroll into reach in short windows.
 - Font size and position values stay readable at large text sizes, with their adjustment buttons on a separate row.
+- The App tab only mentions the Messenger logo's long press when your bundle actually added it, and its note no longer says inbox options need a restart.
 - When the phone won't save a font change (a new file, a size or move step, or going back to your phone's font), the font you had stays picked with its own file and size, and settings say the change didn't save. Before, the new name or size could stay in use without being saved and get saved later by an unrelated switch, paired with the old file.
 - A font file copy that hangs, like a cloud file that never finishes downloading, now has a **Stop copying** button and stops by itself after a minute. Your font stays as it was and you can pick another file right away. A stopped copy that wakes up later never replaces the newer pick.
 - Font size, position and **Use your phone's font** now save in the background, so a slow phone doesn't freeze the screen, and quick taps add up to the size you tapped to.

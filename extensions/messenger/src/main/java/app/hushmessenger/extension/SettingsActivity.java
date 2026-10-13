@@ -354,7 +354,8 @@ public final class SettingsActivity extends Activity {
     }
 
     private LinearLayout menuRowControl() {
-        return controlRow("hide_menu_row", text.format("hide_menu_row"), text.format("hide_menu_row_help"), false);
+        return controlRow("hide_menu_row", text.format("hide_menu_row"),
+            text.format(Settings.logoOpensSettings() ? "hide_menu_row_help" : "hide_menu_row_help_without_logo"), false);
     }
 
     /** Swaps the Hide the Menu row control for one built with its current availability and reason. */
@@ -371,8 +372,12 @@ public final class SettingsActivity extends Activity {
     }
 
     private String accessHelpText() {
-        // The Menu row patch also makes the Messenger logo open settings, and that keeps working while the row is hidden.
-        return text.get(accessHelpId + (!accessHelpMenuRow ? "" : Settings.menuRowHidden() ? "_logo" : "_menu"));
+        // The Menu row patch also makes the Messenger logo open settings where it finds the logo's handler, and that keeps
+        // working while the row is hidden.
+        boolean logo = Settings.logoOpensSettings();
+        if (!accessHelpMenuRow) return text.get(accessHelpId);
+        if (Settings.menuRowHidden()) return text.get(accessHelpId + (logo ? "_logo" : ""));
+        return text.get(accessHelpId + (logo ? "_menu" : "_menu_without_logo"));
     }
 
     private void refreshChoices() {

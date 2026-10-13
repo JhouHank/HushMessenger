@@ -165,9 +165,10 @@ public class RestartActivity extends Activity {
     }
 
     void completeRestart(Intent launch, boolean saved) {
-        // Every way out but the relaunch leaves this process running, so the next start mustn't open settings.
+        // Every way out but the relaunch leaves this process running, so the next start mustn't open settings. A screen
+        // rebuilt for a theme, language or window change saves its own marker, which this one mustn't remove.
         if (isFinishing() || isDestroyed()) {
-            SettingsReopen.forget(Settings.preferences);
+            if (!isChangingConfigurations()) SettingsReopen.forget(Settings.preferences);
             return;
         }
         if (!saved) {

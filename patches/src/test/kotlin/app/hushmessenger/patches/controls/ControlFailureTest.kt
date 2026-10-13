@@ -110,6 +110,7 @@ class ControlFailureTest {
                 assertFailsWith<PatchException> { menuSettingsPatch.execute(context) }
                 record.finalize(resources)
                 assertEquals(false, resources.hasFeature("menu_row"), "A failed Menu row was advertised")
+                assertEquals(false, resources.hasFeature(LOGO_LONG_PRESS), "A failed Menu row advertised the logo")
             }
         }
     }
@@ -176,7 +177,11 @@ class ControlFailureTest {
                             }
                             record.finalize(resources)
                             assertEquals(applies, resources.hasFeature("menu_row"))
-                            assertEquals(if (applies) setOf("menu_row") else emptySet(), bundledControls.toSet())
+                            // Settings mention the logo only where its long press went in.
+                            val logo = broken == "none"
+                            assertEquals(logo, resources.hasFeature(LOGO_LONG_PRESS), "$group $broken logo")
+                            assertEquals(setOfNotNull("menu_row".takeIf { applies }, LOGO_LONG_PRESS.takeIf { logo }),
+                                bundledControls.toSet(), "$group $broken")
                         }
                     }
                 }

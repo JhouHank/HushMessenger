@@ -685,6 +685,13 @@ public final class Settings {
         return prefs != null && prefs.getBoolean("hide_menu_row", false) && menuRowCanHide();
     }
 
+    /** Recorded with the Menu row only when the long press on the Messenger logo at the top of Chats went in too. */
+    static final String LOGO_LONG_PRESS = "logo_long_press";
+
+    static boolean logoOpensSettings() {
+        return installed.contains(LOGO_LONG_PRESS);
+    }
+
     private static final String KEPT_UNSENT_KEY = "kept_unsent_ids";
     private static final int KEPT_UNSENT_LIMIT = 4096;
     private static final Object KEPT_UNSENT_LOCK = new Object();

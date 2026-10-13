@@ -140,7 +140,10 @@ public class QuickSetupsTest {
         }
     }
 
-    /** Bubbles can't run on Android 9, but one saved on, say from a restored file, still goes off with the rest. */
+    /**
+     * Bubbles installed without their host routes can't run on any Android version, but one saved on, say from a restored
+     * file, still goes off with the rest.
+     */
     @Test public void backToDefaultsAlsoTurnsOffAControlThisPhoneCantRun() throws Exception {
         installedFeatures("ads", "bubbles");
         Settings.preferences.edit().putBoolean("bubbles", true).commit();

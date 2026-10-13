@@ -99,7 +99,7 @@ final class SettingsText {
         ENGLISH.put("hide_drawer_icon", "Hide app drawer icon");
         ENGLISH.put("hide_drawer_icon_help", "Keep access through Messenger's Menu or its home screen icon shortcut.");
         ENGLISH.put("hide_menu_row", "Hide the Menu row");
-        ENGLISH.put("hide_menu_row_help", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press the Messenger logo at the top of Chats to get back here, or long-press Messenger's home screen icon and tap Patch controls. If that shortcut goes missing, the row comes back.");
+        ENGLISH.put("hide_menu_row_help", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press the Messenger logo at the top of Chats to get back here, or long-press Messenger's home screen icon and tap Patch controls. If the Patch controls shortcut goes missing, the row comes back.");
         ENGLISH.put("menu_row_needs_shortcut", "Open these settings once from the long-press shortcut first (long-press Messenger's home screen icon, then Patch controls), so you have a way back without the row.");
         ENGLISH.put("shared_install_help", "Uninstalling this entry also removes Messenger and its local data. Use Hide app drawer icon instead.");
         ENGLISH.put("access_help_hosted", "Long-press Messenger's home screen icon for Patch controls or Restart Messenger. A Root Mount install has no separate settings icon in your app drawer.");
@@ -111,6 +111,11 @@ final class SettingsText {
         ENGLISH.put("access_help_logo", "Long-press the Messenger logo at the top of Chats, or long-press Messenger's home screen icon for Patch controls or Restart Messenger. You can also open HushMessenger settings from your app drawer.");
         ENGLISH.put("access_help_hosted_logo", "Long-press the Messenger logo at the top of Chats, or long-press Messenger's home screen icon for Patch controls or Restart Messenger. A Root Mount install has no separate settings icon in your app drawer.");
         ENGLISH.put("access_help_missing_logo", "Long-press the Messenger logo at the top of Chats, or long-press Messenger's home screen icon for Patch controls or Restart Messenger. This bundle has no settings icon in the app drawer.");
+        // A build where the logo's handler wasn't found gets the Menu row without the logo.
+        ENGLISH.put("access_help_menu_without_logo", "Open settings from Messenger's Menu or your app drawer. A long-press on Messenger's home screen icon works too.");
+        ENGLISH.put("access_help_hosted_menu_without_logo", "Open HushMessenger settings from its row in Messenger's Menu tab or side menu. Long-press Messenger's home screen icon for Patch controls or Restart Messenger. A Root Mount install has no separate settings icon in your app drawer.");
+        ENGLISH.put("access_help_missing_menu_without_logo", "Open HushMessenger from Messenger's Menu tab or side menu. Long-press Messenger's home screen icon for Patch controls or Restart Messenger. This bundle has no settings icon in the app drawer.");
+        ENGLISH.put("hide_menu_row_help_without_logo", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press Messenger's home screen icon and tap Patch controls to get back here. If the Patch controls shortcut goes missing, the row comes back.");
         ENGLISH.put("drawer_search", "App drawer icon settings");
         ENGLISH.put("drawer_root", "Hide app drawer icon isn't needed on Root Mount. There is no separate settings icon to hide.");
         ENGLISH.put("drawer_missing", "Hide app drawer icon isn't available. This patch bundle has no settings icon to hide.");
@@ -159,7 +164,7 @@ final class SettingsText {
         ENGLISH.put("copy_help", "Copies app versions and control choices. No account or chat details. Nothing is sent.");
         ENGLISH.put("setup_activity_help", "Activity notes only show that a control ran. They don't prove it had a visible effect or protected your privacy.");
         ENGLISH.put("usage", "USING YOUR CONTROLS");
-        ENGLISH.put("save_help", "Changes save as you go. Use Restart Messenger after changing inbox controls. Your account stays signed in.");
+        ENGLISH.put("save_help", "Changes save as you go. Inbox options show up with the next chat list Messenger builds, and Restart Messenger applies everything at once. Your account stays signed in.");
         ENGLISH.put("pause_help", "Pause all changes turns every control off for now. Your choices are kept.");
         ENGLISH.put("account_help", "Your choices apply to every Messenger account in this installation.");
         ENGLISH.put("missing", "Missing a control?");

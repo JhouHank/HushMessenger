@@ -595,16 +595,27 @@ val textStylePatch = bytecodePatch(
 }
 
 private var menuRowApplied = false
+private var logoLongPressApplied = false
 
-// Lets the settings screen mention the Menu tab row only on builds that have it.
+/** Recorded only when the long press on the Messenger logo at the top of Chats went in, so settings mention it then only. */
+internal const val LOGO_LONG_PRESS = "logo_long_press"
+
+// Lets the settings screen mention the Menu tab row and the logo only on builds that have them.
 private val menuRowResources = resourcePatch(description = "Record HushMessenger capability: menu_row") {
     dependsOn(settingsResources)
     execute {
         menuRowApplied = false
-        document("AndroidManifest.xml").use { it.requireFeatureAbsent("menu_row") }
+        logoLongPressApplied = false
+        document("AndroidManifest.xml").use {
+            it.requireFeatureAbsent("menu_row")
+            it.requireFeatureAbsent(LOGO_LONG_PRESS)
+        }
     }
     finalize {
-        if (menuRowApplied) document("AndroidManifest.xml").use { it.addFeature("menu_row") }
+        document("AndroidManifest.xml").use {
+            if (menuRowApplied) it.addFeature("menu_row")
+            if (menuRowApplied && logoLongPressApplied) it.addFeature(LOGO_LONG_PRESS)
+        }
     }
 }
 
@@ -655,9 +666,11 @@ val menuSettingsPatch = bytecodePatch(
         refreshTarget.injectLegacyDrawer(legacy.refresh)
         // And a long press on the Messenger logo at the top of Chats or on the Menu tab's title. A build where either
         // handler isn't found in exactly one place keeps that title as it was, with a warning, and the rest still goes in.
-        hookLogoLongPress()
+        val logo = hookLogoLongPress()
         hookLogoLongPress(menuTitleLongPressSites, MENU_TAB_TITLE)
         recordControl("menu_row")
+        if (logo) recordControl(LOGO_LONG_PRESS)
         menuRowApplied = true
+        logoLongPressApplied = logo
     }
 }
