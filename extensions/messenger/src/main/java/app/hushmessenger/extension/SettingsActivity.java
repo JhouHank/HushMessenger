@@ -2490,10 +2490,15 @@ public final class SettingsActivity extends Activity {
         feedback(text.get("open_help"), Toast.LENGTH_LONG);
     }
 
-    /** Opens a web page in the phone's browser, or says there isn't one. */
+    /** Opens a web page in the phone's browser, or says why it couldn't. */
     private void openPage(String url) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)); }
         catch (android.content.ActivityNotFoundException error) { feedback(text.get("no_browser"), Toast.LENGTH_LONG); }
+        catch (SecurityException denied) {
+            // Android can refuse a launch it would otherwise resolve. The page and the platform's message stay out of the log.
+            android.util.Log.w("HushMessenger", "The phone refused to open a web page from settings");
+            feedback(text.get("page_blocked"), Toast.LENGTH_LONG);
+        }
     }
 
     /** One toast at a time, built on the app context so no destroyed page is kept alive. */

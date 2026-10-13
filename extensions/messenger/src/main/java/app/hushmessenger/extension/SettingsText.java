@@ -162,6 +162,7 @@ final class SettingsText {
         ENGLISH.put("missing_help", "Pick it in Morphe Manager and patch Messenger again. Updating the patch source alone doesn't add new controls.");
         ENGLISH.put("source", "Source and licenses");
         ENGLISH.put("no_browser", "No web browser found on this phone");
+        ENGLISH.put("page_blocked", "Your phone didn't allow opening that page");
         ENGLISH.put("support", "Support HushMessenger");
         ENGLISH.put("support_help", "Buy me a coffee on Ko-fi");
         ENGLISH.put("credits", "GPL-3.0. Includes work from De-Vanced, ReVanced, Doom and Messenger Cleaner.");
