@@ -149,7 +149,9 @@ public class SettingsNavigationTest {
                 assertTrue(control.getMinimumWidth() >= 48 * density);
                 assertTrue(((View) control.getParent()).getPaddingTop() > 0);
             }
-            assertTrue(root.findViewWithTag("ads").getContentDescription().toString().contains("Experimental"));
+            for (String key : SettingsActivity.EXPERIMENTAL) {
+                assertTrue(key, root.findViewWithTag(key).getContentDescription().toString().contains("Experimental"));
+            }
         }
     }
 
