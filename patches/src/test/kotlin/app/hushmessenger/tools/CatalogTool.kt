@@ -1,5 +1,6 @@
 package app.hushmessenger.tools
 
+import app.hushmessenger.patches.controls.LOGO_LONG_PRESS
 import app.morphe.patcher.patch.Patch
 import app.morphe.patcher.patch.loadPatchesFromJar
 import com.android.tools.smali.dexlib2.ReferenceType
@@ -133,6 +134,12 @@ object CatalogTool {
             names == declarations.map { it.second }.toSet() + NON_CONTROL_PATCHES) { "Built patch names differ from control declarations" }
         return keys.toSet()
     }
+
+    /**
+     * Capabilities the patches record that aren't controls. Settings reads each by a key of its own, written separately
+     * in Java, so both DEX files have to carry the same one.
+     */
+    private val RECORDED_CAPABILITIES = setOf("menu_row", LOGO_LONG_PRESS)
 
     private const val EXTENSION = "app/hushmessenger/extension/"
     private val EXTENSION_METHOD = Regex("""L($EXTENSION[A-Za-z0-9_$/]+);->([A-Za-z0-9_$<>]+)\(([^)]*)\)(\[*(?:[ZBSCIJFDV]|L[^;\s]+;))""")
@@ -427,7 +434,7 @@ object CatalogTool {
             root.resolve("extensions/messenger/src/main/AndroidManifest.xml").readText(), patchNames,
         )
         validatePatcherClasses(patchClasses, patcherDex)
-        val references = validateExtensionContract(patcherDex, extensionDex, controls)
+        val references = validateExtensionContract(patcherDex, extensionDex, controls + RECORDED_CAPABILITIES)
         val document = catalog(version, patches)
         val output = Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), document) + "\n"
         report.parentFile.mkdirs()

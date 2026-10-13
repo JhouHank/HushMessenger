@@ -126,13 +126,18 @@ class ControlFailureTest {
             for ((group, profile) in controlProfiles.values.distinct().withIndex()) {
                 activeProfile = profile
                 val ids = profile.hooks.getValue("menu_settings")
-                for (broken in listOf("none", "no-logo", "add", "bind", "drawer", "click", "bind-registers", "drawer-registers",
-                    "refresh-result", "row-store", "factory", "click-branch", "click-late-branch")) {
+                for (broken in listOf("none", "no-logo", "menu-title-only", "add", "bind", "drawer", "click", "bind-registers",
+                    "drawer-registers", "refresh-result", "row-store", "factory", "click-branch", "click-late-branch")) {
                     // The fifth mandatory target now needs complete native model contracts, not a MenuRow placeholder.
-                    // Every case but no-logo also has the Chats title handler the logo's long press goes in through.
-                    val drawer = legacyDrawerFixture(profile, if (broken == "no-logo") "none" else broken).classes
-                    val classes = (if (broken == "no-logo") drawer else drawer + chatsTitleClasses()).toSet()
-                    val applies = broken == "none" || broken == "no-logo"
+                    // Every case but no-logo also has the Chats title handler the logo's long press goes in through, and
+                    // menu-title-only has the Menu tab's title handler without the Chats one.
+                    val drawer = legacyDrawerFixture(profile, if (broken in setOf("no-logo", "menu-title-only")) "none" else broken).classes
+                    val classes = when (broken) {
+                        "no-logo" -> drawer
+                        "menu-title-only" -> drawer + chatsTitleClasses().drop(1)
+                        else -> drawer + chatsTitleClasses()
+                    }.toSet()
+                    val applies = broken in setOf("none", "no-logo", "menu-title-only")
                     withResourceContext(temporary.resolve("$group-$broken")) { resources, config ->
                         val context = BytecodePatchContext::class.java.declaredConstructors.single()
                             .newInstance(config, resources.packageMetadata) as BytecodePatchContext
@@ -162,7 +167,8 @@ class ControlFailureTest {
                                     val calls = allMethods.filter { it.hookId() == title }.flatMap { method ->
                                         method.implementation!!.instructions.filter { (it as? ReferenceInstruction)?.reference?.toString() == LOGO_LONG_PRESSED }
                                     }
-                                    assertEquals(if (broken == "none") 1 else 0, calls.size, "$group $broken $title")
+                                    val hooked = broken == "none" || (broken == "menu-title-only" && title == SYNTHETIC_MENU_TITLE_LONG_PRESS)
+                                    assertEquals(if (hooked) 1 else 0, calls.size, "$group $broken $title")
                                 }
                                 // The stub is swapped for the generated factory in both method views the dex writer reads.
                                 val settings = classes.single { it.type == SETTINGS }
