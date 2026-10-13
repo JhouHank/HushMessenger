@@ -15,6 +15,11 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
@@ -58,7 +63,9 @@ public class CustomFontSettingsTest {
         OwnFont.forget();
     }
 
-    @After public void restore() {
+    @After public void restore() throws Exception {
+        settle();
+        SettingsActivity.fontTimeoutMillis = 60_000;
         Settings.preferences.edit().clear().commit();
         Settings.customFont = null;
         OwnFont.forget();
@@ -262,6 +269,7 @@ public class CustomFontSettingsTest {
             ((android.widget.CompoundButton) root.findViewWithTag(OwnFont.KEY)).setChecked(false);
 
             root.findViewWithTag("font_phone").performClick();
+            settle();
             assertEquals("", Settings.preferences.getString(OwnFont.NAME_KEY, null));
             assertEquals("Back to your phone's font. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
             assertTrue(status.getText().toString().startsWith("None chosen"));
@@ -286,26 +294,32 @@ public class CustomFontSettingsTest {
             assertEquals("Text sits where the font puts it", place.getText().toString());
 
             larger.performClick();
+            settle();
             assertEquals(105, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
             assertEquals("Text size 105%", size.getText().toString());
             assertEquals("Text size 105%. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
             for (int step = 0; step < 20; step++) larger.performClick();
+            settle();
             assertEquals(FontFile.SCALE_MOST, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
             assertFalse(larger.isEnabled());
             for (int step = 0; step < 20; step++) smaller.performClick();
+            settle();
             assertEquals(FontFile.SCALE_LEAST, Settings.preferences.getInt(OwnFont.SCALE_KEY, 0));
             assertEquals("Text size 70%", size.getText().toString());
             assertFalse(smaller.isEnabled());
             assertTrue(larger.isEnabled());
 
             up.performClick();
+            settle();
             assertEquals(-2, Settings.preferences.getInt(OwnFont.SHIFT_KEY, 0));
             assertEquals("Text moved up 2%", place.getText().toString());
             down.performClick();
             down.performClick();
+            settle();
             assertEquals("Text moved down 2%", place.getText().toString());
             assertEquals("Text moved down 2%. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
             for (int step = 0; step < 20; step++) down.performClick();
+            settle();
             assertEquals(FontFile.SHIFT_MOST, Settings.preferences.getInt(OwnFont.SHIFT_KEY, 0));
             assertFalse(down.isEnabled());
             assertTrue(up.isEnabled());
@@ -314,6 +328,7 @@ public class CustomFontSettingsTest {
             File sized = FontFile.adjusted(FontFile.file(activity), 120, 0);
             assertNotNull(sized);
             root.findViewWithTag("font_phone").performClick();
+            settle();
             assertFalse(sized.exists());
             assertEquals(View.GONE, root.findViewWithTag("font_adjust").getVisibility());
         }
@@ -405,13 +420,16 @@ public class CustomFontSettingsTest {
             for (String way : new String[] {"false", "throw"}) {
                 refusal.set(way);
                 root.findViewWithTag("font_size_larger").performClick();
+                settle();
                 assertFalse(way, prefs.contains(OwnFont.SCALE_KEY));
                 assertEquals("Text size 100%", size.getText().toString());
                 assertEquals("Couldn't save that change, so your font stays as it was. Try again.", ShadowToast.getTextOfLatestToast());
                 root.findViewWithTag("font_shift_down").performClick();
+                settle();
                 assertFalse(way, prefs.contains(OwnFont.SHIFT_KEY));
 
                 root.findViewWithTag("font_phone").performClick();
+                settle();
                 assertEquals(way, "Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
                 assertArrayEquals(rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
                 assertEquals("Couldn't go back to your phone's font. Try again.", ShadowToast.getTextOfLatestToast());
@@ -475,6 +493,228 @@ public class CustomFontSettingsTest {
         assertEquals("Inter-Regular.otf", SettingsActivity.lastPart("primary:Inter-Regular.otf"));
         assertEquals("your font file", SettingsActivity.cleanFontName(SettingsActivity.lastPart("primary:Download/")));
         assertNull(SettingsActivity.lastPart(null));
+    }
+
+    /** A slow save never holds up a tap. Quick taps add up, run on the font save thread and say only the last result. */
+    @Test public void aSlowSaveWaitsOffTheMainThreadAndQuickTapsAddUp() throws Exception {
+        OwnFontTest.pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        SharedPreferences prefs = Settings.preferences;
+        CountDownLatch disk = new CountDownLatch(1);
+        List<String> savedOn = Collections.synchronizedList(new ArrayList<>());
+        Settings.preferences = slow(prefs, disk, savedOn);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            View larger = root.findViewWithTag("font_size_larger");
+            int toasts = ShadowToast.shownToastCount();
+            for (int tap = 0; tap < 3; tap++) larger.performClick();
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            assertEquals("the taps came back while the disk still held the first save", 1, disk.getCount());
+            assertFalse("no new file while a save waits", root.findViewWithTag("font_file").isEnabled());
+            disk.countDown();
+            settle();
+            assertEquals(115, prefs.getInt(OwnFont.SCALE_KEY, 0));
+            assertEquals("Text size 115%", ((TextView) root.findViewWithTag("font_size_value")).getText().toString());
+            assertEquals("Text size 115%. Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+            assertEquals(toasts + 1, ShadowToast.shownToastCount());
+            assertTrue(root.findViewWithTag("font_file").isEnabled());
+            root.findViewWithTag("font_phone").performClick();
+            settle();
+            assertEquals("", prefs.getString(OwnFont.NAME_KEY, null));
+        } finally {
+            disk.countDown();
+            Settings.preferences = prefs;
+        }
+        assertEquals(4, savedOn.size());
+        for (String thread : savedOn) assertEquals("HushMessengerFontSave", thread);
+    }
+
+    /** [prefs] whose font commits off the main thread wait for [disk], noting the thread each one ran on. */
+    private static SharedPreferences slow(SharedPreferences prefs, CountDownLatch disk, List<String> savedOn) {
+        ClassLoader loader = CustomFontSettingsTest.class.getClassLoader();
+        return (SharedPreferences) Proxy.newProxyInstance(loader, new Class<?>[] {SharedPreferences.class}, (proxy, method, args) -> {
+            Object result = method.invoke(prefs, args);
+            if (!method.getName().equals("edit")) return result;
+            SharedPreferences.Editor editor = (SharedPreferences.Editor) result;
+            boolean[] font = {false};
+            return Proxy.newProxyInstance(loader, new Class<?>[] {SharedPreferences.Editor.class}, (editProxy, editMethod, editArgs) -> {
+                if (editArgs != null && editArgs.length > 0 && editArgs[0] instanceof String && ((String) editArgs[0]).startsWith("custom_font"))
+                    font[0] = true;
+                if (editMethod.getName().equals("commit") && font[0]) {
+                    savedOn.add(Thread.currentThread().getName());
+                    if (Looper.myLooper() != Looper.getMainLooper()) assertTrue(disk.await(10, TimeUnit.SECONDS));
+                }
+                Object edited = editMethod.invoke(editor, editArgs);
+                return edited == editor ? editProxy : edited;
+            });
+        });
+    }
+
+    /**
+     * A provider can stall answering the name, opening the file, after the font header or closing. Stop and the deadline
+     * each give the font rows back at once, a newer pick goes through, and the stalled copy that wakes up later never
+     * replaces it or says anything.
+     */
+    @Test public void aStalledCopyCanBeStoppedAndNeverReplacesALaterPick() throws Exception {
+        SettingsActivity.fontTimeoutMillis = 5_000;
+        byte[] rubik = FontFileTest.font(FontFileTest.STATIC_FONT), other = FontFileTest.font(FontFileTest.VARIABLE_FONT);
+        String[] stalls = {"query", "open", "read", "close"};
+        for (int index = 0; index < stalls.length; index++) {
+            String stall = stalls[index];
+            boolean byDeadline = index % 2 == 1;
+            CountDownLatch reached = new CountDownLatch(1), release = new CountDownLatch(1);
+            AtomicReference<Thread> stalled = new AtomicReference<>();
+            Runnable wait = () -> {
+                stalled.compareAndSet(null, Thread.currentThread());
+                reached.countDown();
+                // A provider that ignores both the interrupt and the close.
+                while (true) {
+                    try {
+                        if (release.await(10, TimeUnit.SECONDS)) return;
+                    } catch (InterruptedException ignored) {
+                        // Keeps waiting.
+                    }
+                }
+            };
+            Uri uri = Uri.parse("content://" + (stall.equals("query") ? "stalled.fonts" : "fonts") + "/picked/Stalled-" + stall + ".ttf");
+            var resolver = Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver());
+            if (stall.equals("query")) {
+                org.robolectric.shadows.ShadowContentResolver.registerProviderInternal("stalled.fonts", new StalledProvider(wait));
+            } else if (stall.equals("open")) {
+                resolver.registerInputStreamSupplier(uri, () -> {
+                    wait.run();
+                    return new ByteArrayInputStream(other);
+                });
+            } else {
+                resolver.registerInputStream(uri, new java.io.FilterInputStream(new ByteArrayInputStream(other)) {
+                    private boolean waited;
+
+                    @Override public int read(byte[] buffer, int offset, int length) throws java.io.IOException {
+                        if (stall.equals("read") && !waited && ((java.io.ByteArrayInputStream) in).available() < other.length) {
+                            waited = true;
+                            wait.run();
+                        }
+                        return super.read(buffer, offset, length);
+                    }
+
+                    @Override public void close() throws java.io.IOException {
+                        if (stall.equals("close")) wait.run();
+                        super.close();
+                    }
+                });
+            }
+            try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                SettingsActivity activity = screen.get();
+                View root = activity.getWindow().getDecorView();
+                TextView status = root.findViewWithTag("font_file_status");
+                View stop = root.findViewWithTag("font_file_stop"), choose = root.findViewWithTag("font_file");
+                assertEquals(View.GONE, stop.getVisibility());
+                activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
+                assertTrue(stall, reached.await(10, TimeUnit.SECONDS));
+                assertEquals(stall, "Copying the font file...", status.getText().toString());
+                assertEquals(View.VISIBLE, stop.getVisibility());
+                assertFalse(choose.isEnabled());
+
+                if (byDeadline) {
+                    Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(SettingsActivity.fontTimeoutMillis));
+                    assertEquals(stall, "That file took too long to copy, so it was stopped. Your font didn't change.",
+                        ShadowToast.getTextOfLatestToast());
+                } else {
+                    stop.performClick();
+                    assertEquals(stall, "Stopped copying. Your font didn't change.", ShadowToast.getTextOfLatestToast());
+                }
+                assertEquals(View.GONE, stop.getVisibility());
+                assertTrue(stall, choose.isEnabled());
+
+                String name = "Rubik-" + stall + ".ttf";
+                Uri later = Uri.parse("content://fonts/picked/" + name);
+                resolver.registerInputStream(later, new ByteArrayInputStream(rubik));
+                activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(later));
+                awaitToast("Font set to " + name);
+
+                release.countDown();
+                stalled.get().join(10_000);
+                assertFalse(stall + " is still stuck", stalled.get().isAlive());
+                Shadows.shadowOf(Looper.getMainLooper()).idle();
+                assertEquals(stall, name, Settings.preferences.getString(OwnFont.NAME_KEY, null));
+                assertArrayEquals(stall, rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
+                assertEquals(stall, "Font set to " + name + ". Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+                assertEquals(name + " is picked. Turn the switch on to use it.", status.getText().toString());
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    /** Two copies stuck past stopping are the most. A third pick waits until one of them gives up. */
+    @Test public void twoStuckCopiesAreTheMost() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        List<Thread> stuck = Collections.synchronizedList(new ArrayList<>());
+        var resolver = Shadows.shadowOf(RuntimeEnvironment.getApplication().getContentResolver());
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            SettingsActivity activity = screen.get();
+            View root = activity.getWindow().getDecorView();
+            for (int copy = 0; copy < 3; copy++) {
+                Uri uri = Uri.parse("content://fonts/picked/Stuck-" + copy + ".ttf");
+                CountDownLatch reached = new CountDownLatch(1);
+                resolver.registerInputStreamSupplier(uri, () -> {
+                    stuck.add(Thread.currentThread());
+                    reached.countDown();
+                    try {
+                        release.await(20, TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                        // Stopping can't end a provider's open.
+                    }
+                    return new ByteArrayInputStream(new byte[0]);
+                });
+                activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(uri));
+                if (copy == 2) {
+                    assertEquals("Couldn't start that. Try again in a moment.", ShadowToast.getTextOfLatestToast());
+                    assertEquals(View.GONE, root.findViewWithTag("font_file_stop").getVisibility());
+                    break;
+                }
+                assertTrue(reached.await(10, TimeUnit.SECONDS));
+                root.findViewWithTag("font_file_stop").performClick();
+            }
+            release.countDown();
+            for (Thread thread : stuck) thread.join(10_000);
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
+            resolver.registerInputStream(rubik, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
+            activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
+            awaitToast("Font set to Rubik-Regular.ttf");
+        } finally {
+            release.countDown();
+        }
+    }
+
+    /** A provider whose name lookup waits on [stall]. */
+    private static final class StalledProvider extends android.content.ContentProvider {
+        private final Runnable stall;
+
+        StalledProvider(Runnable stall) {
+            this.stall = stall;
+        }
+
+        @Override public boolean onCreate() { return true; }
+
+        @Override public android.database.Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) {
+            stall.run();
+            return null;
+        }
+
+        @Override public String getType(Uri uri) { return null; }
+
+        @Override public Uri insert(Uri uri, android.content.ContentValues values) { return null; }
+
+        @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+
+        @Override public int update(Uri uri, android.content.ContentValues values, String selection, String[] args) { return 0; }
+    }
+
+    /** Waits for the queued font saves, then runs what they posted back to the main thread. */
+    static void settle() throws Exception {
+        SettingsActivity.FONT_WRITES.submit(() -> { }).get(10, TimeUnit.SECONDS);
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
     }
 
     private static void awaitToast(String prefix) throws InterruptedException {
