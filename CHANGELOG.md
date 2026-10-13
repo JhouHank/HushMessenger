@@ -5,6 +5,7 @@
 Development v0.23.3.
 
 - Long-press the Messenger logo at the top of Chats to open HushMessenger settings. It's a way in from inside Messenger even when your launcher has no long-press menu, and it works while changes are paused. It comes with **Open settings from menu**. Messenger's own long press on the logo still runs first.
+- The README is much shorter and sticks to installing and using the patches. The Messenger internals audit and the version history it used to carry are still in the repository history, last at commit 3cf54ff.
 - With **Hide Meta AI** on, typing @ in a chat no longer suggests Meta AI or its imagine entries. Messenger had started building that list a newer way that went around the switch. Silent and the rest of the list stay.
 - New **Hide Mark as read** switch. It takes Mark as read out of the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays where it is. Like every switch it starts off.
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
