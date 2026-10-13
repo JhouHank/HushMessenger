@@ -2125,6 +2125,51 @@ public class CompatReport {
         return hookId(init);
     }
 
+    static final String SNIPPET_MAKER = "Lcom/facebook/messaging/threadlist/plugins/core/threadsnippet/lastmessage/LastMessageSnippetImpl;";
+
+    /**
+     * The chat list snippet's constructor that Use system emoji passes a Like through (#34 follow-up), or null. Mirrors
+     * likeSnippetInit in EmojiFont.kt: the one class LastMessageSnippetImpl builds from a CharSequence that names itself
+     * LastMessageThreadSnippet, final, with that one field and one constructor.
+     */
+    static String likeSnippetInit(Map<String, ClassDef> byType) {
+        var maker = byType.get(SNIPPET_MAKER);
+        if (maker == null) return null;
+        var built = new LinkedHashSet<String>();
+        for (var m : maker.getMethods()) for (var i : instructions(m)) {
+            if (i.getOpcode() == Opcode.INVOKE_DIRECT && i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr &&
+                "<init>".equals(mr.getName()) && mr.getParameterTypes().size() == 1 &&
+                "Ljava/lang/CharSequence;".equals(mr.getParameterTypes().get(0).toString())) built.add(mr.getDefiningClass());
+        }
+        var named = new ArrayList<ClassDef>();
+        for (var type : built) {
+            var cls = byType.get(type);
+            if (cls == null) continue;
+            boolean names = false;
+            for (var m : cls.getMethods()) if ("toString".equals(m.getName())) for (var i : instructions(m))
+                if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference s &&
+                    s.getString().startsWith("LastMessageThreadSnippet(text=")) names = true;
+            if (names) named.add(cls);
+        }
+        if (named.size() != 1) return null;
+        var snippet = named.get(0);
+        var fields = new ArrayList<String>();
+        for (var f : snippet.getFields()) if (!AccessFlags.STATIC.isSet(f.getAccessFlags())) fields.add(f.getType());
+        Method init = null;
+        for (var m : snippet.getMethods()) {
+            if (!"<init>".equals(m.getName())) continue;
+            if (init != null) return null;
+            init = m;
+        }
+        if (!AccessFlags.FINAL.isSet(snippet.getAccessFlags()) || !fields.equals(List.of("Ljava/lang/CharSequence;")) || init == null ||
+            !hookId(init).equals(snippet.getType() + "-><init>(Ljava/lang/CharSequence;)V")) return null;
+        var body = instructions(init);
+        if (body.isEmpty() || body.get(0).getOpcode() != Opcode.INVOKE_DIRECT || !(body.get(0) instanceof ReferenceInstruction call) ||
+            !(call.getReference() instanceof MethodReference mr) || !"Ljava/lang/Object;".equals(mr.getDefiningClass()) ||
+            !"<init>".equals(mr.getName()) || mediaTargets(init).contains(1) || init.getImplementation().getRegisterCount() - 2 + 1 > 15) return null;
+        return hookId(init);
+    }
+
     /**
      * Every method that loads the emoji drawer flag, but only when the one renderer that throws the anchor loads it
      * too. Mirrors EmojiDrawer.kt.
@@ -4317,6 +4362,15 @@ public class CompatReport {
                 blockers.add("Material You theme");
                 anyFail = true;
             }
+        }
+
+        // Use system emoji's chat list Like is optional: the switch applies without it, so a miss only warns
+        {
+            var byType = new HashMap<String, ClassDef>();
+            classes.forEach(c -> byType.put(c.getType(), c));
+            var snippet = likeSnippetInit(byType);
+            if (snippet != null) System.out.println("[PASS] Use system emoji: chat list Like\n       " + snippet);
+            else System.out.println("[WARN] Use system emoji: the chat list snippet changed, so a Like there can still show as a box until Messenger's emoji font loads");
         }
 
         // Check each control patch: against the recorded build, or for a new build, that it resolves

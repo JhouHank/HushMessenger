@@ -268,6 +268,7 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
             val emojiFontHolder = if ("emoji_typeface" in selected) {
                 discoveredControls.getValue("emoji_typeface").single().emojiFontHolder { classDefByOrNull(it) }
             } else null
+            val likeSnippet = if ("emoji_typeface" in selected) likeSnippetInit { classDefByOrNull(it) } else null
             val methods = selected.associateWith { hook ->
                 discoveredControls.getValue(hook).map { original ->
                     mutableClassDefBy(original.definingClass).methods.single { it.hookId() == original.hookId() }
@@ -303,6 +304,11 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
                 emojiFontHolder?.let { init ->
                     mutableClassDefBy(init.substringBefore("->")).methods.single { it.hookId() == init }.injectEmojiFontHolder()
                 }
+                likeSnippet?.let { init ->
+                    mutableClassDefBy(init.substringBefore("->")).methods.single { it.hookId() == init }.injectLikeSnippet()
+                }
+                if (emojiFontHolder != null && likeSnippet == null) java.util.logging.Logger.getLogger("").warning(
+                    "Use system emoji: this Messenger builds its chat list snippet differently, so a Like there can still show as a box until Messenger's emoji font loads")
             }
             recordControl(key)
             applied = true

@@ -870,6 +870,32 @@ public final class Settings {
         }
     }
 
+    private static final String LIKE = new String(Character.toChars(0xF0000));
+    private static final String THUMBS_UP = new String(Character.toChars(0x1F44D));
+
+    /**
+     * The chat list's last-message snippet as Messenger builds it (#34 follow-up). A Like there is U+F0000, which only
+     * Messenger's downloaded emoji font can draw, so a phone that hasn't got that font yet shows a box, stock Messenger
+     * too. Until the font is known, from this run or the last, the phone's own thumbs up stands in. Both are two chars
+     * long, so spans over the text stay where they were.
+     */
+    public static CharSequence chatListSnippet(CharSequence text) {
+        try {
+            if (text == null || android.text.TextUtils.indexOf(text, LIKE) < 0 || messengerEmojiFile != null
+                || rememberedEmojiFont() != null || !enabled("use_system_emoji")) return text;
+            if (!(text instanceof android.text.Spanned)) return text.toString().replace(LIKE, THUMBS_UP);
+            android.text.SpannableStringBuilder swapped = new android.text.SpannableStringBuilder(text);
+            for (int at = android.text.TextUtils.indexOf(swapped, LIKE); at >= 0;
+                 at = android.text.TextUtils.indexOf(swapped, LIKE, at + THUMBS_UP.length())) {
+                swapped.replace(at, at + LIKE.length(), THUMBS_UP);
+            }
+            return swapped;
+        } catch (RuntimeException error) {
+            hookFailedPrivately("use_system_emoji", "Can't show the Like in the chat list", error);
+            return text;
+        }
+    }
+
     @android.annotation.TargetApi(29)
     static android.graphics.Typeface withMessengerFallback(java.io.File messengerFont) throws java.io.IOException {
         android.graphics.fonts.Font system = systemEmojiShaped instanceof android.graphics.fonts.Font

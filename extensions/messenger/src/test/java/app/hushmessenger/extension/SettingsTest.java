@@ -602,6 +602,53 @@ public class SettingsTest {
         }
     }
 
+    /** #34 follow-up: before a phone has Messenger's emoji font, a Like in the chat list is a box, stock Messenger too. */
+    @Test public void theChatListLikeIsAThumbsUpOnlyUntilMessengersFontIsKnown() throws Exception {
+        String like = new String(Character.toChars(0xF0000)), thumbs = new String(Character.toChars(0x1F44D));
+        java.io.File messengerFont = java.io.File.createTempFile("FacebookEmoji", ".ttf");
+        try {
+            resetEmoji();
+            Settings.activeAt.clear();
+            String snippet = "You: " + like;
+            assertSame("Off leaves it as Messenger wrote it", snippet, Settings.chatListSnippet(snippet));
+            assertEquals(0, Settings.lastActive("use_system_emoji"));
+            Settings.preferences.edit().putBoolean("use_system_emoji", true).commit();
+            assertEquals("You: " + thumbs, Settings.chatListSnippet(snippet).toString());
+            assertTrue("A swap is a use", Settings.lastActive("use_system_emoji") > 0);
+            assertEquals(thumbs + " ok " + thumbs, Settings.chatListSnippet(like + " ok " + like).toString());
+            String plain = "See you at 5";
+            assertSame("Nothing to swap", plain, Settings.chatListSnippet(plain));
+            assertNull(Settings.chatListSnippet(null));
+
+            // Both are two chars long, so a span over the sender's name stays on it.
+            android.text.SpannableString styled = new android.text.SpannableString("Sam: " + like + " hi");
+            Object bold = new android.text.style.StyleSpan(android.graphics.Typeface.BOLD);
+            styled.setSpan(bold, 0, 3, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            CharSequence swapped = Settings.chatListSnippet(styled);
+            assertEquals("Sam: " + thumbs + " hi", swapped.toString());
+            assertEquals(0, ((android.text.Spanned) swapped).getSpanStart(bold));
+            assertEquals(3, ((android.text.Spanned) swapped).getSpanEnd(bold));
+            assertEquals("Messenger's own text isn't changed in place", "Sam: " + like + " hi", styled.toString());
+
+            // Last run's font file, still there: Use system emoji draws the Like from it already.
+            Settings.preferences.edit().putString(Settings.EMOJI_FONT_PATH, messengerFont.getPath()).commit();
+            assertSame(snippet, Settings.chatListSnippet(snippet));
+            Settings.preferences.edit().putString(Settings.EMOJI_FONT_PATH, messengerFont.getPath() + ".gone").commit();
+            assertEquals("A remembered file that's gone doesn't count", "You: " + thumbs, Settings.chatListSnippet(snippet).toString());
+            // Messenger loading its font in this run.
+            Settings.messengerEmojiFont(new java.io.File(messengerFont.getPath() + ".gone"));
+            assertSame(snippet, Settings.chatListSnippet(snippet));
+
+            Settings.messengerEmojiFile = null;
+            Settings.preferences.edit().remove(Settings.EMOJI_FONT_PATH).putBoolean("paused", true).commit();
+            assertSame("Pause leaves it as Messenger wrote it", snippet, Settings.chatListSnippet(snippet));
+            assertNull(Settings.hookErrors.get("use_system_emoji"));
+        } finally {
+            resetEmoji();
+            messengerFont.delete();
+        }
+    }
+
     /** A font that's still being written fails the merge once, so the same file gets three tries and then no more. */
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     @Test @Config(sdk = 31) public void aFailedEmojiMergeIsRetriedOnTheSameFileUpToThreeTimes() throws Exception {
