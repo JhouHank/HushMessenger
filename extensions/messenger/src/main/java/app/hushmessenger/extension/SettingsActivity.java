@@ -76,6 +76,9 @@ public final class SettingsActivity extends Activity {
     private volatile long updateGeneration;
     private java.net.HttpURLConnection updateConnection;
     private LinearLayout emptyState;
+    /** Shown above both pages while a change waits for Messenger to restart. */
+    private LinearLayout restartRow;
+    private TextView restartWaiting;
     static final int SAVE_CHOICES = 7101, READ_CHOICES = 7102, PICK_FONT = 7103;
     /** The names providers give fonts, and plain bytes for one that doesn't know a font. The copy checks what it really is. */
     static final String[] FONT_TYPES = {"font/ttf", "font/otf", "font/collection", "font/sfnt", "application/x-font-ttf",
@@ -206,7 +209,12 @@ public final class SettingsActivity extends Activity {
             if (!java.util.Arrays.asList("all", "inbox", "chats", "more").contains(category)) category = "all";
             restoreControlsScroll = state.getInt("controls_scroll");
             restoreAppScroll = state.getInt("app_scroll");
+        } else {
+            // Reopened after a restart asked for here: back on the page it was asked from.
+            page = SettingsReopen.page(getIntent().getStringExtra(SettingsReopen.EXTRA));
         }
+        // What Messenger read as it started, as near as settings can tell, so the restart row knows what changed since.
+        RestartWaiting.baseline(Settings.preferences, readAtStart());
         LinearLayout root = new LinearLayout(this) {
             private int availableHeight = -1;
             private boolean revealSearch;
@@ -457,6 +465,53 @@ public final class SettingsActivity extends Activity {
             navigation.addView(button, new LinearLayout.LayoutParams(0, -2, 1));
         }
         ui.add(header, navigation, 16);
+        // In the header, so it shows on both pages the moment a restart-gated change is made, with the button right there.
+        restartRow = ui.row();
+        restartRow.setTag("restart_row");
+        restartRow.setGravity(Gravity.CENTER_VERTICAL);
+        if (ui.largeText) restartRow.setOrientation(LinearLayout.VERTICAL);
+        restartRow.setPadding(ui.dp(14), ui.dp(10), ui.dp(10), ui.dp(10));
+        restartRow.setBackground(ui.shape(ui.warningSurface, 0, 12));
+        restartWaiting = ui.text("", 14, ui.warning, true);
+        restartWaiting.setTag("restart_waiting");
+        restartWaiting.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        restartRow.addView(restartWaiting, new LinearLayout.LayoutParams(ui.largeText ? -1 : 0, -2, ui.largeText ? 0 : 1));
+        Button restartNow = ui.primaryButton(text.get("restart"));
+        restartNow.setTag("restart_now");
+        restartNow.setOnClickListener(view -> HostScreens.restartInto(this, page));
+        LinearLayout.LayoutParams restartParams = new LinearLayout.LayoutParams(-2, -2);
+        restartParams.setMarginStart(ui.dp(ui.largeText ? 0 : 12));
+        restartParams.topMargin = ui.dp(ui.largeText ? 8 : 0);
+        restartRow.addView(restartNow, restartParams);
+        restartRow.setVisibility(View.GONE);
+        ui.add(header, restartRow, 12);
+    }
+
+    /** Choices Messenger reads only as it starts, as saved now. Font choices count only while the font switch is on. */
+    private java.util.Map<String, Object> readAtStart() {
+        java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
+        SharedPreferences prefs = Settings.preferences;
+        if (Settings.installed.contains("bubbles")) values.put("bubbles", Settings.selectedBubbleMode());
+        if (Settings.installed.contains(OwnFont.KEY) && prefs.getBoolean(OwnFont.KEY, false)) {
+            // The copy's size and time too, so a new file under the same name still counts.
+            java.io.File copy = FontFile.file(this);
+            values.put(OwnFont.NAME_KEY, prefs.getString(OwnFont.NAME_KEY, "") + "\n" + copy.length() + "\n" + copy.lastModified());
+            values.put(OwnFont.SCALE_KEY, OwnFont.scale(prefs));
+            values.put(OwnFont.SHIFT_KEY, OwnFont.shift(prefs));
+        }
+        return values;
+    }
+
+    private void updateRestartRow() {
+        if (restartRow == null) return;
+        List<String> keys = new ArrayList<>();
+        for (String[] spec : installedControls) keys.add(spec[0]);
+        int waiting = RestartWaiting.count(Settings.preferences, keys, readAtStart());
+        restartRow.setVisibility(waiting > 0 ? View.VISIBLE : View.GONE);
+        if (waiting > 0) {
+            String line = text.count("restart_waiting", waiting);
+            if (!line.contentEquals(restartWaiting.getText())) restartWaiting.setText(line);
+        }
     }
 
     private ScrollView scrollPage(LinearLayout parent) {
@@ -740,6 +795,8 @@ public final class SettingsActivity extends Activity {
     }
 
     private void refreshFontFile() {
+        // A new file under the old name saves nothing new, so no settings change calls refreshChoices.
+        updateRestartRow();
         if (fontStatus == null) return;
         String name = Settings.preferences.getString(OwnFont.NAME_KEY, "");
         boolean copy = FontFile.file(this).isFile(), busy = fontBusy.get(), on = Settings.preferences.getBoolean(OwnFont.KEY, false);
@@ -1056,7 +1113,7 @@ public final class SettingsActivity extends Activity {
         ui.add(access, accessHelp, 0);
         Button restart = ui.primaryButton(text.get("restart"));
         restart.setTag("restart_messenger");
-        restart.setOnClickListener(view -> HostScreens.open(this, HostScreens.RESTART));
+        restart.setOnClickListener(view -> HostScreens.restartInto(this, page));
         ui.add(access, restart, 12);
         // Without the Menu row, a launcher that has no app shortcuts would leave no way back in.
         if (menuRow && drawerAlias && !hosted) {
@@ -1082,6 +1139,21 @@ public final class SettingsActivity extends Activity {
             ui.add(access, sharedInstall, 12);
         }
         ui.add(content, access, 8);
+        if (!installedControls.isEmpty()) {
+            ui.add(content, ui.heading(text.get("quick_setups")), 22);
+            LinearLayout quick = ui.panel();
+            quick.setTag("quick_setups");
+            ui.add(quick, ui.text(text.get("quick_setups_help"), 13, ui.muted, false), 0);
+            for (String name : QuickSetups.CHOICES) {
+                ui.rule(quick, 12);
+                Button choice = ui.button(text.get("quick_" + name));
+                choice.setTag("quick_" + name);
+                choice.setOnClickListener(view -> applyQuickSetup(name));
+                ui.add(quick, choice, 8);
+                ui.add(quick, ui.text(text.get("quick_" + name + "_help"), 13, ui.muted, false), 8);
+            }
+            ui.add(content, quick, 12);
+        }
         ui.add(content, ui.heading(text.get("appearance")), 22);
         LinearLayout appearance = ui.panel();
         appearance.setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14));
@@ -1190,25 +1262,65 @@ public final class SettingsActivity extends Activity {
         source.setTag("source_licenses");
         source.setOnClickListener(view -> openPage("https://github.com/SysAdminDoc/HushMessenger#research-and-credits"));
         ui.add(content, source, 16);
-        LinearLayout support = ui.panel();
-        support.setTag("support");
-        support.setClickable(true);
-        support.setFocusable(true);
-        support.setBackground(ui.interactive(ui.surface, ui.line, 12));
-        support.setContentDescription(text.get("support") + ". " + text.get("support_help"));
-        support.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+        // Built when tapped, so the controls listed are the ones on right then.
+        ui.add(content, linkPanel("report_problem", "report", () -> openPage(ProblemReport.issueUrl(reportFacts()))), 12);
+        ui.add(content, linkPanel("support", "support", () -> openPage(SUPPORT_PAGE)), 12);
+        ui.add(content, ui.text(text.get("credits"), 12, ui.muted, false), 16);
+        ui.add(content, ui.text(text.get("independent"), 12, ui.muted, false), 20);
+    }
+
+    /** A panel that opens a page: text [id]'s title in the accent color over its "_help" line, read out as one button. */
+    private LinearLayout linkPanel(String tag, String id, Runnable open) {
+        LinearLayout panel = ui.panel();
+        panel.setTag(tag);
+        panel.setClickable(true);
+        panel.setFocusable(true);
+        panel.setBackground(ui.interactive(ui.surface, ui.line, 12));
+        panel.setContentDescription(text.get(id) + ". " + text.get(id + "_help"));
+        panel.setAccessibilityDelegate(new View.AccessibilityDelegate() {
             @Override public void onInitializeAccessibilityNodeInfo(View host, android.view.accessibility.AccessibilityNodeInfo info) {
                 super.onInitializeAccessibilityNodeInfo(host, info);
                 // A panel that opens a page is a button to a screen reader.
                 info.setClassName(Button.class.getName());
             }
         });
-        ui.add(support, ui.text(text.get("support"), 16, ui.accent, true), 0);
-        ui.add(support, ui.text(text.get("support_help"), 14, ui.muted, false), 4);
-        support.setOnClickListener(view -> openPage(SUPPORT_PAGE));
-        ui.add(content, support, 12);
-        ui.add(content, ui.text(text.get("credits"), 12, ui.muted, false), 16);
-        ui.add(content, ui.text(text.get("independent"), 12, ui.muted, false), 20);
+        ui.add(panel, ui.text(text.get(id), 16, ui.accent, true), 0);
+        ui.add(panel, ui.text(text.get(id + "_help"), 14, ui.muted, false), 4);
+        panel.setOnClickListener(view -> open.run());
+        return panel;
+    }
+
+    /** What Report a problem fills in: versions, the phone and the English titles of the controls saved on. */
+    private ProblemReport.Facts reportFacts() {
+        String messenger = "";
+        long code = 0;
+        try {
+            PackageInfo host = getPackageManager().getPackageInfo(getPackageName(), 0);
+            messenger = host.versionName;
+            code = host.getLongVersionCode();
+        } catch (PackageManager.NameNotFoundException unknown) {
+            // The report says "unknown" instead.
+        }
+        List<String> on = new ArrayList<>();
+        for (String[] spec : installedControls) if (Settings.preferences.getBoolean(spec[0], false)) on.add(spec[1]);
+        return new ProblemReport.Facts(BuildConfig.VERSION_NAME, messenger, code, Build.MANUFACTURER, Build.MODEL,
+            Build.VERSION.RELEASE, Build.VERSION.SDK_INT, Settings.preferences.getBoolean("paused", false), CrashGuard.isSafeMode(), on);
+    }
+
+    /**
+     * Saves one Quick setups choice in a single write, then says how many controls changed. The switches, the counts and
+     * the restart row follow from refreshChoices, the same as after a tap on each switch.
+     */
+    private void applyQuickSetup(String name) {
+        java.util.Map<String, Boolean> changes = QuickSetups.changes(QuickSetups.values(name), Settings.preferences,
+            key -> Settings.installed.contains(key) && Settings.available(key));
+        if (!changes.isEmpty()) {
+            SharedPreferences.Editor edit = Settings.preferences.edit();
+            for (java.util.Map.Entry<String, Boolean> change : changes.entrySet()) edit.putBoolean(change.getKey(), change.getValue());
+            edit.apply();
+        }
+        refreshChoices();
+        feedback(changes.isEmpty() ? text.get("quick_unchanged") : text.count("quick_changed", changes.size()), Toast.LENGTH_SHORT);
     }
 
     private void copySetup() {
@@ -2412,22 +2524,23 @@ public final class SettingsActivity extends Activity {
             enabledCount.setText(text.count("enabled", enabled));
             setupNote.setText(text.get("saved"));
         }
+        updateRestartRow();
     }
 
     private void filterControls(String query) {
-        String needle = query.trim().toLowerCase(Locale.ROOT);
+        // Every word typed, in any order, with accents and case ignored (SettingsSearch).
+        List<String> terms = SettingsSearch.terms(query);
         clearQuery.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
         String drawerWords = "hide app drawer icon launcher settings menu row " + text.get("hide_drawer_icon") + " " + text.get("hide_menu_row");
         // One letter matches almost anything, so the link waits for a second one.
-        drawerSearchLink.setVisibility(controlRows.isEmpty() || (needle.length() >= 2 && drawerWords.toLowerCase(Locale.ROOT).contains(needle)) ? View.VISIBLE : View.GONE);
+        drawerSearchLink.setVisibility(controlRows.isEmpty() || (query.trim().length() >= 2 && SettingsSearch.matches(terms, drawerWords)) ? View.VISIBLE : View.GONE);
         int visible = 0;
         for (int i = 0; i < controlRows.size(); i++) {
             String[] spec = installedControls.get(i);
             String bucket = "inbox".equals(spec[3]) ? "inbox" :
                 ("conversations".equals(spec[3]) || "stickers".equals(spec[3])) ? "chats" : "more";
-            boolean match = ("all".equals(category) || category.equals(bucket)) &&
-                (spec[1] + " " + spec[2] + " " + SettingsText.english(spec[3]) + " " +
-                    text.display(text.control(spec, 1)) + " " + text.display(text.control(spec, 2)) + " " + text.get(spec[3])).toLowerCase(Locale.ROOT).contains(needle);
+            boolean match = ("all".equals(category) || category.equals(bucket)) && SettingsSearch.matches(terms, spec[1], spec[2],
+                SettingsText.english(spec[3]), text.display(text.control(spec, 1)), text.display(text.control(spec, 2)), text.get(spec[3]));
             controlRows.get(i).setVisibility(match ? View.VISIBLE : View.GONE);
             if (match) visible++;
         }

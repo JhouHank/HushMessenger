@@ -40,8 +40,10 @@ public class RestartActivity extends Activity {
             fail("restart_unavailable");
             return;
         }
+        // Only a restart asked for from settings carries a page to come back to.
+        String page = getIntent().getStringExtra(SettingsReopen.EXTRA);
         new Thread(() -> {
-            boolean saved = saveBeforeRestart(Settings.preferences);
+            boolean saved = saveBeforeRestart(Settings.preferences, page);
             runOnUiThread(() -> completeRestart(launch, saved));
         }, "HushMessenger-save-restart").start();
     }
@@ -148,10 +150,14 @@ public class RestartActivity extends Activity {
         return activity.applicationInfo != null ? activity.isEnabled() : activity.enabled;
     }
 
-    static boolean saveBeforeRestart(SharedPreferences preferences) {
+    static boolean saveBeforeRestart(SharedPreferences preferences) { return saveBeforeRestart(preferences, null); }
+
+    /** Saves the choices, and with a [page] the marker that brings settings back on it after the relaunch. */
+    static boolean saveBeforeRestart(SharedPreferences preferences, String page) {
         try {
             // A changed value forces a disk write of the latest choices, including pending apply() calls.
-            return preferences != null && preferences.edit().putLong("restart_requested_at", System.nanoTime()).commit();
+            return preferences != null && SettingsReopen.remember(preferences.edit().putLong("restart_requested_at", System.nanoTime()),
+                page, android.os.SystemClock.elapsedRealtime()).commit();
         } catch (RuntimeException error) {
             Log.e("HushMessenger", "Couldn't save settings before restart", error);
             return false;

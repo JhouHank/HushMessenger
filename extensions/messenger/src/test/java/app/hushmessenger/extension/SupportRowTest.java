@@ -66,6 +66,38 @@ public class SupportRowTest {
         }
     }
 
+    @Test public void reportAProblemSitsJustAboveSupportAndOpensAFilledReport() throws Exception {
+        Settings.preferences.edit().putBoolean("people", true).putBoolean("typing", true).commit();
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            root.findViewWithTag("tab_app").performClick();
+            View report = root.findViewWithTag("report_problem");
+            View support = root.findViewWithTag("support");
+            android.view.ViewGroup page = (android.view.ViewGroup) support.getParent();
+            assertSame(page, report.getParent());
+            assertEquals(page.indexOfChild(support) - 1, page.indexOfChild(report));
+            // Ko-fi is the last row; only the license lines follow it.
+            for (int i = page.indexOfChild(support) + 1; i < page.getChildCount(); i++)
+                assertTrue(page.getChildAt(i) instanceof android.widget.TextView && !page.getChildAt(i).isClickable());
+            assertEquals("Report a problem. Opens a GitHub report with your versions and settings filled in. Add what happened.",
+                report.getContentDescription().toString());
+            report.performClick();
+            Intent opened = Shadows.shadowOf(screen.get()).getNextStartedActivity();
+            assertEquals(Intent.ACTION_VIEW, opened.getAction());
+            assertTrue(opened.hasCategory(Intent.CATEGORY_BROWSABLE));
+            String url = opened.getDataString();
+            String prefix = ProblemReport.NEW_ISSUE + "?title=&body=";
+            assertTrue(url, url.startsWith(prefix));
+            assertTrue(url.length() <= ProblemReport.MAX_LENGTH);
+            String body = java.net.URLDecoder.decode(url.substring(prefix.length()), "UTF-8");
+            assertTrue(body, body.startsWith("Versions: HushMessenger " + BuildConfig.VERSION_NAME + " on Messenger "));
+            assertTrue(body, body.contains("\nControls on: Hide People You May Know, Hide typing indicator\n"));
+            assertTrue(body, body.endsWith("What happened:\n\n\nWhat I expected:\n\n"));
+            // No package name, so a clone install's name stays private too.
+            assertFalse(body, body.contains(screen.get().getPackageName()));
+        }
+    }
+
     @Test public void withoutABrowserTheRowSaysSo() {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).checkActivities(true);
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
@@ -85,7 +117,7 @@ public class SupportRowTest {
             root.findViewWithTag("tab_app").performClick();
             Runnable undo = denyLaunches(screen.get());
             try {
-                for (String tag : new String[] {"source_licenses", "support"}) {
+                for (String tag : new String[] {"source_licenses", "report_problem", "support"}) {
                     ShadowToast.reset();
                     root.findViewWithTag(tag).performClick();
                     assertEquals(tag, "Your phone didn't allow opening that page", ShadowToast.getTextOfLatestToast());

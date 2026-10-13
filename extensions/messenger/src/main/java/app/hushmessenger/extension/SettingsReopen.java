@@ -1,0 +1,97 @@
+package app.hushmessenger.extension;
+
+import android.app.Activity;
+import android.app.Application;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.util.Log;
+
+/**
+ * The way back to the settings page a restart was asked from. Settings hands RestartActivity the page, and it goes
+ * into the settings store with the time, as a one-shot marker, in the same commit that saves the choices before the
+ * relaunch. The first screen the next process shows takes the marker: it's cleared first, so a page that fails to
+ * open isn't tried again on every start, and only a marker younger than MAX_AGE_MS opens settings. One left by a
+ * restart that never finished, or a phone switched off, is dropped. The time is the phone's time since it booted,
+ * which a clock change can't move. A restart from the home screen shortcut carries no page, so it lands in Messenger.
+ */
+final class SettingsReopen {
+    /** The extra carrying the page, on the restart screen's intent and on the settings intent it reopens. */
+    static final String EXTRA = "app.hushmessenger.page";
+    static final String PAGE_KEY = "reopen_settings_page";
+    static final String TIME_KEY = "reopen_settings_at";
+    /** A slow phone's cold start fits easily, and a later start doesn't count. */
+    static final long MAX_AGE_MS = 90_000;
+
+    private SettingsReopen() { }
+
+    /** One of the settings screen's two pages. Anything else is the first one. */
+    static String page(String requested) {
+        return "app".equals(requested) ? "app" : "controls";
+    }
+
+    /** Adds the marker for [page] at [now] to [edit], or nothing for a restart that didn't come from settings. */
+    static SharedPreferences.Editor remember(SharedPreferences.Editor edit, String page, long now) {
+        return page == null ? edit : edit.putString(PAGE_KEY, page(page)).putLong(TIME_KEY, now);
+    }
+
+    /**
+     * Takes the marker: clears it, then answers its page if it was written less than MAX_AGE_MS before [now], and
+     * null otherwise. A second call answers null. With no marker, nothing is written.
+     */
+    static String takeFresh(SharedPreferences prefs, long now) {
+        if (!prefs.contains(PAGE_KEY) && !prefs.contains(TIME_KEY)) return null;
+        String page;
+        long at;
+        try {
+            page = prefs.getString(PAGE_KEY, null);
+            at = prefs.getLong(TIME_KEY, -1);
+        } catch (ClassCastException wrongType) {
+            page = null;
+            at = -1;
+        }
+        // Cleared before anything opens, so a screen that fails to open isn't retried on every start.
+        prefs.edit().remove(PAGE_KEY).remove(TIME_KEY).commit();
+        long age = now - at;
+        return page == null || at < 0 || age < 0 || age >= MAX_AGE_MS ? null : page(page);
+    }
+
+    /** HostScreens hands over Messenger's Application here. The first screen this process shows checks the marker once. */
+    static void watch(Application app) {
+        app.registerActivityLifecycleCallbacks(new FirstScreen(app));
+    }
+
+    static final class FirstScreen implements Application.ActivityLifecycleCallbacks {
+        private final Application app;
+
+        FirstScreen(Application app) { this.app = app; }
+
+        @Override public void onActivityResumed(Activity activity) {
+            app.unregisterActivityLifecycleCallbacks(this);
+            try {
+                // Settings live in the main process, the one Messenger's own screens open in.
+                if (!activity.getPackageName().equals(Application.getProcessName())) return;
+                // Settings' own store, opened directly: reading a marker shouldn't start settings and CrashGuard early.
+                SharedPreferences prefs = Settings.preferences != null ? Settings.preferences
+                    : activity.getApplicationContext().getSharedPreferences("hushmessenger", Context.MODE_PRIVATE);
+                String page = takeFresh(prefs, SystemClock.elapsedRealtime());
+                // A settings screen that is already up is where the restart meant to go.
+                if (page == null || activity instanceof SettingsActivity || activity instanceof RestartActivity) return;
+                Intent settings = HostScreens.intentFor(activity, HostScreens.SETTINGS).putExtra(EXTRA, page);
+                activity.startActivity(settings);
+            } catch (RuntimeException | LinkageError error) {
+                // Messenger's first screen is a fine place to land; the restart itself already worked.
+                Log.w("HushMessenger", "Couldn't reopen settings after the restart", error);
+            }
+        }
+
+        @Override public void onActivityCreated(Activity activity, Bundle state) { }
+        @Override public void onActivityStarted(Activity activity) { }
+        @Override public void onActivityPaused(Activity activity) { }
+        @Override public void onActivityStopped(Activity activity) { }
+        @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
+        @Override public void onActivityDestroyed(Activity activity) { }
+    }
+}
