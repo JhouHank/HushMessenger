@@ -4,6 +4,7 @@
 
 Development v0.23.3.
 
+- Long-press the Messenger logo at the top of Chats to open HushMessenger settings. It's a way in from inside Messenger even when your launcher has no long-press menu, and it works while changes are paused. It comes with **Open settings from menu**. Messenger's own long press on the logo still runs first.
 - With **Hide Meta AI** on, typing @ in a chat no longer suggests Meta AI or its imagine entries. Messenger had started building that list a newer way that went around the switch. Silent and the rest of the list stay.
 - New **Hide Mark as read** switch. It takes Mark as read out of the menu you get when you press and hold a chat in your chat list, so you can't mark a chat read by accident. Mark as unread stays where it is. Like every switch it starts off.
 - Replying with Hide read receipts on now allows Seen only for that chat in the same account. A reply no longer opens a brief Seen window in other chats.
@@ -25,7 +26,7 @@ Development v0.23.3.
 - Long replies grow with their text so the editor scrolls as one page. Replies and saved messages keep their own text direction in right-to-left layouts.
 - Large App-page labels reserve a separate switch column, including in right-to-left layouts.
 - Enabled controls explain when they're waiting for Messenger to use them. Clearing a search keeps the category you picked.
-- New **Hide the Menu row** choice on the App tab takes the HushMessenger row out of Messenger's Menu tab and side menu, so the long-press **Patch controls** shortcut is the only way in. It can be turned on once you've opened settings from that shortcut, and the row comes back by itself if the shortcut ever goes missing. Together with **Hide app drawer icon** that leaves just the long-press entry.
+- New **Hide the Menu row** choice on the App tab takes the HushMessenger row out of Messenger's Menu tab and side menu, so the long-press **Patch controls** shortcut and the Messenger logo are the ways in. It can be turned on once you've opened settings from that shortcut, and the row comes back by itself if the shortcut ever goes missing. Together with **Hide app drawer icon** that leaves just those two.
 - Switches have clearer on and disabled states in both themes. Focus and pointer feedback match the rest of settings, and restart text fits narrower windows.
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
 - Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.
