@@ -103,5 +103,5 @@ internal fun MutableMethod.validateAiMentionRows() {
 /** With the switch on each check answers false, as it does for an account without the feature, so its row isn't built. */
 internal fun MutableMethod.injectAiMentionRows() {
     validateAiMentionRows()
-    injectSwitch("hideMetaAi", "0x0")
+    injectSwitch("$SETTINGS->hideMetaAi()Z", "0x0")
 }

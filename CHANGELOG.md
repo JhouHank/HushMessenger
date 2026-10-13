@@ -58,7 +58,7 @@ Development v0.23.3.
 - Retired the outstanding Messenger 580 installation checks. Current builds support Messenger 582 only.
 - Checked that a failed system-emoji font merge retries the same file and stops after three failures.
 - The compatibility report now checks everything the reply and Seen hooks rely on in Messenger's code, so a build that moved them shows up in the report instead of failing at patch time.
-- The patch catalog check now makes sure the bundled extension has every class and method the patches call and every control they record, and that each patch class made it into the Android half of the bundle. A failed check removes the old receipt instead of leaving it behind.
+- The patch catalog check now makes sure the bundled extension has every class and method the patches call and every control they record, and that each patch class made it into the Android half of the bundle. A failed check removes the old receipt instead of leaving it behind. The switches, message log, auto reply, screenshot and Material You hooks now name their extension calls in full, so the check covers them too, and a call pieced together while patching is refused instead of skipped.
 - The Meta AI, People and Notifications tab switches and the emoji drawer switch no longer wait on settings to start while holding their own lock. Nothing took those locks in the other order, so there was no hang to fix.
 
 ### New

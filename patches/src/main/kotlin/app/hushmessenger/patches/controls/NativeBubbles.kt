@@ -120,7 +120,7 @@ internal fun injectNativeBubbles(eligibility: MutableMethod, mode: MutableMethod
     mode.validateNativeBubbleMode()
     capability.validateNativeBubbleRoutesStub()
     if (!routes) return
-    eligibility.injectSwitch("enableBubbles", "0x1")
+    eligibility.injectSwitch("$SETTINGS->enableBubbles()Z", "0x1")
     mode.injectNativeBubbleMode()
     capability.replaceInstruction(0, "const/4 v${capability.bubbleCode()[0].bubbleRegister()}, 0x1")
 }

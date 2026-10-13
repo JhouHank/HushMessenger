@@ -27,7 +27,7 @@ class ControlsTest {
     @Test fun optOutBranchesToTheUnmodifiedOriginalFirstInstruction() {
         val gate = method()
         val original = gate.implementation!!.instructions.toList()
-        gate.injectSwitch("hideStories", "0x0")
+        gate.injectSwitch("$SETTINGS->hideStories()Z", "0x0")
         val code = gate.implementation!!.instructions
         assertEquals(Opcode.IF_EQZ, code[2].opcode)
         val targetAddress = code.take(2).sumOf { it.codeUnits } + (code[2] as OffsetInstruction).codeOffset
@@ -38,13 +38,23 @@ class ControlsTest {
     @Test fun methodsWithNoScratchLocalFailBeforeChangingParameters() {
         val gate = method(registers = 1, body = "const/4 v0, 0x0\nreturn v0")
         val original = gate.implementation!!.instructions.toList()
-        assertFailsWith<PatchException> { gate.injectSwitch("hideStories", "0x0") }
+        assertFailsWith<PatchException> { gate.injectSwitch("$SETTINGS->hideStories()Z", "0x0") }
         assertEquals(original, gate.implementation!!.instructions.toList())
+    }
+
+    /** A bare name would reach the patcher DEX apart from its class, where the catalog check can't match it. */
+    @Test fun aSwitchNamesItsWholeSettingsGetter() {
+        for (getter in listOf("hideStories", "$SETTINGS->hideStories", "Lapp/hushmessenger/extension/Other;->hideStories()Z")) {
+            val gate = method()
+            val original = gate.implementation!!.instructions.toList()
+            assertFailsWith<PatchException>(getter) { gate.injectSwitch(getter, "0x0") }
+            assertEquals(original, gate.implementation!!.instructions.toList())
+        }
     }
 
     @Test fun typingHookRetainsTheOriginalRunnableAndReturnsOnlyWhenEnabled() {
         val runnable = method(body = "return-void", returnType = "V")
-        runnable.injectSwitch("suppressTyping", "0x0")
+        runnable.injectSwitch("$SETTINGS->suppressTyping()Z", "0x0")
         assertEquals(listOf(Opcode.INVOKE_STATIC, Opcode.MOVE_RESULT, Opcode.IF_EQZ, Opcode.RETURN_VOID, Opcode.RETURN_VOID),
             runnable.implementation!!.instructions.map { it.opcode })
     }

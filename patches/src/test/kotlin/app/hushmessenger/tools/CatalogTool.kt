@@ -138,13 +138,16 @@ object CatalogTool {
     private val EXTENSION_METHOD = Regex("""L($EXTENSION[A-Za-z0-9_$/]+);->([A-Za-z0-9_$<>]+)\(([^)]*)\)(\[*(?:[ZBSCIJFDV]|L[^;\s]+;))""")
     private val EXTENSION_FIELD = Regex("""L($EXTENSION[A-Za-z0-9_$/]+);->([A-Za-z0-9_$]+):(\[*(?:[ZBSCIJFD]|L[^;\s]+;))""")
     private val EXTENSION_TYPE = Regex("""L$EXTENSION[A-Za-z0-9_$/]+;""")
+    /** An extension class and arrow with no whole member after it: the rest gets joined on at patch time, out of sight. */
+    private val EXTENSION_JOIN = Regex("""L$EXTENSION[A-Za-z0-9_$/]+;->(?![A-Za-z0-9_$<>]+[(:])""")
 
     private fun strings(dex: DexBackedDexFile) = dex.getReferences(ReferenceType.STRING).map { (it as StringReference).string }
 
     /**
      * The packaged extension defines every class, method and field the patcher DEX names in its hook code, and both DEX
-     * files carry every control key. A swapped, stale or unrelated extension that's structurally fine fails here. Returns
-     * the number of extension references checked.
+     * files carry every control key. A swapped, stale or unrelated extension that's structurally fine fails here. The
+     * patches write each extension member out whole, so a reference joined at patch time is refused rather than skipped.
+     * Returns the number of extension references checked.
      */
     fun validateExtensionContract(patcherDex: ByteArray, extensionDex: ByteArray, controlKeys: Set<String>): Int {
         val patcher = DexBackedDexFile.fromInputStream(null, patcherDex.inputStream())
@@ -153,6 +156,7 @@ object CatalogTool {
         val named = strings(patcher)
         var checked = 0
         for (text in named) {
+            EXTENSION_JOIN.find(text)?.let { throw IllegalArgumentException("The patcher DEX builds ${it.value} at patch time, so it can't be checked") }
             for (match in EXTENSION_METHOD.findAll(text)) {
                 val (type, name, parameters, returns) = match.destructured
                 val owner = requireNotNull(classes["L$type;"]) { "The extension has no L$type;" }

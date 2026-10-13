@@ -541,7 +541,13 @@ internal fun MutableMethod.validateScratch() {
     }
 }
 
+/**
+ * [getter] is the whole reference, like "$SETTINGS->hideStories()Z", written out where it's passed so the patcher DEX
+ * holds it as one string the catalog check can find in the packaged extension.
+ */
 internal fun MutableMethod.injectSwitch(getter: String, result: String) {
+    // Checked by parts: a "Settings;->" literal of its own would read as a half-built reference to the catalog check.
+    if (getter.substringBefore("->", "") != SETTINGS || !getter.endsWith("()Z")) throw PatchException("Messenger controls: $getter isn't a Settings switch")
     validateSwitch()
     val returnCode = when (returnType) {
         "V" -> "return-void"
@@ -551,7 +557,7 @@ internal fun MutableMethod.injectSwitch(getter: String, result: String) {
         }
     }
     addInstructionsWithLabels(0, """
-        invoke-static {}, $SETTINGS->$getter()Z
+        invoke-static {}, $getter
         move-result v0
         if-eqz v0, :stock_behavior
         $returnCode

@@ -107,8 +107,9 @@ internal fun MutableMethod.injectScreenshotViewer() {
     validateScreenshotViewer()
     for (at in screenshotViewerSites()) {
         val old = getInstruction(at)
-        val setter = if (old.mediaRef() == SET_FLAGS) "setScreenshotFlags(${WINDOW}II)V" else "addScreenshotFlags(${WINDOW}I)V"
-        replaceInstruction(at, "invoke-static {${old.mediaArgs().joinToString(", ") { "v$it" }}}, $SETTINGS->$setter")
+        // Whole references, so each sits in the patcher DEX as one string the catalog check can find.
+        val setter = if (old.mediaRef() == SET_FLAGS) "$SETTINGS->setScreenshotFlags(${WINDOW}II)V" else "$SETTINGS->addScreenshotFlags(${WINDOW}I)V"
+        replaceInstruction(at, "invoke-static {${old.mediaArgs().joinToString(", ") { "v$it" }}}, $setter")
     }
 }
 

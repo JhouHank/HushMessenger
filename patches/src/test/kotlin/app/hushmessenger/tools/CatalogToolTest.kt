@@ -294,6 +294,21 @@ class CatalogToolTest {
         assertEquals("The patcher DEX names no extension code", nothing.message)
     }
 
+    /** A getter joined on at patch time never sits in the DEX whole, so the check refuses it instead of passing it by. */
+    @Test fun anExtensionReferenceFinishedAtPatchTimeIsRefused() {
+        val keys = setOf("people")
+        val extension = extensionDex("logoLongPressed", "people")
+        for (joined in listOf("invoke-static {}, Lapp/hushmessenger/extension/Settings;->",
+            "sget v0, Lapp/hushmessenger/extension/MaterialYouTheme;-> v1")) {
+            val refused = assertFailsWith<IllegalArgumentException>(joined) {
+                CatalogTool.validateExtensionContract(patcherDex("invoke-static/range {p1 .. p1}, $logoCall", joined, "people"), extension, keys)
+            }
+            assertTrue(refused.message!!.endsWith("at patch time, so it can't be checked"), refused.message)
+        }
+        // A whole member right after the arrow is an ordinary reference.
+        assertEquals(2, CatalogTool.validateExtensionContract(patcherDex("invoke-static/range {p1 .. p1}, $logoCall", "people"), extension, keys))
+    }
+
     @Test fun everyPatchClassInTheJarIsInThePatcherDex() {
         val patcher = patcherDex("people")
         CatalogTool.validatePatcherClasses(listOf("app/hushmessenger/patches/Fixture.class"), patcher)
