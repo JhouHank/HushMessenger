@@ -264,7 +264,11 @@ internal fun findCommunityInbox(classes: Iterable<ClassDef>): CommunityInboxCont
                 a[3].communityRegister() == 0 && compares(2) && compares(4))
             Triple(a[0].communityRef(), a[1].communityRef(), a[3].communityRef())
         }
-        val keyType = (keyField as? FieldReference)?.type ?: throw CommunityChanged()
+        // The key's own and only instance field of that enum type, as CompatReport checks.
+        val keyRef = keyField as? FieldReference ?: throw CommunityChanged()
+        val keyFields = (byType[THREAD_KEY] ?: throw CommunityChanged()).instanceFields.filter { it.type == keyRef.type }
+        communityRequire(keyRef.definingClass == THREAD_KEY && keyFields.size == 1 && keyFields[0].name == keyRef.name)
+        val keyType = keyRef.type
         val keyEnums = communityEnums(byType[keyType] ?: throw CommunityChanged())
         communityRequire(channelType.toString() == keyEnums["COMMUNITY_CHANNEL"].toString() &&
             announcementType.toString() == keyEnums["COMMUNITY_ANNOUNCEMENT_CHANNEL"].toString())

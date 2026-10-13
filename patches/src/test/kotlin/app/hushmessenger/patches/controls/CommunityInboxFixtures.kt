@@ -35,8 +35,12 @@ internal fun communityInboxFixture(shape583: Boolean = false, anyBody: String? =
     val record = code?.let { Files.readAllLines(Path.of("../scripts/profiles/$it.txt")) }
     val ids = (record?.single { it.startsWith("nativeCommunityInbox ") }?.substringAfter(' ') ?: SYNTHETIC_PROFILE.nativeCommunityInbox).split('|')
     val (updateId, ctorId, scopeGetterId, switchId, summaryField) = ids
-    val joinedId = ids[5]; val nullableId = ids[6]; val anyId = ids[7]; val channelId = ids[8]; val requests = ids[9]
-    val prefix = ids[10]; val path = ids.subList(11, 16); val folderGetter = ids[16]; val inbox = ids[17]
+    val joinedId = ids[5]; val nullableId = ids[6]; val anyId = ids[7]
+    // 583's identity has no separate channel check, so everything after the community check sits one earlier.
+    check(ids.size == 17 || ids.size == 18) { "nativeCommunityInbox has ${ids.size} parts" }
+    val channelId = if (ids.size == 18) ids[8] else "$TK->isCommunityChannel()Z"
+    val rest = ids.drop(ids.size - 9)
+    val requests = rest[0]; val prefix = rest[1]; val path = rest.subList(2, 7); val folderGetter = rest[7]; val inbox = rest[8]
     val callbackType = path.first().substringBefore("->")
     val COORDINATOR = path[2].substringAfter(':'); val LIFE = path[3].substringAfter(':'); val CONFIG = path[4].substringAfter(':')
     val FOLDER = inbox.substringBefore("->")

@@ -262,6 +262,24 @@ class NativeMediaControlsTest {
         }
     }
 
+    /** No recorded profile names 583's cell yet, so this one names it to check the injection compares 583's own label. */
+    @Test fun the583CellComparesItsOwnLabel() {
+        val cell = aiCells.single { it.label == GENERATE_AI_LABEL_583 }
+        val base = SYNTHETIC_PROFILE
+        activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,
+            base.peopleKey, base.peopleFlagCheck, base.subtabsSupplier, base.browserPreferenceKey, base.browserPreferenceIndex,
+            base.adFilterSize, base.adFilterExits, base.bubbleCapabilityGetter, base.bubbleRolloutGetter, base.nativeBubbleRoutes,
+            base.nativeCommunityInbox)
+        val method = findAiStickerCells(aiStickerCellFixture(cell.render)).single() as MutableMethod
+        val before = method.implementation!!.instructions.toList()
+        method.injectAiStickerCell()
+        val after = method.implementation!!.instructions.toList()
+        assertEquals(before, after.drop(10))
+        assertEquals(GENERATE_AI_LABEL_583, (after[2] as NarrowLiteralInstruction).narrowLiteral)
+        assertEquals(10, after.branchTarget(3))
+        assertEquals(10, after.branchTarget(7))
+    }
+
     @Test fun disconnectedOrChangedAiLabelSourcesAndFieldsFailDiscovery() {
         for (change in listOf("label", "argument", "store", "ctor_argument", "ctor_receiver", "field", "superclass", "extra", "duplicate")) {
             val fixture = aiStickerCellFixture().toMutableList()

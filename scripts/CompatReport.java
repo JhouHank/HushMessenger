@@ -469,21 +469,40 @@ public class CompatReport {
         return read;
     }
 
-    /** The Notifications tab's preference key and its server-override check. */
+    /** The section check's false-default register by its register count, as in ControlHooks.kt's PEOPLE_SECTION_DEFAULTS. */
+    static final Map<Integer, Integer> PEOPLE_SECTION_DEFAULTS = Map.of(10, 5, 8, 3);
+
+    /** The Notifications tab's preference key and its server-override check, checked as validatePeopleSection does. */
     static List<String> peopleSection(List<Method> jewel, String getter) {
-        if (jewel.size() != 1) return null;
+        if (jewel.size() != 1 || jewel.get(0).getImplementation() == null) return null;
         var code = instructions(jewel.get(0));
+        Integer no = PEOPLE_SECTION_DEFAULTS.get(jewel.get(0).getImplementation().getRegisterCount());
         // The server flag loads at 17.
         var flags = new ArrayList<Integer>();
         for (int i = 0; i < code.size(); i++) {
             if (code.get(i).getOpcode() == Opcode.CONST_WIDE && code.get(i) instanceof WideLiteralInstruction flag &&
                 PEOPLE_SERVER_FLAGS.contains(flag.getWideLiteral())) flags.add(i);
         }
-        if (flags.size() != 1 || flags.get(0) != 17) return null;
-        int at = flags.get(0);
-        if (code.size() < at + 4 || code.get(8).getOpcode() != Opcode.SGET_OBJECT || register(code.get(8)) != 0 ||
+        if (no == null || flags.size() != 1 || flags.get(0) != 17) return null;
+        int at = flags.get(0), last = code.size() - 1;
+        // Both branches land on the final return of the false default, after the "hidden" true return.
+        if (code.size() < at + 7 || register(code.get(at)) != 0 ||
+            code.get(at + 1).getOpcode() != Opcode.INVOKE_STATIC ||
+            code.get(at + 2).getOpcode() != Opcode.MOVE_RESULT || register(code.get(at + 2)) != 0 ||
+            code.get(at + 3).getOpcode() != Opcode.IF_NEZ || register(code.get(at + 3)) != 0 ||
+            !jumpsTo(code, 12, last) || !jumpsTo(code, at + 3, last) ||
+            code.get(last).getOpcode() != Opcode.RETURN || register(code.get(last)) != no ||
+            code.get(last - 1).getOpcode() != Opcode.RETURN || register(code.get(last - 1)) != 0 ||
+            code.get(last - 2).getOpcode() != Opcode.CONST_4 ||
+            !(code.get(last - 2) instanceof NarrowLiteralInstruction one) || one.getNarrowLiteral() != 1 ||
+            code.get(8).getOpcode() != Opcode.SGET_OBJECT || register(code.get(8)) != 0 ||
+            code.get(9).getOpcode() != Opcode.CONST_4 || register(code.get(9)) != no ||
+            !(code.get(9) instanceof NarrowLiteralInstruction zero) || zero.getNarrowLiteral() != 0 ||
             code.get(10).getOpcode() != Opcode.INVOKE_INTERFACE || !getter.equals(ref(code.get(10))) ||
-            code.get(at + 1).getOpcode() != Opcode.INVOKE_STATIC) return null;
+            !(code.get(10) instanceof FiveRegisterInstruction call) || call.getRegisterCount() != 3 ||
+            call.getRegisterC() != 1 || call.getRegisterD() != 0 || call.getRegisterE() != no ||
+            code.get(11).getOpcode() != Opcode.MOVE_RESULT || register(code.get(11)) != 0 ||
+            code.get(12).getOpcode() != Opcode.IF_EQZ || register(code.get(12)) != 0) return null;
         return List.of(ref(code.get(8)), ref(code.get(at + 1)));
     }
 
@@ -2152,6 +2171,8 @@ public class CompatReport {
     static final String THREAD_SUMMARY_TYPE = "Lcom/facebook/messaging/model/threads/ThreadSummary;";
 
     static final String MESSENGER_BROWSER_LAUNCHER = "Lcom/facebook/messaging/browser/util/MessengerBrowserLauncher;";
+    static final List<String> REVOKE_HANDLER = List.of("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;");
+    static final List<String> STATIC_REVOKE_HANDLER = List.of("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;", "Ljava/util/Map;");
     static final String JSON_PUT = "Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;";
 
     /**
@@ -3165,6 +3186,7 @@ public class CompatReport {
         for (var cls : classes) for (var method : cls.getMethods())
             if (!screenshotViewerSites(method).isEmpty()) found.get("screenshot_viewers").add(method);
         var jewelCandidates = new ArrayList<Map.Entry<Method, Set<String>>>();
+        var browserChecks = new ArrayList<Method>();
 
         boolean hasAdItem = false, hasImmutableCopy = false;
         for (var cls : classes) {
@@ -3415,12 +3437,12 @@ public class CompatReport {
                         BUBBLE_ROLLOUTS.contains(flag.getWideLiteral()))) found.get("bubble_mode").add(method);
 
                 // browser
-                // 583 dropped the skip-reason logging, so its check is the launcher's one (Uri, session) boolean
-                if ("Z".equals(method.getReturnType()) &&
-                    (strings.contains("iab_skipped_reason") && strings.contains("user_prefers_external") ||
-                     MESSENGER_BROWSER_LAUNCHER.equals(cls.getType()) && !isStatic &&
-                     paramTypes.equals(List.of("Landroid/net/Uri;", BUBBLE_SESSION)))) {
+                if ("Z".equals(method.getReturnType()) && strings.contains("iab_skipped_reason") && strings.contains("user_prefers_external")) {
                     found.get("browser").add(method);
+                }
+                if ("Z".equals(method.getReturnType()) && MESSENGER_BROWSER_LAUNCHER.equals(cls.getType()) && !isStatic &&
+                    paramTypes.equals(List.of("Landroid/net/Uri;", BUBBLE_SESSION))) {
+                    browserChecks.add(method);
                 }
 
                 // people_jewel, kept once discovery knows the preference getter. It takes the suggestions logger, then its owner.
@@ -3452,9 +3474,8 @@ public class CompatReport {
                     if (secureFlag && addFlags) found.get("allow_screenshot").add(method);
                 }
 
-                // keep_unsent (583's handler is static and also takes the extras Map)
-                if ("V".equals(method.getReturnType()) && (paramTypes.size() == 3 || paramTypes.size() == 4) &&
-                    "Landroid/content/Intent;".equals(paramTypes.get(0)) &&
+                // keep_unsent: 582's instance (Intent, session, String) handler, or 583's static one that adds the extras Map
+                if ("V".equals(method.getReturnType()) && paramTypes.equals(isStatic ? STATIC_REVOKE_HANDLER : REVOKE_HANDLER) &&
                     strings.stream().anyMatch(s -> s.contains("ACTION_REVOKE_MESSAGE"))) {
                     found.get("keep_unsent").add(method);
                 }
@@ -3705,6 +3726,8 @@ public class CompatReport {
                 }
             }
         }
+        // 583 dropped the skip-reason logging, so only a build without it falls back to the launcher's (Uri, session) check.
+        if (found.get("browser").isEmpty()) found.get("browser").addAll(browserChecks);
         // The Notifications tab reads its preference through the getter the external-browser check uses.
         var read = browserPreferenceRead(found.get("browser"));
         for (var candidate : jewelCandidates) {

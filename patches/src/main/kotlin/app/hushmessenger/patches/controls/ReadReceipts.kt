@@ -182,8 +182,8 @@ private class ReadFlow(method: Method) {
 
 /**
  * Where the dispatcher's pieces sit in each supported body: the composer and account copies, the thread's null default
- * (its if-eqz, getter and result follow it), the null path's copy and the dispatch. Messenger 583 drops one parameter
- * check near the top, so its body is four instructions shorter with the same seam.
+ * (its if-eqz, getter and result follow it), the null path's copy and the dispatch. Messenger 583's body is four
+ * instructions shorter with the same seam: the composer copy sits three earlier and everything after it four.
  */
 internal class ReplyReadShape(val size: Int, val composer: Int, val session: Int, val nullThread: Int, val absent: Int, val dispatch: Int)
 

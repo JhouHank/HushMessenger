@@ -118,8 +118,8 @@ class CommunityInboxTest {
         assertEquals(63, render.communityReadSite(contract.capturedScope))
         // The inline check must compare the key's type with the channel, then the announcement channel, and nothing else.
         val kind = "Lcom/facebook/messaging/model/threadkey/ThreadKey;->kind:LX/KeyKind;"
-        fun inline(first: String, second: String, register: Int = 1) = """
-            iget-object v1, p0, $kind
+        fun inline(first: String, second: String, register: Int = 1, field: String = kind) = """
+            iget-object v1, p0, $field
             sget-object v0, LX/KeyKind;->$first:LX/KeyKind;
             if-eq v$register, v0, :yes
             sget-object v0, LX/KeyKind;->$second:LX/KeyKind;
@@ -134,6 +134,16 @@ class CommunityInboxTest {
         assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("announcement", "channel"))))
         assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "channel"))))
         assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", register = 2))))
+        // The type has to come from the key's own field, not another class's or a field the key doesn't have.
+        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", field = "LX/OtherKey;->kind:LX/KeyKind;"))))
+        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", field = kind.replace("->kind", "->other")))))
+        // A 583 record's identity has 17 parts, and the fixture built from one gives the same identity back.
+        val field = ControlProfile::class.java.getDeclaredField("nativeCommunityInbox").apply { isAccessible = true }
+        val original = SYNTHETIC_PROFILE.nativeCommunityInbox
+        try {
+            field.set(SYNTHETIC_PROFILE, contract.identity)
+            assertEquals(contract.identity, assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true))).identity)
+        } finally { field.set(SYNTHETIC_PROFILE, original) }
     }
 
     @Test fun everySupportedBuildsRecordedIdsConnectThroughTheClosure() {
