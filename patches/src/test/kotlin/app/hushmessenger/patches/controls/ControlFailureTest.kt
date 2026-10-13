@@ -143,6 +143,7 @@ class ControlFailureTest {
                             discoveredControls = findControls(classes)
                             validateControls(discoveredControls, setOf("menu_settings"))
                             logoLongPressSites = findLogoLongPress(classes)
+                            menuTitleLongPressSites = findLogoLongPress(classes, MENU_TAB_TITLE)
                             bundledControls.clear()
                             val targets = classes.flatMap { it.methods }.filter { it.hookId() in ids }
                             val allMethods = classes.flatMap { it.methods }.filter { it.implementation != null }
@@ -154,11 +155,14 @@ class ControlFailureTest {
                                     (it as? com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction)
                                         ?.reference.toString().startsWith("$SETTINGS->")
                                 } })
-                                // The logo gets its long press where the handler is, and a build without one keeps the rest.
-                                val logoCalls = allMethods.filter { it.hookId() == SYNTHETIC_LOGO_LONG_PRESS }.flatMap { method ->
-                                    method.implementation!!.instructions.filter { (it as? ReferenceInstruction)?.reference?.toString() == LOGO_LONG_PRESSED }
+                                // The logo and the Menu title get their long press where the handlers are, and a build
+                                // without them keeps the rest.
+                                for (title in listOf(SYNTHETIC_LOGO_LONG_PRESS, SYNTHETIC_MENU_TITLE_LONG_PRESS)) {
+                                    val calls = allMethods.filter { it.hookId() == title }.flatMap { method ->
+                                        method.implementation!!.instructions.filter { (it as? ReferenceInstruction)?.reference?.toString() == LOGO_LONG_PRESSED }
+                                    }
+                                    assertEquals(if (broken == "none") 1 else 0, calls.size, "$group $broken $title")
                                 }
-                                assertEquals(if (broken == "none") 1 else 0, logoCalls.size, "$group $broken logo")
                                 // The stub is swapped for the generated factory in both method views the dex writer reads.
                                 val settings = classes.single { it.type == SETTINGS }
                                 val factory = settings.methods.single { it.hookId() == LEGACY_SECTION }

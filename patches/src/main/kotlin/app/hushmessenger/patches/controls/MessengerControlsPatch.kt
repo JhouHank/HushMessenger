@@ -85,6 +85,7 @@ internal val settingsExtension = bytecodePatch(description = "Load HushMessenger
         communityInboxContract = findCommunityInbox(classes)
         discoveredControls = findControls(classes, communityInboxContract)
         logoLongPressSites = findLogoLongPress(classes)
+        menuTitleLongPressSites = findLogoLongPress(classes, MENU_TAB_TITLE)
         val nativeGate = discoveredControls["bubble_mode"].orEmpty().singleOrNull()
         nativeBubbleRoutesVerified = nativeBubbleActivityVerified && nativeGate != null &&
             findNativeBubbleRoutes(classes, nativeGate.hookId()) == activeProfile.nativeBubbleRoutes
@@ -99,6 +100,7 @@ internal val settingsExtension = bytecodePatch(description = "Load HushMessenger
         nativeBubbleRoutesVerified = false
         communityInboxContract = null
         logoLongPressSites = emptyList()
+        menuTitleLongPressSites = emptyList()
         messageLogContract = null
         readReceiptThreadFields = emptyMap()
     }
@@ -609,7 +611,7 @@ private val menuRowResources = resourcePatch(description = "Record HushMessenger
 @Suppress("unused")
 val menuSettingsPatch = bytecodePatch(
     name = "Open settings from menu",
-    description = "Adds a HushMessenger entry to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats open these settings too. Works as soon as you patch it in, with no switch.",
+    description = "Adds a HushMessenger entry to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or on the Menu tab's title open these settings too. Works as soon as you patch it in, with no switch.",
     default = true,
 ) {
     category("Navigation")
@@ -651,9 +653,10 @@ val menuSettingsPatch = bytecodePatch(
         drawerTarget.injectMenuDrawerAdd()
         clickTarget.injectMenuFolderClick(folderItemType)
         refreshTarget.injectLegacyDrawer(legacy.refresh)
-        // And a long press on the Messenger logo at the top of Chats. A build where that handler isn't found in exactly
-        // one place keeps its logo as it was, with a warning, and the rest of this patch still goes in.
+        // And a long press on the Messenger logo at the top of Chats or on the Menu tab's title. A build where either
+        // handler isn't found in exactly one place keeps that title as it was, with a warning, and the rest still goes in.
         hookLogoLongPress()
+        hookLogoLongPress(menuTitleLongPressSites, MENU_TAB_TITLE)
         recordControl("menu_row")
         menuRowApplied = true
     }

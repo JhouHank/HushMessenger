@@ -40,7 +40,7 @@ Prefer a local source? Download [`patches-0.23.0.mpp`](https://github.com/SysAdm
 
 ## Settings
 
-Long-press Messenger's icon on your home screen and tap **Patch controls**. The **HushMessenger** row in Messenger's Menu tab and side menu opens the same screen, and so does the **HushMessenger settings** icon in your app drawer. **App > Hide app drawer icon** hides that icon without touching Messenger. Inside Messenger, a long press on the Messenger logo at the top of Chats opens settings too, even while changes are paused. On a Root Mount install there's no drawer icon, and the long-press shortcuts appear once Messenger has started.
+Long-press Messenger's icon on your home screen and tap **Patch controls**. The **HushMessenger** row in Messenger's Menu tab and side menu opens the same screen, and so does the **HushMessenger settings** icon in your app drawer. **App > Hide app drawer icon** hides that icon without touching Messenger. Inside Messenger, a long press on the Messenger logo at the top of Chats or on the Menu tab's title opens settings too, even while changes are paused. On a Root Mount install there's no drawer icon, and the long-press shortcuts appear once Messenger has started.
 
 **Pause all changes** turns every switch off at once without forgetting your choices. Changes to inbox options, the Meta AI tab, bubbles, your font and **Restore old emoji drawer** need **Restart Messenger**. While one is waiting, a bar at the top of settings says how many and has the button, and after the restart settings open again on the page you left. The button is also on the App tab and in the icon's long-press menu. If Messenger crashes three times near startup, safe mode pauses the controls. Open settings and tap **Resume**.
 
@@ -106,7 +106,7 @@ The screenshots below show the current development settings, with grouped contro
 | Material You theme | In dark mode on Android 12 and newer, Messenger takes the accent color from your wallpaper. A **Pure black dark mode** switch sits under Appearance. |
 | Use your own font | Replaces Meta's font with your phone's, or with a .ttf or .otf file you pick, with size and position adjustments. Restart Messenger after a change. |
 | Bold and italic text | Adds Bold and Italic to the text selection menu. On a Samsung phone, turn them on once under **Manage apps** in that menu. |
-| Open settings from menu | Adds the HushMessenger row to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats open settings. Always on. |
+| Open settings from menu | Adds the HushMessenger row to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or the Menu tab's title open settings. Always on. |
 
 ### Patches without a switch
 

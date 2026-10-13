@@ -1321,10 +1321,10 @@ public final class Settings {
     }
 
     /**
-     * A long press on the Messenger logo at the top of Chats ends here, after Messenger's own handling of that press. The
-     * patch calls this just before the Chats title's long press handler returns, with the toolbar's context. Messenger
-     * hands the press to a title shortcut plugin that only its internal builds have, so for everyone else it did nothing
-     * but vibrate. Like the Menu rows, this doesn't ask Pause or safe mode first: it's a way back into settings to undo
+     * A long press on the Messenger logo at the top of Chats, or on the Menu tab's title, ends here, after Messenger's own
+     * handling of that press. The patch calls this just before each title's long press handler returns, with the
+     * toolbar's context. Messenger hands the press to a title shortcut plugin that only its internal builds have, so for
+     * everyone else it did nothing but vibrate. Like the Menu rows, this doesn't ask Pause or safe mode first: it's a way back into settings to undo
      * either. A launch Android refuses gets the same toast as the side menu row, pointing at the launcher shortcut.
      */
     public static void logoLongPressed(Context context) {
@@ -1332,12 +1332,12 @@ public final class Settings {
         try {
             HostScreens.open(context, HostScreens.SETTINGS);
         } catch (RuntimeException | LinkageError error) {
-            hookFailed("menu_row", "Opening settings from the Messenger logo failed", error);
+            hookFailed("menu_row", "Opening settings from a tab title failed", error);
             try {
                 android.widget.Toast.makeText(context, new SettingsText(context).get("settings_open_failed"),
                         android.widget.Toast.LENGTH_LONG).show();
             } catch (RuntimeException | LinkageError feedbackError) {
-                hookFailedPrivately("menu_row", "Messenger logo feedback unavailable", feedbackError);
+                hookFailedPrivately("menu_row", "Tab title feedback unavailable", feedbackError);
             }
         }
     }

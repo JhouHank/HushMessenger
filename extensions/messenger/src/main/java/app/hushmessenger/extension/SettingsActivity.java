@@ -359,7 +359,8 @@ public final class SettingsActivity extends Activity {
     }
 
     private String accessHelpText() {
-        return text.get(accessHelpId + (accessHelpMenuRow && !Settings.menuRowHidden() ? "_menu" : ""));
+        // The Menu row patch also makes the Messenger logo open settings, and that keeps working while the row is hidden.
+        return text.get(accessHelpId + (!accessHelpMenuRow ? "" : Settings.menuRowHidden() ? "_logo" : "_menu"));
     }
 
     private void refreshChoices() {

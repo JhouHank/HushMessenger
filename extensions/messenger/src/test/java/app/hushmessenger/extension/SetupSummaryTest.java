@@ -127,6 +127,8 @@ public class SetupSummaryTest {
                 root.findViewWithTag("tab_app").performClick();
                 String text = ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString();
                 assertEquals(menuRow, text.contains("Messenger's Menu"));
+                // The logo's long press comes with the same patch.
+                assertEquals(menuRow, text.contains("Messenger logo at the top of Chats"));
                 assertTrue(text.contains("app drawer"));
                 assertTrue(text.contains("Patch controls"));
             }
@@ -378,16 +380,18 @@ public class SetupSummaryTest {
                 assertTrue(hide.isEnabled());
                 hide.setChecked(true);
                 assertTrue(Settings.menuRowHidden());
-                // The same screen stops pointing at the row as soon as it's hidden.
+                // The same screen stops pointing at the row as soon as it's hidden, but the logo still opens settings.
                 org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
-                assertEquals(new SettingsText(screen.get()).get("access_help_missing"),
-                    ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
+                String hidden = ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString();
+                assertEquals(new SettingsText(screen.get()).get("access_help_missing_logo"), hidden);
+                assertFalse(hidden.contains("Menu tab"));
+                assertTrue(hidden.contains("Messenger logo"));
             }
             // With the row gone, the App tab stops pointing at it.
             try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
                 View root = screen.get().getWindow().getDecorView();
                 root.findViewWithTag("tab_app").performClick();
-                assertEquals(new SettingsText(screen.get()).get("access_help_missing"),
+                assertEquals(new SettingsText(screen.get()).get("access_help_missing_logo"),
                     ((android.widget.TextView) root.findViewWithTag("access_help")).getText().toString());
             }
         } finally {
