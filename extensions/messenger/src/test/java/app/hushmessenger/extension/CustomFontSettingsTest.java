@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Looper;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -312,6 +313,64 @@ public class CustomFontSettingsTest {
             root.findViewWithTag("font_phone").performClick();
             assertFalse(sized.exists());
             assertEquals(View.GONE, root.findViewWithTag("font_adjust").getVisibility());
+        }
+    }
+
+    @Test @Config(sdk = 36) public void fontAdjustmentValuesAndButtonsFitLargeTextInBothDirections() throws Exception {
+        OwnFontTest.pick(FontFileTest.STATIC_FONT, "Rubik-Regular.ttf");
+        for (String locale : new String[] {"en-rUS", "ar-rXB"}) {
+            RuntimeEnvironment.setQualifiers(locale + "-w320dp-h640dp-mdpi");
+            RuntimeEnvironment.setFontScale(2f);
+            for (boolean light : new boolean[] {false, true}) {
+                Settings.preferences.edit().putBoolean("light", light).commit();
+                try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+                    View root = screen.get().getWindow().getDecorView();
+                    ((EditText) root.findViewWithTag("find_control")).setText("Use your own font");
+                    for (int pass = 0; pass < 2; pass++) {
+                        root.measure(View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY));
+                        root.layout(0, 0, 320, 640);
+                        Shadows.shadowOf(Looper.getMainLooper()).idle();
+                    }
+                    for (String tag : new String[] {"font_size_value", "font_shift_value"}) {
+                        TextView value = root.findViewWithTag(tag);
+                        assertTrue(locale + " " + tag + " has room for its text", value.getWidth() > 0);
+                        assertTrue(locale + " " + tag + " stays readable", value.getLineCount() >= 1 && value.getLineCount() <= 3);
+                        assertEquals(0, value.getLayout().getEllipsisCount(value.getLineCount() - 1));
+                        assertTrue(value.getLayout().getHeight() <= value.getHeight() - value.getTotalPaddingTop() - value.getTotalPaddingBottom());
+                    }
+                    for (String[] pair : new String[][] {{"font_size_smaller", "font_size_larger"}, {"font_shift_up", "font_shift_down"}}) {
+                        View first = root.findViewWithTag(pair[0]), second = root.findViewWithTag(pair[1]);
+                        View row = (View) first.getParent();
+                        for (View button : new View[] {first, second}) {
+                            assertTrue(locale + " " + button.getTag() + " has a usable width", button.getWidth() > 0);
+                            assertTrue(button.getLeft() >= 0 && button.getRight() <= row.getWidth());
+                        }
+                        assertTrue("Step buttons share the available width", Math.abs(first.getWidth() - second.getWidth()) <= 1);
+                    }
+                    String screenshots = System.getenv("HUSH_SCREENSHOTS");
+                    if (screenshots != null && !screenshots.isBlank()) {
+                        Files.createDirectories(new File(screenshots).toPath());
+                        for (String tag : new String[] {"font_size_value", "font_shift_value"}) {
+                            View value = root.findViewWithTag(tag);
+                            android.view.ViewGroup adjustment = (android.view.ViewGroup) value.getParent();
+                            View actions = adjustment.getChildAt(adjustment.indexOfChild(value) + 1);
+                            adjustment.requestRectangleOnScreen(new android.graphics.Rect(Math.min(value.getLeft(), actions.getLeft()),
+                                value.getTop(), Math.max(value.getRight(), actions.getRight()), actions.getBottom()), true);
+                            root.measure(View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY),
+                                View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY));
+                            root.layout(0, 0, 320, 640);
+                            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(320, 640, android.graphics.Bitmap.Config.ARGB_8888);
+                            try (var stream = new java.io.ByteArrayOutputStream()) {
+                                root.draw(new android.graphics.Canvas(bitmap));
+                                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream));
+                                Files.write(new File(screenshots, "settings-" + tag + "-" + (light ? "light" : "dark") + "-" +
+                                    (locale.equals("ar-rXB") ? "rtl" : "large") + ".png").toPath(), stream.toByteArray());
+                            } finally { bitmap.recycle(); }
+                        }
+                    }
+                }
+            }
         }
     }
 

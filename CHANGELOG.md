@@ -21,6 +21,9 @@ Development v0.23.3.
 
 ### Settings
 
+- Settings have a more compact header, filled page navigation and grouped controls. Message log, auto replies and restart use matching panels and buttons in both themes. Reply and log actions share the bottom of the screen and still scroll into reach in short windows.
+- Font size and position values stay readable at large text sizes, with their adjustment buttons on a separate row.
+
 - Restoring a settings backup no longer turns **Auto reply** on, since backups don't include the replies. A backup with it off still turns it off. If a backup would have turned it on, the restore message says why it stayed off. The restore message also puts a period after the count now.
 - Auto replies keep their labels while you type, show how many replies are available and flag an unfinished reply before saving. Cancel leaves saved replies alone. Drafts, group choice and text selection survive a recreated settings screen.
 - Message log now explains an empty log, distinguishes a read failure from an empty result and offers retry. Clear log reports a failure if it can't remove the file or key. Saved message text can be selected. When an older log can't be read, it's set aside and new messages keep showing under a short notice with a Remove old log button. The 30-day note under that notice no longer sits right against it.

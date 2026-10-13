@@ -570,7 +570,13 @@ public class SettingsReliabilityTest {
             Switch control = root.findViewWithTag("people");
             ViewGroup row = (ViewGroup) control.getParent();
             assertEquals(View.LAYOUT_DIRECTION_RTL, row.getLayoutDirection());
-            assertEquals(12, row.getChildAt(0).getLeft() - control.getRight());
+            // Descriptions span the row now; the title reserves the switch column.
+            ViewGroup labels = (ViewGroup) row.getChildAt(0);
+            ViewGroup titleLine = (ViewGroup) labels.getChildAt(0);
+            Rect titleBounds = new Rect();
+            titleLine.getChildAt(0).getDrawingRect(titleBounds);
+            row.offsetDescendantRectToMyCoords(titleLine.getChildAt(0), titleBounds);
+            assertTrue("The visible title stays clear of the switch", titleBounds.left - control.getRight() >= 12);
         }
     }
 

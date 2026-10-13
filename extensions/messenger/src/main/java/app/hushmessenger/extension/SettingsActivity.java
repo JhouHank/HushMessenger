@@ -68,7 +68,6 @@ public final class SettingsActivity extends Activity {
     private final List<LinearLayout> groups = new ArrayList<>();
     private final List<Button> categories = new ArrayList<>();
     private final List<Button> tabs = new ArrayList<>();
-    private final List<View> tabLines = new ArrayList<>();
     private TextView searchStatus, enabledCount, setupNote;
     private Button safeModeAction, clearQuery;
     private Button drawerSearchLink;
@@ -391,7 +390,7 @@ public final class SettingsActivity extends Activity {
         compact = next;
         scrollHeader = nextScrollHeader;
         // Content pages already pad 20dp, so a header or reminder moved inside them adds none.
-        header.setPadding(ui.dp(scrollHeader ? 0 : 20), ui.dp(compact ? 8 : 50), ui.dp(scrollHeader ? 0 : 20), 0);
+        header.setPadding(ui.dp(scrollHeader ? 0 : 20), ui.dp(compact ? 8 : 24), ui.dp(scrollHeader ? 0 : 20), 0);
         placeBrand();
         placeHeader();
         ((ViewGroup) reminder.getParent()).removeView(reminder);
@@ -418,17 +417,17 @@ public final class SettingsActivity extends Activity {
 
     private void buildHeader(LinearLayout root) {
         header = ui.column();
-        header.setPadding(ui.dp(20), ui.dp(50), ui.dp(20), 0);
+        header.setPadding(ui.dp(20), ui.dp(24), ui.dp(20), 0);
         ui.add(root, header, 0);
         brand = ui.row();
         if (ui.largeText) brand.setOrientation(LinearLayout.VERTICAL);
         LinearLayout wordmark = ui.column();
-        TextView title = ui.text("HushMessenger", 28, ui.text, true);
+        TextView title = ui.text("HushMessenger", 26, ui.text, true);
         title.setTag("wordmark");
         title.setAccessibilityHeading(true);
         // Linear font scaling on Android 13 and older could otherwise split the wordmark mid-word.
         title.setMaxLines(1);
-        title.setAutoSizeTextTypeUniformWithConfiguration(18, 28, 1, TypedValue.COMPLEX_UNIT_SP);
+        title.setAutoSizeTextTypeUniformWithConfiguration(18, 26, 1, TypedValue.COMPLEX_UNIT_SP);
         ui.add(wordmark, title, 0);
         TextView subtitle = ui.text(text.get(Settings.preview ? "preview_notice" : "tagline"), 14,
             Settings.preview ? ui.warning : ui.muted, false);
@@ -438,7 +437,7 @@ public final class SettingsActivity extends Activity {
         Button open = ui.button(text.get("open"));
         open.setTag("open_messenger");
         open.setContentDescription(text.get("open_messenger"));
-        open.setBackground(new android.graphics.drawable.InsetDrawable(ui.interactive(ui.background, ui.accent, 8), 0, ui.dp(8), 0, ui.dp(8)));
+        open.setBackground(new android.graphics.drawable.InsetDrawable(ui.interactive(ui.background, ui.accent, 12), 0, ui.dp(8), 0, ui.dp(8)));
         open.setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(8));
         open.setOnClickListener(view -> openMessenger());
         LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(ui.largeText ? -2 : ui.dp(68), -2);
@@ -447,20 +446,17 @@ public final class SettingsActivity extends Activity {
         brand.addView(open, openParams);
         ui.add(header, brand, 0);
         LinearLayout navigation = ui.row();
+        navigation.setPadding(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3));
+        navigation.setBackground(ui.shape(ui.surface, ui.line, 12));
         for (String name : new String[] {"controls", "app"}) {
-            LinearLayout tab = ui.column();
             Button button = ui.button(text.get(name));
             button.setTag("tab_" + name);
             button.setTextSize(16);
             button.setOnClickListener(view -> showPage(name));
-            ui.add(tab, button, 0);
             tabs.add(button);
-            View underline = new View(this);
-            tab.addView(underline, new LinearLayout.LayoutParams(-1, ui.dp(2)));
-            tabLines.add(underline);
-            navigation.addView(tab, new LinearLayout.LayoutParams(0, -2, 1));
+            navigation.addView(button, new LinearLayout.LayoutParams(0, -2, 1));
         }
-        ui.add(header, navigation, 0);
+        ui.add(header, navigation, 16);
     }
 
     private ScrollView scrollPage(LinearLayout parent) {
@@ -482,7 +478,7 @@ public final class SettingsActivity extends Activity {
 
     private LinearLayout pageContent(ScrollView scroll) {
         LinearLayout content = ui.column();
-        content.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(24));
+        content.setPadding(ui.dp(20), ui.dp(16), ui.dp(20), ui.dp(24));
         scroll.addView(content);
         return content;
     }
@@ -491,7 +487,7 @@ public final class SettingsActivity extends Activity {
         LinearLayout setup = ui.panel();
         setup.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(8));
         ui.add(setup, ui.heading(text.get("setup")), 0);
-        enabledCount = ui.text("", 22, ui.text, true);
+        enabledCount = ui.text("", 24, ui.text, true);
         enabledCount.setTag("enabled_count");
         ui.add(setup, enabledCount, 12);
         setupNote = ui.text("", 14, ui.muted, false);
@@ -515,6 +511,7 @@ public final class SettingsActivity extends Activity {
         search = ui.field(text.get("search"), 100, true);
         search.setTag("find_control");
         search.setTextSize(16);
+        search.setMinHeight(ui.dp(52));
         search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
         search.setOnEditorActionListener((view, action, event) -> {
             if (action != android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) return false;
@@ -545,7 +542,7 @@ public final class SettingsActivity extends Activity {
             filters.addView(button, params);
             categories.add(button);
         }
-        ui.add(content, filters, 6);
+        ui.add(content, filters, 12);
         searchStatus = ui.text("", 13, ui.muted, false);
         searchStatus.setTag("search_status");
         searchStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -555,6 +552,7 @@ public final class SettingsActivity extends Activity {
         drawerSearchLink.setOnClickListener(view -> showPage("app"));
         ui.add(content, drawerSearchLink, 8);
         LinearLayout group = null;
+        LinearLayout groupBody = null;
         String last = "";
         for (String[] spec : CONTROLS) {
             if (!Settings.installed.contains(spec[0])) continue;
@@ -566,7 +564,10 @@ public final class SettingsActivity extends Activity {
                 heading.addView(ui.heading(text.get(last).toUpperCase(Locale.ROOT)), new LinearLayout.LayoutParams(0, -2, 1));
                 heading.addView(ui.text("", 13, ui.muted, true));
                 ui.add(group, heading, 0);
-                ui.rule(group, 10);
+                groupBody = ui.column();
+                groupBody.setPadding(ui.dp(16), ui.dp(4), ui.dp(16), ui.dp(4));
+                groupBody.setBackground(ui.shape(ui.surface, ui.line, 12));
+                ui.add(group, groupBody, 10);
                 ui.add(content, group, 24);
                 groups.add(group);
             }
@@ -579,10 +580,11 @@ public final class SettingsActivity extends Activity {
                 else if (OwnFont.KEY.equals(spec[0])) addFontFile(wrapper);
                 else if (AutoReply.KEY.equals(spec[0])) addAutoReplyActions(wrapper);
                 else addMessageLogActions(wrapper);
+                wrapper.setPadding(0, 0, 0, ui.dp(12));
                 row = wrapper;
             }
             row.setTag(spec[3]);
-            ui.add(group, row, 0);
+            ui.add(groupBody, row, 0);
             controlRows.add(row);
             installedControls.add(spec);
         }
@@ -706,10 +708,13 @@ public final class SettingsActivity extends Activity {
     private void fontAdjustRow(TextView value, Button less, Button more) {
         value.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         LinearLayout row = ui.row();
-        row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
+        if (ui.largeText) ui.add(fontAdjust, value, 16);
+        else row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(ui.largeText ? 0 : -2, -2, ui.largeText ? 1 : 0);
+        row.addView(less, first);
+        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(first);
         gap.setMarginStart(ui.dp(8));
-        row.addView(less, gap);
+        if (!ui.largeText) first.setMarginStart(ui.dp(8));
         row.addView(more, new LinearLayout.LayoutParams(gap));
         ui.add(fontAdjust, row, 8);
     }
@@ -903,7 +908,7 @@ public final class SettingsActivity extends Activity {
     @SuppressWarnings("deprecation")
     private LinearLayout controlRow(String key, String title, String description, boolean divided) {
         boolean appRow = !divided && !"paused".equals(key);
-        boolean overlay = appRow && !ui.largeText;
+        boolean overlay = !"paused".equals(key) && !ui.largeText;
         boolean available = Settings.available(key);
         if (!available) description += " " + text.format(CameraActivity.KEY.equals(key) ? "camera_unsupported"
             : TextStyleActivity.KEY.equals(key) ? "text_style_unsupported"
@@ -997,10 +1002,10 @@ public final class SettingsActivity extends Activity {
                 return super.performAccessibilityAction(host, action, arguments);
             }
         });
-        row.setBackground(ui.interactive(ui.background, 0, 0));
+        row.setBackground(ui.interactive(ui.surface, 0, 0));
         if (divided) {
             row.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] {
-                ui.shape(ui.line, 0, 0), new android.graphics.drawable.InsetDrawable(ui.interactive(ui.background, 0, 0), 0, 0, 0, ui.dp(1))
+                ui.shape(ui.line, 0, 0), new android.graphics.drawable.InsetDrawable(ui.interactive(ui.surface, 0, 0), 0, 0, 0, ui.dp(1))
             }));
         } else row.setBackground(ui.interactive(ui.surface, 0, 0));
         row.setPadding(0, ui.dp(divided ? 16 : 0), 0, ui.dp(divided ? 16 : 0));
@@ -1073,7 +1078,7 @@ public final class SettingsActivity extends Activity {
             TextView sharedInstall = ui.text(text.get("shared_install_help"), 13, ui.muted, false);
             sharedInstall.setTag("shared_install_help");
             sharedInstall.setPadding(ui.dp(12), ui.dp(12), ui.dp(12), ui.dp(12));
-            sharedInstall.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 4));
+            sharedInstall.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 8));
             ui.add(access, sharedInstall, 12);
         }
         ui.add(content, access, 8);
@@ -1177,7 +1182,7 @@ public final class SettingsActivity extends Activity {
         ui.add(content, ui.text(text.get("pause_help"), 14, ui.muted, false), 14);
         ui.add(content, ui.text(text.get("account_help"), 14, ui.muted, false), 14);
         LinearLayout help = ui.panel();
-        help.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 8));
+        help.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 12));
         ui.add(help, ui.text(text.get("missing"), 16, ui.accent, true), 0);
         ui.add(help, ui.text(text.get("missing_help"), 14, ui.muted, false), 8);
         ui.add(content, help, 18);
@@ -1189,7 +1194,7 @@ public final class SettingsActivity extends Activity {
         support.setTag("support");
         support.setClickable(true);
         support.setFocusable(true);
-        support.setBackground(ui.interactive(ui.surface, ui.line, 8));
+        support.setBackground(ui.interactive(ui.surface, ui.line, 12));
         support.setContentDescription(text.get("support") + ". " + text.get("support_help"));
         support.setAccessibilityDelegate(new View.AccessibilityDelegate() {
             @Override public void onInitializeAccessibilityNodeInfo(View host, android.view.accessibility.AccessibilityNodeInfo info) {
@@ -1584,8 +1589,12 @@ public final class SettingsActivity extends Activity {
                     }
                     if (result.entries.isEmpty()) {
                         LinearLayout empty = ui.panel();
+                        empty.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(20));
                         empty.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-                        empty.addView(ui.text(text.get("message_log_empty"), 18, ui.text, true));
+                        View accent = new View(this);
+                        accent.setBackground(ui.shape(ui.accent, 0, 2));
+                        empty.addView(accent, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(4)));
+                        ui.add(empty, ui.text(text.get("message_log_empty"), 18, ui.text, true), 16);
                         ui.add(empty, ui.text(text.get(Settings.wouldUse(MessageLog.KEY) ? "message_log_empty_on" : "message_log_empty_off"), 14, ui.muted, false), 8);
                         ui.add(list, empty, result.setAside ? 12 : 0);
                     }
@@ -1609,8 +1618,8 @@ public final class SettingsActivity extends Activity {
 
     private View messageLogEntry(MessageLog.Entry entry) {
         LinearLayout card = ui.column();
-        card.setBackground(ui.shape(ui.surface, ui.line, 8));
-        card.setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(10));
+        card.setBackground(ui.shape(ui.surface, ui.line, 12));
+        card.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(16));
         // Messenger's chat key means nothing to a reader, so an entry without a name reads as an unknown chat.
         String who = entry.sender.isEmpty() ? (entry.chat.isEmpty() ? text.get("message_log_unknown_thread") : entry.chat)
             : entry.chat.isEmpty() ? entry.sender : text.get("message_log_in_group", entry.sender, entry.chat);
@@ -1660,7 +1669,7 @@ public final class SettingsActivity extends Activity {
         if (!Settings.wouldUse(AutoReply.KEY)) {
             TextView status = ui.text(text.get("auto_reply_off"), 14, ui.muted, false);
             status.setPadding(ui.dp(12), ui.dp(12), ui.dp(12), ui.dp(12));
-            status.setBackground(ui.shape(ui.infoSurface, ui.infoBorder, 8));
+            status.setBackground(ui.shape(ui.surface, ui.line, 12));
             ui.add(sheet.body, status, 0);
         }
         LinearLayout listHeading = ui.row();
@@ -1726,7 +1735,7 @@ public final class SettingsActivity extends Activity {
                 if (!rule.when.isEmpty() && rule.reply.isEmpty()) {
                     TextView error = card.findViewWithTag("auto_reply_error");
                     error.setVisibility(View.VISIBLE);
-                    reply.setBackground(ui.interactive(ui.surface, ui.error, 8, ui.error));
+                    reply.setBackground(ui.interactive(ui.surface, ui.error, 12, ui.error));
                     if (Build.VERSION.SDK_INT >= 30) reply.setStateDescription(text.get("auto_reply_required"));
                     if (firstInvalid == null) firstInvalid = reply;
                 }
@@ -1775,7 +1784,7 @@ public final class SettingsActivity extends Activity {
 
     private View autoReplyCard(LinearLayout list, AutoReply.Rule rule) {
         LinearLayout card = ui.column();
-        card.setBackground(ui.shape(ui.surface, ui.line, 8));
+        card.setBackground(ui.shape(ui.surface, ui.line, 12));
         card.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(12));
         TextView number = ui.text("", 13, ui.accent, true);
         number.setTag("auto_reply_number");
@@ -1794,7 +1803,7 @@ public final class SettingsActivity extends Activity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (error.getVisibility() != View.VISIBLE) return;
                 error.setVisibility(View.GONE);
-                reply.setBackground(ui.interactive(ui.surface, ui.outline, 8));
+                reply.setBackground(ui.interactive(ui.surface, ui.outline, 12));
                 if (Build.VERSION.SDK_INT >= 30) reply.setStateDescription(null);
             }
             @Override public void afterTextChanged(Editable value) { }
@@ -2377,9 +2386,8 @@ public final class SettingsActivity extends Activity {
             Button tab = tabs.get(i);
             boolean selected = tab.getTag().equals("tab_" + page);
             tab.setSelected(selected);
-            tab.setTextColor(selected ? ui.accent : ui.muted);
-            tab.setBackground(ui.interactive(ui.background, 0, 4));
-            tabLines.get(i).setBackgroundColor(selected ? ui.accent : ui.line);
+            tab.setTextColor(selected ? ui.selectedText : ui.muted);
+            tab.setBackground(ui.interactive(selected ? ui.accent : ui.surface, 0, 10, selected ? ui.outline : ui.accent));
         }
     }
 
@@ -2435,9 +2443,8 @@ public final class SettingsActivity extends Activity {
             boolean selected = button.getTag().equals("category_" + category);
             button.setSelected(selected);
             button.setTextColor(selected ? ui.selectedText : ui.muted);
-            button.setBackground(new android.graphics.drawable.InsetDrawable(
-                ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 4, selected ? ui.text : ui.accent),
-                0, ui.dp(6), 0, ui.dp(6)));
+            button.setBackground(ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 12,
+                selected ? ui.outline : ui.accent));
             button.setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8));
         }
         searchStatus.setText(controlRows.isEmpty() ? text.get("none_installed") :

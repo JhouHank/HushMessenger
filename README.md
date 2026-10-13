@@ -46,6 +46,8 @@ Long-press Messenger's icon on your home screen and tap **Patch controls**. The 
 
 The **Controls** tab has All, Inbox, Chats and More filters and a search box. A switch that's on shows when Messenger last checked it. The **App** tab has the restart button, appearance, **Save choices to a file** and **Restore choices from a file**, and **Copy setup**, which copies your versions and switch states for a bug report with no chats or account details in it. **Check for updates** is off by default. When it's on, it asks GitHub at most once an hour and sends nothing but the request.
 
+The screenshots below show the current development settings, with grouped controls and matching dark and light themes.
+
 <p>
   <img src="assets/settings-dark.png" width="300" alt="Controls tab in the dark theme, with search and category filters">
   <img src="assets/settings-light.png" width="300" alt="Controls tab in the light theme, with search and category filters">
