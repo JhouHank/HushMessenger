@@ -4,6 +4,8 @@
 
 Development v0.23.3.
 
+- Compatibility profiles now match their generated form exactly, so the profile checks pass without changing any hooks.
+
 - Long-press the Messenger logo at the top of Chats to open HushMessenger settings. It's a way in from inside Messenger even when your launcher has no long-press menu, and it works while changes are paused. It comes with **Open settings from menu**. Messenger's own long press on the logo still runs first.
 - The README is much shorter and sticks to installing and using the patches. The Messenger internals audit and the version history it used to carry are still in the repository history, last at commit 3cf54ff.
 - With **Hide Meta AI** on, typing @ in a chat no longer suggests Meta AI or its imagine entries. Messenger had started building that list a newer way that went around the switch. Silent and the rest of the list stay.
