@@ -2733,13 +2733,11 @@ public class CompatReport {
         return builders.size() == 1 ? builders : List.of();
     }
 
-    /** One build's numbering of the @ list row flags. Meta renumbers them with each release. Mirrors AiMentionRows.kt. */
+    /** 583's numbering of the @ list row flags. Meta renumbers them with each release. Mirrors AiMentionRows.kt. */
     record AiRowFlags(Set<Long> row, Set<Long> chat, long encrypted, long imagine, long imagineYourself) {}
-    static final List<AiRowFlags> AI_ROW_BUILDS = List.of(
-        new AiRowFlags(Set.of(0x81063b011b2d8aL, 0x81063b01042d83L), Set.of(0x81063b011b2d8aL, 0x81063b00042d40L),
-            0x81063b00052d41L, 0x81063b00402d51L, 0x81063b00f92d7fL),
+    static final AiRowFlags AI_ROW_FLAGS =
         new AiRowFlags(Set.of(0x810637011b2d49L, 0x81063701042d42L), Set.of(0x810637011b2d49L, 0x81063700042cffL),
-            0x81063700052d00L, 0x81063700402d10L, 0x81063700f92d3eL));
+            0x81063700052d00L, 0x81063700402d10L, 0x81063700f92d3eL);
     static final String CAPABILITIES = "Lcom/facebook/xapp/messaging/capability/vector/Capabilities;";
     static final String FB_SESSION_TYPE = "Lcom/facebook/auth/usersession/FbUserSession;";
 
@@ -2750,7 +2748,7 @@ public class CompatReport {
      * that checks a capability and defers to a same-class (FbUserSession)Z reading the encrypted flag (encrypted chats),
      * (FbUserSession, ThreadKey, Capabilities, Z, Z)Z reading the imagine flag and (FbUserSession, ThreadKey,
      * Capabilities)Z reading the imagine yourself flag. Counted only when there is exactly one of each, all five share a
-     * class and all read one build's flags. Mirrors AiMentionRows.kt.
+     * class and all read 583's flags. Mirrors AiMentionRows.kt.
      */
     static boolean defersToEncryptedCheck(ClassDef cls, Method method, long encrypted) {
         var calls = new ArrayList<MethodReference>();
@@ -2771,11 +2769,7 @@ public class CompatReport {
     }
 
     static List<Method> aiMentionRowChecks(List<ClassDef> classes) {
-        for (var build : AI_ROW_BUILDS) {
-            var checks = aiMentionRowChecks(classes, build);
-            if (!checks.isEmpty()) return checks;
-        }
-        return List.of();
+        return aiMentionRowChecks(classes, AI_ROW_FLAGS);
     }
 
     static List<Method> aiMentionRowChecks(List<ClassDef> classes, AiRowFlags build) {
