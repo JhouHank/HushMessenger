@@ -74,6 +74,8 @@ internal var discoveredControls: Map<String, List<Method>> = emptyMap()
 internal var nativeBubbleActivityVerified = false
 internal var nativeBubbleRoutesVerified = false
 internal var communityInboxContract: CommunityInboxContract? = null
+/** Each control's hooks, filled as the control patches below are declared. HookInjectionReplayTest replays them. */
+internal val controlHooks = linkedMapOf<String, Set<String>>()
 
 internal val settingsExtension = bytecodePatch(description = "Load HushMessenger runtime controls") {
     dependsOn(settingsResources)
@@ -239,6 +241,8 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
     manifest: (Document.() -> Unit)? = null): BytecodePatch {
     var applied = false
     var nativeRoutesApplied = false
+    val selected = hooks.toSet().ifEmpty { setOf(key) }
+    controlHooks[key] = selected
     val featureResources = resourcePatch(description = "Record HushMessenger capability: $key") {
         dependsOn(settingsResources)
         execute {
@@ -263,7 +267,6 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
         compatibleWith(MessengerTarget.COMPATIBILITY)
         dependsOn(settingsExtension, featureResources)
         execute {
-            val selected = hooks.toSet().ifEmpty { setOf(key) }
             validateControls(discoveredControls, selected)
             // Proved on the stock classes, and the extension's half checked, before any target is edited.
             val inboxRoute = if (INBOX_REFRESH_HOOK in selected) {

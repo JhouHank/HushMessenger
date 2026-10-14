@@ -9,6 +9,8 @@ internal object ExpectedTotals {
     const val CONTROLS = 51
     /** Controls whose description sends people to HushMessenger settings > Controls. */
     const val DIRECTED_CONTROLS = 50
+    /** Controls declared through controlPatch, whose injection HookInjectionReplayTest replays on the real builds. */
+    const val REPLAYED_CONTROLS = 46
     /** Hook methods per 583 build. Nine of them read the emoji drawer flag. */
     const val HOOKS_583 = 167
     /** The complete synthetic discovery fixture, one method per expected hook. */
