@@ -2,8 +2,14 @@
 
 ## Unreleased
 
-- **Fix shared videos with xHE-AAC sound** now also works on a video you pick inside a chat, not only one you share into Messenger from another app. Its xHE-AAC sound is converted to regular AAC in a copy in Messenger's cache, so the video sends instead of failing with "Unable to send". Your original file isn't changed, and old copies get cleaned up as new ones are made.
-- **Slide chats in and out** measures Messenger's short freezes against your screen's own refresh rate now, instead of assuming 60 Hz. On a 90 or 120 Hz screen a freeze of a few frames gets skipped over rather than counted as part of the slide.
+### Reported issues
+
+- [#57](https://github.com/SysAdminDoc/HushMessenger/issues/57) **Fix shared videos with xHE-AAC sound** now also works on a video you pick inside a chat, not only one you share into Messenger from another app. Its xHE-AAC sound is converted to regular AAC in a copy in Messenger's cache, so the video sends instead of failing with "Unable to send". Your original file isn't changed, and old copies get cleaned up as new ones are made.
+- [#28](https://github.com/SysAdminDoc/HushMessenger/issues/28) **Slide chats in and out** measures Messenger's short freezes against your screen's own refresh rate now, instead of assuming 60 Hz. On a 90 or 120 Hz screen a freeze of a few frames gets skipped over rather than counted as part of the slide.
+
+### Changed and fixed
+
+- Morphe Manager lists every change of the release your Messenger was patched with, not only a short summary. For that one release Manager shows the patch source's description instead of the changelog, and the description was a single paragraph while older releases listed their changes. It now carries the release's changelog groups after the summary. You'll see it from the next release on.
 
 ## 0.24.0 (2026-10-14)
 
