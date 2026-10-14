@@ -83,7 +83,8 @@ internal fun Method.screenshotViewerSites(): List<Int> {
             parameterTypes.map { it.toString() } == listOf("Landroid/view/LayoutInflater;", "Landroid/view/ViewGroup;", "Landroid/os/Bundle;") &&
             returnType == "Landroid/view/View;" -> {
             sites = listOf(32); allowedJumps = emptySet()
-            implementation!!.registerCount == 23 && code.size in setOf(438, 441, 449, 450) &&
+            // 583 runs it to 449, or 450 in 346611351.
+            implementation!!.registerCount == 23 && code.size in setOf(449, 450) &&
                 result(26, "Landroid/app/Dialog;", 0) && nullCheck(27, 0, 33) && window(28, "Landroid/app/Dialog;", 0, 1, 33) &&
                 literal(31, 0) && call(32, ADD_FLAGS, listOf(1, 0))
         }

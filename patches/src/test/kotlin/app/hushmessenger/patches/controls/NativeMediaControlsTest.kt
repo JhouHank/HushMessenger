@@ -22,7 +22,7 @@ import kotlin.test.*
 private const val EMOJI_DRAWER_READS = 10
 
 /** [resumeTail] pads onResume after the guarded part: 22 instructions in 582, two more in older releases. */
-internal fun screenshotViewerFixture(id: String, quickSize: Int = 438, resumeTail: Int = 22): MutableMethod {
+internal fun screenshotViewerFixture(id: String, quickSize: Int = 449, resumeTail: Int = 22): MutableMethod {
     val body: String
     val registers: Int
     when {
@@ -136,7 +136,7 @@ class NativeMediaControlsTest {
     @Test fun allMappingsReplaceOnlyTheFourCallsAndRetainTheirMasksAndLifecycle() {
         for (profile in controlProfiles.values.toSet()) {
             activeProfile = profile
-            for (size in listOf(438, 441, 450)) {
+            for (size in listOf(449, 450)) {
                 val methods = profile.hooks.getValue("screenshot_viewers").map { screenshotViewerFixture(it, size) }
                 for (method in methods) {
                     val before = method.implementation!!.instructions.toList()
@@ -194,10 +194,12 @@ class NativeMediaControlsTest {
         assertFailsWith<PatchException> { mask.screenshotViewerSites() }
         assertEquals(listOf(9), screenshotViewerFixture("$EPHEMERAL_VIEWER->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;").screenshotViewerSites())
         val quick = "$QUICKSNAP_VIEWER->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;"
-        assertEquals(listOf(32), screenshotViewerFixture(quick, 441).screenshotViewerSites())
-        // Messenger 583 runs it to 450 with the same guarded prefix.
+        // Messenger 583 runs it to 449, or 450 in 346611351, with the same guarded prefix.
+        assertEquals(listOf(32), screenshotViewerFixture(quick, 449).screenshotViewerSites())
         assertEquals(listOf(32), screenshotViewerFixture(quick, 450).screenshotViewerSites())
         assertFailsWith<PatchException> { screenshotViewerFixture(quick, 444).screenshotViewerSites() }
+        // 582's 438 and 441 instruction bodies are refused.
+        for (size in listOf(438, 441)) assertFailsWith<PatchException> { screenshotViewerFixture(quick, size).screenshotViewerSites() }
     }
 
     @Test fun eachAiCellNeedsItsOwnLabelAndAllItsSources() {

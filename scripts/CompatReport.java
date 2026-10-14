@@ -1615,7 +1615,7 @@ public class CompatReport {
         } else if (method.getDefiningClass().equals(QUICKSNAP_VIEWER) && method.getName().equals("onCreateView") &&
                 p.equals(List.of("Landroid/view/LayoutInflater;", "Landroid/view/ViewGroup;", "Landroid/os/Bundle;")) && method.getReturnType().equals("Landroid/view/View;")) {
             sites = List.of(32);
-            valid = impl.getRegisterCount() == 23 && Set.of(438, 441, 449, 450).contains(c.size()) && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
+            valid = impl.getRegisterCount() == 23 && Set.of(449, 450).contains(c.size()) && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
                 mediaNull(c, 27, 0, 33) && mediaWindow(c, 28, "Landroid/app/Dialog;", 0, 1, 33) && mediaLiteral(c, 31, 0) && mediaCall(c, 32, ADD_FLAGS, 1, 0);
         } else return List.of();
         var setters = new ArrayList<Integer>();
