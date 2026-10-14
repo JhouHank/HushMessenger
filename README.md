@@ -98,7 +98,7 @@ The screenshots below show the settings in the current release, in the dark and 
 | Use system emoji | Draws emoji with your phone's own set on Android 12 and newer. |
 | Send photos at original quality | With HD on, a JPEG photo up to 20 MB goes out with its own image data instead of Messenger's re-encoded copy. Location and camera details are stripped, as Messenger does. |
 | Send videos without re-encoding | A video up to 25 MB goes out as it is. |
-| Fix shared videos with xHE-AAC sound | Converts a video's xHE-AAC sound track to regular AAC so Messenger can send it, whether it's shared in from another app or picked in a chat. |
+| Fix videos that won't send | A video whose only sound is xHE-AAC gets that sound converted to regular AAC, and a Samsung screen recording loses the tag Samsung's recorder adds when Messenger's media check rejects it, so neither ends in "Unable to send". Works for videos shared in from another app and ones picked in a chat. |
 | Use the phone's camera app | A chat's camera button opens your own camera app. Photos only. |
 | Open web links externally | Opens http and https links in your default browser. |
 | Slide chats in and out | Slides a chat in from the side when you open it and back out when you leave. |

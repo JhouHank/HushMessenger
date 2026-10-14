@@ -194,7 +194,7 @@ public class CompatReport {
         PATCHES.put("Use system emoji", List.of("emoji_typeface"));
         PATCHES.put("Send photos at original quality", List.of("original_photo"));
         PATCHES.put("Send videos without re-encoding", List.of("original_video"));
-        PATCHES.put("Fix shared videos with xHE-AAC sound", List.of("xhe_audio", "xhe_transcode"));
+        PATCHES.put("Fix videos that won't send", List.of("xhe_audio", "xhe_transcode"));
         PATCHES.put("Turn off the swipe up for disappearing messages", List.of("disappearing_swipe"));
         PATCHES.put("Use the phone's camera app", List.of("system_camera"));
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));

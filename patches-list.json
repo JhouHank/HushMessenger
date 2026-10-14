@@ -347,8 +347,8 @@
             ]
         },
         {
-            "name": "Fix shared videos with xHE-AAC sound",
-            "description": "Messenger can't send a video whose only sound is xHE-AAC, which Facebook and Instagram now use. Whether you share one into Messenger from another app or pick it in a chat, its sound is converted to regular AAC first, so it sends. The picture isn't touched. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "name": "Fix videos that won't send",
+            "description": "Messenger stops two kinds of video with \"Unable to send\". One is a video whose only sound is xHE-AAC, which Facebook and Instagram now use. The other is a Samsung screen recording whose recorder tag Messenger's media check rejects. Whether you share one into Messenger from another app or pick it in a chat, the sound is converted to regular AAC, or the tag is dropped, so it sends. The picture isn't touched. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Conversations",
             "dependencies": [
