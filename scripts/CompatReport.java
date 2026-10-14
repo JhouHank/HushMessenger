@@ -4102,7 +4102,32 @@ public class CompatReport {
         for (var candidate : jewelCandidates) {
             if (read != null && candidate.getValue().contains(read.getter())) found.get("people_jewel").add(candidate.getKey());
         }
+        // The patches refuse these hooks without a free local register, mostly for the scratch v0 their edits write.
+        for (var key : NEEDS_A_LOCAL) {
+            var methods = found.get(key);
+            // ad_events' visibility callback reuses its event register, so only the static entry event needs a local.
+            if (methods != null && methods.stream().anyMatch(m -> !hasLocal(m) &&
+                (!"ad_events".equals(key) || AccessFlags.STATIC.isSet(m.getAccessFlags())))) methods.clear();
+        }
         return found;
+    }
+
+    /**
+     * Every hook whose method the patches refuse when it has no local register, through validateScratch or a register
+     * check of its own. The control tests' zero-local check (MirroredFinders.kt) fails when this set and the patches part.
+     */
+    static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
+        "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
+        "disappearing_swipe", "facebook", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
+        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "people_tab", "stories", "system_camera", "typing",
+        "unsent_indicator");
+
+    /** More registers than the parameters take, as ControlHooks.kt's validateScratch asks. */
+    static boolean hasLocal(Method method) {
+        if (method.getImplementation() == null) return false;
+        int words = AccessFlags.STATIC.isSet(method.getAccessFlags()) ? 0 : 1;
+        for (var type : method.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
+        return method.getImplementation().getRegisterCount() > words;
     }
 
     static List<Map.Entry<String, String>> findDexSites(List<ClassDef> classes) {
