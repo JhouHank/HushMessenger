@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.24.0 (2026-10-14)
 
 This release moves HushMessenger to Messenger 583.0.0.29.95, all six arm64 builds of it. 582 isn't accepted anymore, so update Messenger before you patch. It also adds new switches, among them Pin more chats, Bold and italic text, Hide People tab and Stop nearby scans, and settings get a restart button, Quick setups and a Report a problem row.
 
@@ -56,12 +56,12 @@ This release moves HushMessenger to Messenger 583.0.0.29.95, all six arm64 build
 - Reply and message-log dialogs keep their actions reachable in short windows and large text, with matching keyboard, cutout and right-to-left spacing.
 - A failed log clear keeps its retry action available, even if the messages are already gone or the screen rotated during the clear. The settings header and restart reminder adapt to larger text to leave more room for controls.
 - Long replies grow with their text so the editor scrolls as one page. Replies and saved messages keep their own text direction in right-to-left layouts.
-- Large App-page labels reserve a separate switch column, including in right-to-left layouts.
+- Long labels on the App tab keep clear of their switch, in right-to-left layouts too.
 - Enabled controls explain when they're waiting for Messenger to use them. Clearing a search keeps the category you picked.
 - New **Hide the Menu row** choice on the App tab takes the HushMessenger row out of Messenger's Menu tab and side menu, so the long-press **Patch controls** shortcut and the Messenger logo are the ways in. It can be turned on once you've opened settings from that shortcut, and the row comes back by itself if the shortcut ever goes missing. Together with **Hide app drawer icon** that leaves just those two.
 - Switches have clearer on and disabled states in both themes. Focus and pointer feedback match the rest of settings, and restart text fits narrower windows.
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
-- Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.
+- Restart Messenger now shows that choices are being saved before the app reopens. The message log and Auto reply screens use the same style, in the light theme too.
 - **Restart Messenger** no longer leaves a black screen behind. On a fast phone the restart could reopen Messenger before its own restarting screen had appeared, and Android then didn't bring Messenger back until you tapped its icon. The restart waits for that screen to show first now.
 - The restart screen keeps its text clear of camera cutouts and system bars.
 - If your phone refuses to open a link from settings (Source and licenses, Support or View release), settings stay open and say so instead of closing.
