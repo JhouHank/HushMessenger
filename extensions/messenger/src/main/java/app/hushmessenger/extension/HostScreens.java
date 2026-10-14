@@ -83,6 +83,15 @@ public final class HostScreens {
         return "";
     }
 
+    /**
+     * The Messenger build the patch started from, "583.0.0.29.95|346611369|base": version name, version code and the
+     * mapping its hooks came from. The patch rewrites this, so it holds on Root Mount installs and under Spoof package
+     * version, where Android's version code says something else. The extension alone has none.
+     */
+    static String originalBuild() {
+        return "";
+    }
+
     /** Rewritten only when the native notification, shortcut and activity routes have been validated together. */
     static boolean nativeBubbleRoutes() { return false; }
 

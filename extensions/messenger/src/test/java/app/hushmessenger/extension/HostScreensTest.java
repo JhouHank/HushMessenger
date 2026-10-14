@@ -408,8 +408,9 @@ public class HostScreensTest {
         assertEquals(Set.of(), Settings.bundled(null));
         assertEquals(Set.of("ads", "menu_row", "people"), Settings.bundled("ads,menu_row,people"));
         assertEquals(Set.of("ads"), Settings.bundled(",ads,"));
-        // The extension alone records nothing; the patch writes the list.
+        // The extension alone records nothing; the patch writes the list and the build it started from.
         assertEquals("", HostScreens.bundledControls());
+        assertEquals("", HostScreens.originalBuild());
     }
 
     @Test public void onARootMountInstallTheAppTabLeavesOutTheDrawerIcon() {

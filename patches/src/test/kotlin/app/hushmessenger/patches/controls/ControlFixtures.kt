@@ -63,6 +63,9 @@ internal fun factoryApplication(body: String = """
 internal fun bundledControlsMethod(body: String = "const-string v0, \"\"\nreturn-object v0") =
     fixtureMethod(BUNDLED_CONTROLS, body, 1, AccessFlags.STATIC.value)
 
+internal fun originalBuildMethod(body: String = "const-string v0, \"\"\nreturn-object v0") =
+    fixtureMethod(ORIGINAL_BUILD, body, 1, AccessFlags.STATIC.value)
+
 internal fun nativeBubbleRoutesMethod(body: String = "const/4 v0, 0x0\nreturn v0") =
     fixtureMethod(NATIVE_BUBBLE_ROUTES, body, 1, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)
 
@@ -121,7 +124,7 @@ internal fun inboxRefreshRouteMethod(body: String = "const-string v0, \"\"\nretu
 /** The factory and the extension classes every settings run touches, as a supported APK plus the extension has them. */
 internal fun screenHostClasses() = listOf(
     fixtureClass(FACTORY_TYPE, listOf(factoryActivity(), factoryApplication())),
-    fixtureClass(HOST_SCREENS, listOf(bundledControlsMethod(), nativeBubbleRoutesMethod(), inboxRefreshRouteMethod())),
+    fixtureClass(HOST_SCREENS, listOf(bundledControlsMethod(), originalBuildMethod(), nativeBubbleRoutesMethod(), inboxRefreshRouteMethod())),
     fixtureClass(INBOX_REFRESH, listOf(fixtureMethod(INBOX_ITEMS_CALL, "return-void", 1, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value))),
 )
 

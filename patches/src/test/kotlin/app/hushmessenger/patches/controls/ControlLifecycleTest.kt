@@ -145,6 +145,11 @@ class ControlLifecycleTest {
         assertEquals(if ("people" in selection.keys) INBOX_ROUTE.toString() else "",
             ((route.implementation!!.instructions.first() as ReferenceInstruction).reference as StringReference).string,
             "${selection.name}: chat list route")
+        // Every run records the build it started from, which the manifest's own mapping names here.
+        val build = host.methods.single { it.hookId() == ORIGINAL_BUILD }
+        assertEquals("583.0.0.29.95|$LIFECYCLE_VERSION_CODE|$LIFECYCLE_VERSION_CODE",
+            ((build.implementation!!.instructions.first() as ReferenceInstruction).reference as StringReference).string,
+            "${selection.name}: original build")
         val factory = classes.single { it.type == FACTORY_TYPE }
         for ((method, call) in mapOf(
             INSTANTIATE_ACTIVITY to "$HOST_SCREENS->activityFor(Ljava/lang/String;Landroid/content/Intent;)Landroid/app/Activity;",
