@@ -86,7 +86,7 @@ The screenshots below show the current development settings, with grouped contro
 | Stop analytics uploads | Blocks Messenger's analytics uploader. Events still get recorded on your phone and can upload once you turn this off. |
 | Stop ad attribution uploads | Stops the job that sends your advertising ID and ad tracking setting to Meta. |
 | Stop inbox and ad link logging | Stops the reports about which part of your chat list was on screen and which ad opened a chat. |
-| Stop MQTT logging | Drops the health reports and push logging Messenger's MQTT client sends. Messages and calls keep working. |
+| Stop MQTT logging | Drops the health reports and push logging Messenger's MQTT client sends. Messenger sends most of its traffic another way, so there's often little for it to drop. Messages and calls keep working. |
 | Stop nearby scans | Stops Messenger from reading the list of Wi-Fi networks around you, and hides the name and hardware address of the one you're connected to, the way Android does when Messenger can't see your location. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices. Experimental, since Messenger hasn't started those scans on the test phones yet. |
 | Keep a message log | Saves a copy of each message that raised a notification, encrypted chats included, so an unsend can't take it back. It stays on your phone, encrypted. **View log** and **Clear log** sit under the switch. |
 | Auto reply | Answers messages with a reply you write, for certain words or for any message. One reply per chat every five minutes, and group chats only when you allow it. |
