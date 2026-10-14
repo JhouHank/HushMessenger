@@ -83,12 +83,14 @@ final class MessageLogRenderProbe {
             instrumentation.runOnMainSync(opening::stop);
             long pssOpen = pss();
 
-            // A steady scroll to the very end, building every page on the way, the way a person flicks through the log.
+            // A steady scroll to the very end at half a screen a frame, faster than a hard fling, building every page on the way.
             FrameGaps scrolling = new FrameGaps();
             ScrollView scroll = scrollOf(list);
             if (scroll == null) throw new AssertionError("The viewer's list isn't in a ScrollView");
             final LinearLayout cards = list;
-            int step = 60;
+            int[] height = {0};
+            instrumentation.runOnMainSync(() -> height[0] = scroll.getHeight());
+            int step = Math.max(60, height[0] / 2);
             int[] travelled = {0};
             instrumentation.runOnMainSync(scrolling::start);
             Object done = new Object();
