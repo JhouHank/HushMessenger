@@ -27,8 +27,9 @@ import static org.junit.Assert.*;
 @Config(sdk = {28, 36})
 public class RestartActivityTest {
     public static class Probe extends RestartActivity {
-        boolean exited, denied, changing;
+        boolean exited, denied, changing, removedTask;
         @Override void exitProcess() { exited = true; }
+        @Override public void finishAndRemoveTask() { removedTask = true; super.finishAndRemoveTask(); }
         @Override public boolean isChangingConfigurations() { return changing || super.isChangingConfigurations(); }
         @Override public void startActivity(Intent intent) {
             if (denied) throw new SecurityException("Launcher disabled during restart");
@@ -220,6 +221,28 @@ public class RestartActivityTest {
         rejected.completeRestart(intent, true);
         assertFalse(rejected.exited);
         assertTrue(ShadowToast.getTextOfLatestToast().contains("Couldn't restart"));
+    }
+
+    /**
+     * A restart asked for from settings closes their whole task as it goes. A second settings screen stacked in it
+     * outlived the process on the S22 and showed behind the reopened one on Back. The home screen shortcut's restart
+     * only closes itself, and so does a Root Mount install's, whose settings live inside the stock host.
+     */
+    @Test public void aRestartFromSettingsClosesTheirTask() {
+        var fromSettings = Robolectric.buildActivity(Probe.class, new Intent().putExtra(SettingsReopen.EXTRA, "controls")).get();
+        fromSettings.completeRestart(new Intent(Intent.ACTION_MAIN), true);
+        assertTrue(fromSettings.removedTask);
+        assertTrue(fromSettings.exited);
+        var fromShortcut = Robolectric.buildActivity(Probe.class).get();
+        fromShortcut.completeRestart(new Intent(Intent.ACTION_MAIN), true);
+        assertFalse(fromShortcut.removedTask);
+        assertTrue(fromShortcut.isFinishing());
+        var app = RuntimeEnvironment.getApplication();
+        Shadows.shadowOf(app.getPackageManager()).removeActivity(new android.content.ComponentName(app, SettingsActivity.class));
+        var hosted = Robolectric.buildActivity(Probe.class, new Intent().putExtra(SettingsReopen.EXTRA, "app")).get();
+        hosted.completeRestart(new Intent(Intent.ACTION_MAIN), true);
+        assertFalse(hosted.removedTask);
+        assertTrue(hosted.isFinishing());
     }
 
     @Test public void appPageButtonUsesTheSameRestartEntryAsTheShortcut() {

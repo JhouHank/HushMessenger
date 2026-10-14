@@ -176,9 +176,10 @@ final class SettingsReopen {
             done();
             try {
                 Intent settings = HostScreens.intentFor(activity, HostScreens.SETTINGS).putExtra(EXTRA, opening);
-                // Android keeps the settings task across the restart, with the screen the restart was asked from still
-                // in it. Opened from the app drawer, that screen's intent names the launcher alias, so this one would be
-                // stacked on top and Back would show the older copy. Emptying the task first leaves one settings screen.
+                // The restart screen removes the settings task as it relaunches. If one survives anyway, the screen the
+                // restart was asked from is still in it, and opened from the app drawer, its intent names the launcher
+                // alias, so this one would be stacked on top and Back would show the older copy. Emptying the task first
+                // leaves one settings screen.
                 // A Root Mount install's settings are a document task inside the stock host, which is left as it is.
                 if (!HostScreens.hosted(activity)) {
                     settings.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);

@@ -178,7 +178,11 @@ public class RestartActivity extends Activity {
         }
         try {
             startActivity(launch);
-            finish();
+            // Settings come back after a restart asked for from them, so their task goes now, while this process can
+            // still close every screen in it. One left in a dead process outlived the reopen's FLAG_ACTIVITY_CLEAR_TASK
+            // on One UI and showed on Back. A Root Mount install's settings live inside the stock host and stay.
+            if (getIntent().getStringExtra(SettingsReopen.EXTRA) != null && !HostScreens.hosted(this)) finishAndRemoveTask();
+            else finish();
             exitProcess();
         } catch (android.content.ActivityNotFoundException | SecurityException error) {
             Log.e("HushMessenger", "Couldn't restart Messenger", error);
