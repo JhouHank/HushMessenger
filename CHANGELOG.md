@@ -11,6 +11,7 @@ Development v0.23.3.
 - Added build guidance for native checks on an ARM-translated Android 12L emulator and for verifying the framework's low-RAM classification. Stock and patched comparisons keep separate app data and signing keys.
 
 - Compatibility profiles now match their generated form exactly, so the profile checks pass without changing any hooks.
+- The compatibility report now turns down two Messenger builds the patches would refuse anyway: a screenshot viewer with a second method under an entry point's name, and a sticker keyboard whose tab list copy is something a jump lands on. Every control test also runs the report's own finder on its test classes and fails if the report accepts a hook the patches don't.
 - HushMessenger now patches Messenger 583.0.0.29.95 and no longer accepts 582.0.0.61.92. It takes six arm64 builds of 583, the five APKMirror lists plus build 346611440. Meta renumbered several server flags and moved a few checks around in 583, so every switch's hooks were found again on each build, and Morphe Desktop patched and rebuilt all six.
 
 - Long-press the Messenger logo at the top of Chats, or the Menu tab's title, to open HushMessenger settings. It's a way in from inside Messenger even when your launcher has no long-press menu, and it works while changes are paused. It comes with **Open settings from menu**, and the App tab's tip about getting back in now mentions it. Messenger's own long press on the title still runs first.

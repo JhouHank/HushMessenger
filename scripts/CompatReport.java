@@ -344,15 +344,18 @@ public class CompatReport {
     }
 
     /**
-     * How many times a method copies a list into an ImmutableList.Builder through 583's one static
-     * (ImmutableList.Builder, Iterable) -> ImmutableList call, made with invoke-static and not its range form, as the patch
-     * injects. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
+     * True when a method copies a list into an ImmutableList.Builder exactly once through 583's static
+     * (ImmutableList.Builder, Iterable) -> ImmutableList call, made with invoke-static and not its range form, and no
+     * branch, switch case or catch lands on that call, since the patch's hook goes just before it. Mirrors
+     * validateKeyboardTabsInline in ControlHooks.kt.
      */
-    static long keyboardTabCopies(Method method) {
+    static boolean keyboardTabCopy(Method method) {
         String builder = "Lcom/google/common/collect/ImmutableList$Builder;", iterable = "Ljava/lang/Iterable;";
-        return instructions(method).stream().filter(i -> i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction r &&
+        var c = instructions(method); var copies = new ArrayList<Integer>();
+        for (int i = 0; i < c.size(); i++) if (c.get(i).getOpcode() == Opcode.INVOKE_STATIC && c.get(i) instanceof ReferenceInstruction r &&
             r.getReference() instanceof MethodReference m && IMMUTABLE_LIST.equals(m.getReturnType()) &&
-            m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable))).count();
+            m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable))) copies.add(i);
+        return copies.size() == 1 && !mediaTargets(method).contains(copies.get(0));
     }
 
     /** "583.0.0.29.95 (version code 346611351 or 346611369)", joined with " or " across version names. */
@@ -3337,8 +3340,17 @@ public class CompatReport {
         found.get("auto_reply").addAll(messageLogHooks(classes));
         found.get("system_camera").addAll(systemCameraLaunches(classes));
         customFontHooks(classes).forEach((key, methods) -> found.get(key).addAll(methods));
-        for (var cls : classes) for (var method : cls.getMethods())
-            if (!screenshotViewerSites(method).isEmpty()) found.get("screenshot_viewers").add(method);
+        // Every viewer method with an entry point's name is checked, whatever its signature, and one that doesn't match
+        // leaves the control unresolved, as findControls in ControlHooks.kt clears it then.
+        boolean changedViewer = false;
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            boolean candidate = (EPHEMERAL_VIEWER.equals(cls.getType()) && (EPHEMERAL_DIALOG.equals(method.getName()) || "onResume".equals(method.getName()))) ||
+                (QUICKSNAP_VIEWER.equals(cls.getType()) && "onCreateView".equals(method.getName()));
+            if (!candidate) continue;
+            if (screenshotViewerSites(method).isEmpty()) changedViewer = true;
+            else found.get("screenshot_viewers").add(method);
+        }
+        if (changedViewer) found.get("screenshot_viewers").clear();
         var jewelCandidates = new ArrayList<Map.Entry<Method, Set<String>>>();
 
         boolean hasAdItem = false, hasImmutableCopy = false;
@@ -3784,7 +3796,7 @@ public class CompatReport {
 
                 // avatar_tabs: the sticker keyboard's tab list, filled inline in a void composer factory method
                 // that copies it into a builder once.
-                if ("V".equals(method.getReturnType()) && keyboardTabCopies(method) == 1 &&
+                if ("V".equals(method.getReturnType()) && keyboardTabCopy(method) &&
                     "Lcom/facebook/messaging/msys/thread/composer/configuration/xapp/BaseXappComposerConfigurationFactory;".equals(cls.getType()) &&
                     refs.stream().anyMatch(r -> r.toString().startsWith(
                         "Lcom/facebook/xapp/messaging/composer/avatar/composertab/event/ActivateAvatarSticker;->")) &&
