@@ -1,5 +1,6 @@
 package app.hushmessenger.patches.controls
 
+import app.hushmessenger.patches.CompatMirror
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
@@ -84,6 +85,30 @@ class ControlsTest {
         val changed = subtabs("v2")
         assertFailsWith<PatchException> { changed.injectSubtabs() }
         assertEquals(5, changed.implementation!!.instructions.size)
+    }
+
+    @Test fun compatReportRefusesEveryInboxTabsBodyThePatchRefuses() {
+        // CompatReport checks the body where it reads the supplier field, so a refused body fails the profile there.
+        val supplier = "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;"
+        val body = """
+            iget-object v0, p0, LX/2UL;->A00:$supplier
+            iget-object v1, v0, $supplier->A07:Ljava/util/concurrent/atomic/AtomicBoolean;
+            const/4 v0, 0x1
+            invoke-virtual {v1, v0}, Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V
+            return-void
+        """.trimIndent()
+        fun takenBy(text: String, registers: Int = 3): Pair<Boolean, Boolean> {
+            val run = method(registers = registers, returnType = "V", body = text)
+            return runCatching { run.validateSubtabs() }.isSuccess to (CompatMirror.subtabsSupplier(run) != null)
+        }
+        assertEquals(true to true, takenBy(body))
+        for ((name, taken) in listOf(
+            "the setter's value" to takenBy(body.replace("{v1, v0}", "{v1, v2}")),
+            "the value" to takenBy(body.replace("v0, 0x1", "v0, 0x0")),
+            "the flag field" to takenBy(body.replace("->A07:", "->A08:")),
+            "the setter" to takenBy(body.replace("->set(Z)V", "->lazySet(Z)V")),
+            "the register count" to takenBy(body, registers = 4),
+        )) assertEquals(false to false, taken, name)
     }
 
     @Test fun unsentLabelHookReadsTheRowStraightFromTheWrapperList() {

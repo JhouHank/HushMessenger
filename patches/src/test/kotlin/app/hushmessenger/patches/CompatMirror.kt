@@ -20,6 +20,7 @@ object CompatMirror {
         val classpath = listOf(Opcode::class.java, Class.forName("com.google.common.collect.ImmutableList"))
             .joinToString(File.pathSeparator) { File(it.protectionDomain.codeSource.location.toURI()).path }
         val out = Files.createTempDirectory("compat-report")
+        Runtime.getRuntime().addShutdownHook(Thread { out.toFile().deleteRecursively() })
         val errors = java.io.ByteArrayOutputStream()
         val exit = javac.run(null, null, errors, "-nowarn", "-proc:none", "-encoding", "UTF-8", "-d", out.toString(),
             "-cp", classpath, Path.of("../scripts/CompatReport.java").toString())
@@ -44,6 +45,12 @@ object CompatMirror {
     /** CompatReport.nativeBubbleRoutes on [classes] for [gate]: the route string it records, or null when nothing connects. */
     fun nativeBubbleRoutes(classes: Iterable<ClassDef>, gate: String): String? =
         static("nativeBubbleRoutes", List::class.java, String::class.java).invoke(null, classes.toList(), gate) as String?
+
+    /** CompatReport.subtabsSupplier on one inbox tabs run(): the supplier field it records, or null when it refuses the body. */
+    fun subtabsSupplier(method: Method): String? = static("subtabsSupplier", List::class.java).invoke(null, listOf(method)) as String?
+
+    /** CompatReport.pluginGateShape: whether it takes [method] as a plugin gate. The sentinel itself is the profile's to pin. */
+    fun pluginGate(method: Method): Boolean = static("pluginGateShape", Method::class.java).invoke(null, method) as Boolean
 
     private fun id(method: Method) = method.definingClass + "->" + method.name + "(" + method.parameterTypes.joinToString("") +
         ")" + method.returnType

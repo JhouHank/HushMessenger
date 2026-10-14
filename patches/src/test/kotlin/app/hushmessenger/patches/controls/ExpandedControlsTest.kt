@@ -1,5 +1,6 @@
 package app.hushmessenger.patches.controls
 
+import app.hushmessenger.patches.CompatMirror
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.BytecodePatch
 import app.morphe.patcher.patch.Patch
@@ -216,6 +217,36 @@ class ExpandedControlsTest {
                 method("Lfixture/Gate;", "gate", 8, "Z", changed).validatePluginGate()
             }
         }
+    }
+
+    @Test fun compatReportRefusesEveryPluginGateThePatchRefuses() {
+        // CompatReport checks the gates' shape where it reads their sentinel, so a refused gate fails the profile there.
+        val body = """
+            iget-object v0, p0, Lfixture/Gate;->cache:Ljava/lang/Object;
+            const/4 v6, 0x1
+            const/4 v5, 0x0
+            iget-object v1, p0, Lfixture/Gate;->cache:Ljava/lang/Object;
+            sget-object v0, LX/1dj;->A03:Ljava/lang/Object;
+            if-eq v1, v0, :disabled
+            return v6
+            :disabled
+            return v5
+        """.trimIndent()
+        fun takenBy(text: String): Pair<Boolean, Boolean> {
+            val gate = method("Lfixture/Gate;", "gate", 8, "Z", text)
+            return runCatching { gate.validatePluginGate() }.isSuccess to CompatMirror.pluginGate(gate)
+        }
+        assertEquals(true to true, takenBy(body))
+        for (changed in listOf(
+            body.replace("if-eq", "if-ne"),
+            body.replace("return v5", "return v6"),
+            body.replace("v5", "v6"),
+            body.replace("iget-object v1", "const/4 v6, 0x0\niget-object v1"),
+            body.replace("iget-object v1", "const-wide/16 v4, 0x0\niget-object v1"),
+            body.replace("v6, 0x1", "v6, 0x0").replace("v5, 0x0", "v5, 0x1"),
+            body.replace("iget-object v1, p0, Lfixture/Gate;->cache", "iget-object v1, p0, Lfixture/Gate;->other"),
+            body.replace("iget-object v0, p0", "iget-object v2, p0"),
+        )) assertEquals(false to false, takenBy(changed), changed)
     }
 
     @Test fun adExitsCoverIncomingBranchesAndEachKeepTheirOwnResultRegister() {

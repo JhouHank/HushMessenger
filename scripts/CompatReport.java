@@ -447,15 +447,49 @@ public class CompatReport {
         var sentinels = new TreeSet<String>();
         for (var key : PLUGIN_GATE_ANCHORS.keySet()) {
             for (var method : controls.getOrDefault(key, List.of())) {
+                if (!pluginGateShape(method)) return null;
                 var code = instructions(method);
-                if (code.size() < 5) return null;
-                var tail = code.subList(code.size() - 5, code.size());
-                if (!tail.stream().map(Instruction::getOpcode).toList().equals(
-                        List.of(Opcode.IGET_OBJECT, Opcode.SGET_OBJECT, Opcode.IF_EQ, Opcode.RETURN, Opcode.RETURN))) return null;
-                sentinels.add(ref(tail.get(1)));
+                sentinels.add(ref(code.get(code.size() - 4)));
             }
         }
         return sentinels.size() == 1 ? sentinels.first() : null;
+    }
+
+    /**
+     * ControlHooks.kt's validatePluginGate, but for the sentinel, which the profile pins: a local v0, the cache read into
+     * v0 from this, 1 and 0 loaded into two locals nothing later writes, and a tail that reads the same cache into v1,
+     * compares it with the sentinel and returns the 1 or skips to the 0.
+     */
+    static boolean pluginGateShape(Method method) {
+        var impl = method.getImplementation();
+        if (impl == null) return false;
+        int registers = impl.getRegisterCount(), words = AccessFlags.STATIC.isSet(method.getAccessFlags()) ? 0 : 1;
+        for (var type : method.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
+        var code = instructions(method);
+        // Fewer than eight instructions can't hold both the head and the tail.
+        if (registers <= words || code.size() < 8) return false;
+        var tail = code.subList(code.size() - 5, code.size());
+        if (!tail.stream().map(Instruction::getOpcode).toList().equals(
+                List.of(Opcode.IGET_OBJECT, Opcode.SGET_OBJECT, Opcode.IF_EQ, Opcode.RETURN, Opcode.RETURN))) return false;
+        if (code.get(0).getOpcode() != Opcode.IGET_OBJECT || code.get(1).getOpcode() != Opcode.CONST_4 ||
+            code.get(2).getOpcode() != Opcode.CONST_4) return false;
+        var first = (TwoRegisterInstruction) code.get(0);
+        int enabled = register(code.get(1)), disabled = register(code.get(2));
+        if (first.getRegisterA() != 0 || first.getRegisterB() != registers - 1 || !Long.valueOf(1L).equals(wide(code.get(1))) ||
+            !Long.valueOf(0L).equals(wide(code.get(2))) || enabled < 2 || enabled >= registers - 1 || disabled < 2 ||
+            disabled >= registers - 1 || enabled == disabled) return false;
+        for (var i : code.subList(3, code.size())) {
+            if (!i.getOpcode().setsRegister() || !(i instanceof OneRegisterInstruction one)) continue;
+            int written = one.getRegisterA();
+            if (written == enabled || written == disabled ||
+                (i.getOpcode().setsWideRegister() && (written + 1 == enabled || written + 1 == disabled))) return false;
+        }
+        var cache = (TwoRegisterInstruction) tail.get(0);
+        var compare = (TwoRegisterInstruction) tail.get(2);
+        return cache.getRegisterA() == 1 && cache.getRegisterB() == first.getRegisterB() &&
+            Objects.equals(ref(tail.get(0)), ref(code.get(0))) && register(tail.get(1)) == 0 &&
+            compare.getRegisterA() == 1 && compare.getRegisterB() == 0 && ((OffsetInstruction) tail.get(2)).getCodeOffset() == 3 &&
+            register(tail.get(3)) == enabled && register(tail.get(4)) == disabled;
     }
 
     record PreferenceRead(int index, String key, String getter) {}
@@ -520,11 +554,27 @@ public class CompatReport {
         return List.of(ref(code.get(8)), ref(code.get(at + 1)));
     }
 
+    static final String SUBTABS_FLAG =
+        "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;->A07:Ljava/util/concurrent/atomic/AtomicBoolean;";
+
+    /**
+     * The supplier field the inbox tabs run() reads, once the body is ControlHooks.kt's validateSubtabs shape: three
+     * registers, the supplier into v0 from this, its A07 flag into v1, 1 into v0, then v1.set(v0).
+     */
     static String subtabsSupplier(List<Method> subtabs) {
-        if (subtabs.size() != 1) return null;
+        if (subtabs.size() != 1 || subtabs.get(0).getImplementation() == null ||
+            subtabs.get(0).getImplementation().getRegisterCount() != 3) return null;
         var code = instructions(subtabs.get(0));
-        return code.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT, Opcode.IGET_OBJECT,
-            Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID)) ? ref(code.get(0)) : null;
+        if (!code.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT, Opcode.IGET_OBJECT,
+            Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID))) return null;
+        var supplier = (TwoRegisterInstruction) code.get(0);
+        var flag = (TwoRegisterInstruction) code.get(1);
+        var set = (FiveRegisterInstruction) code.get(3);
+        boolean shaped = supplier.getRegisterA() == 0 && supplier.getRegisterB() == 2 && flag.getRegisterA() == 1 &&
+            flag.getRegisterB() == 0 && register(code.get(2)) == 0 && Long.valueOf(1L).equals(wide(code.get(2))) &&
+            set.getRegisterCount() == 2 && set.getRegisterC() == 1 && set.getRegisterD() == 0 && SUBTABS_FLAG.equals(ref(code.get(1))) &&
+            "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V".equals(ref(code.get(3)));
+        return shaped ? ref(code.get(0)) : null;
     }
 
     /** Everything the patches pin, read from the APK's DEX. Values that don't resolve are left out. */
