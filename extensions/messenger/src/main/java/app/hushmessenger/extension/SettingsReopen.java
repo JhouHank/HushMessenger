@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -89,11 +90,30 @@ final class SettingsReopen {
             .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
     }
 
-    /** True for a screen launched as Messenger's start screen, whatever class came up for it. */
+    /**
+     * True for a screen launched as Messenger's start screen, whatever class came up for it: by its name, or as a
+     * launcher entry, which an alternate app icon the restart relaunches through is too.
+     */
     static boolean isStartScreen(Activity activity) {
         Intent launch = activity.getIntent();
-        ComponentName name = launch != null ? launch.getComponent() : null;
-        return name != null && START_SCREEN.equals(name.getClassName());
+        if (launch == null) return false;
+        ComponentName name = launch.getComponent();
+        if (name != null && START_SCREEN.equals(name.getClassName())) return true;
+        return Intent.ACTION_MAIN.equals(launch.getAction()) && launch.hasCategory(Intent.CATEGORY_LAUNCHER);
+    }
+
+    /**
+     * True for a class standing in for the screen its launch entry names, as Messenger's splash does on a cold start
+     * until it's ready and recreates itself as the real one.
+     */
+    static boolean standIn(Activity activity) {
+        try {
+            ActivityInfo info = activity.getPackageManager().getActivityInfo(activity.getComponentName(), 0);
+            String real = info.targetActivity != null ? info.targetActivity : info.name;
+            return !activity.getClass().getName().equals(real);
+        } catch (PackageManager.NameNotFoundException | RuntimeException unknown) {
+            return false;
+        }
     }
 
     /** HostScreens hands over Messenger's Application here. The first screen this process shows checks the marker once. */
@@ -116,8 +136,11 @@ final class SettingsReopen {
         private final Handler main = new Handler(Looper.getMainLooper());
         /** The page taken from the marker, held while Messenger's start screen picks where to go. */
         private String page;
-        /** When the page was taken. A start screen can hand over outside this process (a sign-in, Home) and leave it held. */
-        private long takenAt;
+        /**
+         * When the restart wrote the page. A start screen can hand over outside this process (a sign-in, Home) and leave
+         * it held, so it lasts as long as the marker would have.
+         */
+        private long writtenAt;
         /** Messenger's start screen while it's in front with the page waiting. */
         private Activity startScreen;
         private final Runnable stayedInFront = () -> { if (startScreen != null) open(startScreen); };
@@ -132,10 +155,12 @@ final class SettingsReopen {
                     // Settings' own store, opened directly: reading a marker shouldn't start settings and CrashGuard early.
                     SharedPreferences prefs = Settings.preferences != null ? Settings.preferences
                         : activity.getApplicationContext().getSharedPreferences("hushmessenger", Context.MODE_PRIVATE);
-                    takenAt = SystemClock.elapsedRealtime();
-                    page = takeFresh(prefs, takenAt);
+                    long at;
+                    try { at = prefs.getLong(TIME_KEY, -1); } catch (ClassCastException wrongType) { at = -1; }
+                    page = takeFresh(prefs, SystemClock.elapsedRealtime());
                     if (page == null) { done(); return; }
-                } else if (SystemClock.elapsedRealtime() - takenAt >= MAX_AGE_MS) {
+                    writtenAt = at;
+                } else if (SystemClock.elapsedRealtime() - writtenAt >= MAX_AGE_MS) {
                     // Held that long, the handover never reached a screen here: this is an ordinary launch, not the restart's.
                     done();
                     return;
@@ -143,10 +168,11 @@ final class SettingsReopen {
                 // A settings screen that is already up is where the restart meant to go.
                 if (activity instanceof SettingsActivity || activity instanceof RestartActivity) { done(); return; }
                 if (isStartScreen(activity)) {
-                    // The screen it hands over to opens them. If it stays in front instead, they open over it.
+                    // The screen it hands over to opens them. If it stays in front instead, they open over it. A splash
+                    // in its place is always replaced, however long Messenger takes to get ready, so it gets no timer.
                     startScreen = activity;
                     main.removeCallbacks(stayedInFront);
-                    main.postDelayed(stayedInFront, HANDOVER_MS);
+                    if (!standIn(activity)) main.postDelayed(stayedInFront, HANDOVER_MS);
                     return;
                 }
                 open(activity);
