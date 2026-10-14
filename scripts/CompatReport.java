@@ -201,7 +201,7 @@ public class CompatReport {
         PATCHES.put("Stop ad attribution uploads", List.of("attribution_uploads"));
         PATCHES.put("Stop inbox and ad link logging", List.of("ad_events"));
         PATCHES.put("Stop MQTT logging", List.of("mqtt_telemetry"));
-        PATCHES.put("Stop nearby scans", List.of("nearby_scans"));
+        PATCHES.put("Stop nearby scans", List.of("nearby_scans", "wifi_identity"));
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
@@ -3296,6 +3296,31 @@ public class CompatReport {
         return "Landroid/net/wifi/WifiManager;".equals(call.getDefiningClass()) && "getScanResults".equals(call.getName());
     }
 
+    static final Set<String> WIFI_IDENTITY_READS = Set.of(
+        "Landroid/net/wifi/WifiInfo;->getSSID()Ljava/lang/String;", "Landroid/net/wifi/WifiInfo;->getBSSID()Ljava/lang/String;");
+
+    /**
+     * wifi_identity: every method outside org.webrtc that reads the connected network's SSID or BSSID, taken only while
+     * every such read's answer is kept by the next instruction (move-result-object). Mirrors NearbyScans.kt.
+     */
+    static List<Method> wifiIdentityReads(List<ClassDef> classes) {
+        var readers = new ArrayList<Method>();
+        for (var cls : classes) {
+            if (cls.getType().startsWith("Lorg/webrtc/")) continue;
+            for (var method : cls.getMethods()) {
+                var code = instructions(method);
+                boolean reads = false;
+                for (int at = 0; at < code.size(); at++) {
+                    if (!(code.get(at) instanceof ReferenceInstruction ri && WIFI_IDENTITY_READS.contains(ri.getReference().toString()))) continue;
+                    reads = true;
+                    if (at + 1 >= code.size() || code.get(at + 1).getOpcode() != Opcode.MOVE_RESULT_OBJECT) return List.of();
+                }
+                if (reads) readers.add(method);
+            }
+        }
+        return readers;
+    }
+
     /**
      * The scan-result reader's shape: an instance (Z)ArrayList with one getScanResults call that also returns a register
      * it loads with null, the answer it gives when Messenger may not read the list.
@@ -3343,6 +3368,7 @@ public class CompatReport {
         found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));
         found.get("pinned_chats").addAll(pinnedChatLimit(classes));
         found.get("nearby_scans").addAll(nearbyScans(classes));
+        found.get("wifi_identity").addAll(wifiIdentityReads(classes));
         found.get("text_style").addAll(textStyleField(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));

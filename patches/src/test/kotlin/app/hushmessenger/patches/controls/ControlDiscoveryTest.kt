@@ -30,7 +30,7 @@ class ControlDiscoveryTest {
     )
 
     private fun completeFixture(): List<MutableClass> {
-        val methods = syntheticHooks.filter { it.key !in setOf("unsent_indicator", "delta_unsent", "ai_sticker_cell", "screenshot_viewers", COMMUNITY_INBOX, EMOJI_DRAWER, EMOJI_SEARCH, AI_MENTIONS, AI_COMMANDS, AI_SEARCH_HINT, AI_MENTION_ROWS, XHE_AUDIO, DISAPPEARING_SWIPE, ANALYTICS_UPLOADS, ATTRIBUTION_UPLOADS, AD_EVENTS, MQTT_TELEMETRY, PINNED_CHATS, NEARBY_SCANS, TEXT_STYLE, MESSAGE_LOG, AUTO_REPLY, SYSTEM_CAMERA, HIDE_READ_RECEIPTS, REPLY_READ) + CUSTOM_FONT_HOOKS }.flatMap { (key, ids) ->
+        val methods = syntheticHooks.filter { it.key !in setOf("unsent_indicator", "delta_unsent", "ai_sticker_cell", "screenshot_viewers", COMMUNITY_INBOX, EMOJI_DRAWER, EMOJI_SEARCH, AI_MENTIONS, AI_COMMANDS, AI_SEARCH_HINT, AI_MENTION_ROWS, XHE_AUDIO, DISAPPEARING_SWIPE, ANALYTICS_UPLOADS, ATTRIBUTION_UPLOADS, AD_EVENTS, MQTT_TELEMETRY, PINNED_CHATS, NEARBY_SCANS, WIFI_IDENTITY, TEXT_STYLE, MESSAGE_LOG, AUTO_REPLY, SYSTEM_CAMERA, HIDE_READ_RECEIPTS, REPLY_READ) + CUSTOM_FONT_HOOKS }.flatMap { (key, ids) ->
             ids.map { id ->
                 if (key == "people_jewel") return@map peopleJewelMethod()
                 if (key == "people_tab") return@map peopleTabMethod()

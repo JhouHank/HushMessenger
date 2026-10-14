@@ -168,6 +168,12 @@ hook text_style LX/9xc;->onFocusChanged(ZILandroid/graphics/Rect;)V
 hook typing LX/AkZ;->run()V
 hook typing_mailbox LX/4de;->A0L(Ljava/lang/String;Z)LX/337;
 hook unsent_indicator LX/TDf;->BbQ(I)Ljava/lang/String;
+hook wifi_identity LX/1fX;->A02()LX/UwZ;
+hook wifi_identity LX/36h;->AoM()Ljava/lang/String;
+hook wifi_identity LX/36h;->BFu()J
+hook wifi_identity LX/Adi;->A03()Ljava/lang/String;
+hook wifi_identity LX/Adi;->A04(Ljava/util/Map;)V
+hook wifi_identity LX/MWp;->A01(LX/MWp;)Ljava/lang/String;
 hook xhe_audio LX/KW2;->call()Ljava/lang/Object;
 pluginSentinel LX/1fl;->A03:Ljava/lang/Object;
 preferenceGetter Lcom/facebook/prefs/shared/FbSharedPreferences;->AjW(LX/2vT;Z)Z
