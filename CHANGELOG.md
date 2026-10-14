@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Slide chats in and out** measures Messenger's short freezes against your screen's own refresh rate now, instead of assuming 60 Hz. On a 90 or 120 Hz screen a freeze of a few frames gets skipped over rather than counted as part of the slide.
+
 ## 0.24.0 (2026-10-14)
 
 This release moves HushMessenger to Messenger 583.0.0.29.95, all six arm64 builds of it. 582 isn't accepted anymore, so update Messenger before you patch. It also adds new switches, among them Pin more chats, Bold and italic text, Hide People tab and Stop nearby scans, and settings get a restart button, Quick setups and a Report a problem row.
