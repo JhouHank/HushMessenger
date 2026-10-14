@@ -674,9 +674,8 @@ public class CompatReport {
             calls(c.get(4),0,1) && register(c.get(5)) == 0 && register(c.get(6)) == 0;
     }
 
-    /** The shortcut builder names its ID itself, or (583) through a static (ThreadKey)String helper that does. As in NativeBubbles.kt. */
+    /** The shortcut builder names its ID through a static (ThreadKey)String helper that does. As in NativeBubbles.kt. */
     static boolean namesThreadShortcut(Map<String,ClassDef> byType, List<Instruction> c) {
-        if (c.stream().anyMatch(i -> "thread_shortcut_".equals(ref(i)))) return true;
         for (var i : c) if (i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction r && r.getReference() instanceof MethodReference m &&
             m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(BUBBLE_THREAD)) && "Ljava/lang/String;".equals(m.getReturnType()) &&
             bubbleTarget(byType, m) instanceof Method helper && instructions(helper).stream().anyMatch(h -> "thread_shortcut_".equals(ref(h)))) return true;

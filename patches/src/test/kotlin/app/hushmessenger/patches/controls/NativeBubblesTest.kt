@@ -164,6 +164,8 @@ class NativeBubblesTest {
     private val idField = "Lfixture/Notification;->shortcut:Ljava/lang/String;"
     private val create = "Lfixture/Shortcut;->create(Landroid/content/Context;Landroid/graphics/Bitmap;${thread}Ljava/lang/String;)$container"
     private val updated = "Lfixture/Shortcut;->updated(Landroid/content/Context;Landroid/graphics/Bitmap;${thread}Ljava/lang/String;Z)$container"
+    /** 583's static helper that names the shortcut ID. */
+    private val shortcutKey = "Lfixture/Key;->id(${thread})Ljava/lang/String;"
     private val attach = "Lfixture/Attach;->attach(Landroid/graphics/Bitmap;Lfixture/Notification;${BUBBLE_SESSION}${container}Lfixture/Summary;Lfixture/Trace;Lfixture/Push;Z)V"
 
     private fun routes(longLived: Int = 1, gate: String = SYNTHETIC_PROFILE.hooks.getValue("bubble_mode").single(),
@@ -177,7 +179,7 @@ class NativeBubblesTest {
         }
         val shortcutCode = """
             const/4 v1, $longLived
-            const-string v0, "thread_shortcut_"
+            invoke-static {p3}, $shortcutKey
             new-instance v2, $shortcutBuilder
             invoke-direct {v2, p1, p4}, $shortcutBuilder-><init>(Landroid/content/Context;Ljava/lang/String;)V
             invoke-static {}, Lfixture/Shortcut;->person()Landroid/app/Person;
@@ -200,7 +202,7 @@ class NativeBubblesTest {
             "L${BUBBLE_ACTIVITY.replace('.', '/')};->onPostResume()V", "invoke-virtual {v0, v1}, $gate\nreturn-void")),
             superclass = "Lcom/facebook/messaging/msys/thread/fragment/MsysThreadViewActivity;"),
         fixtureClass("Lfixture/Shortcut;", listOf(method(create, shortcutCode),
-            method(updated, shortcutCode.replace("thread_shortcut_", "updated"), 9),
+            method(updated, shortcutCode.replace("invoke-static {p3}, $shortcutKey", "const-string v0, \"updated\""), 9),
             method("Lfixture/Shortcut;->person()Landroid/app/Person;", "new-instance v0, Landroid/app/Person;\nreturn-object v0", static = true),
             method("Lfixture/Shortcut;->intent()Landroid/content/Intent;", "new-instance v0, Landroid/content/Intent;\nreturn-object v0", static = true))),
         fixtureClass("Lfixture/Attach;", listOf(method(attach, """
@@ -300,6 +302,7 @@ class NativeBubblesTest {
             invoke-virtual {p1, p0}, $notificationBuilder->setBubbleMetadata($metadata)$notificationBuilder
             return-void
         """, 2, static = true))),
+        fixtureClass("Lfixture/Key;", listOf(method(shortcutKey, "const-string v0, \"thread_shortcut_\"\nreturn-object v0", 2, static = true))),
         )
     }
 
@@ -321,19 +324,20 @@ class NativeBubblesTest {
             from = "const/4 v1, 1", to = "const/4 v1, 0"), gate))
     }
 
-    @Test fun the583ShortcutIdComesFromAStaticThreadKeyHelperThatNamesIt() {
+    @Test fun theShortcutIdComesOnlyFromAStaticThreadKeyHelperThatNamesIt() {
         val gate = SYNTHETIC_PROFILE.hooks.getValue("bubble_mode").single()
-        val inline = "const-string v0, \"thread_shortcut_\""
-        val key = "Lfixture/Key;->id($thread)Ljava/lang/String;"
-        fun helperRoutes(helper: String = key, call: String = "invoke-static {p3}, $helper", body: String = "$inline\nreturn-object v0") =
-            routes(changed = create, from = inline, to = call) + fixtureClass(helper.substringBefore("->"),
-                listOf(fixtureMethod(helper, body, 2, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)))
-        assertEquals(findNativeBubbleRoutes(routes(), gate), findNativeBubbleRoutes(helperRoutes(), gate))
-        assertNull(findNativeBubbleRoutes(helperRoutes(body = "const-string v0, \"other_\"\nreturn-object v0"), gate))
-        assertNull(findNativeBubbleRoutes(helperRoutes(call = "invoke-virtual {p3}, $key"), gate))
-        assertNull(findNativeBubbleRoutes(helperRoutes(helper = "Lfixture/Key;->id(Ljava/lang/Object;)Ljava/lang/String;"), gate))
+        val call = "invoke-static {p3}, $shortcutKey"
+        assertNotNull(findNativeBubbleRoutes(routes(), gate))
+        // A builder that names the ID itself is the form before 583, which no supported build has.
+        assertNull(findNativeBubbleRoutes(routes(changed = create, from = call, to = "const-string v0, \"thread_shortcut_\""), gate))
+        assertNull(findNativeBubbleRoutes(routes(changed = shortcutKey, from = "thread_shortcut_", to = "other_"), gate))
+        assertNull(findNativeBubbleRoutes(routes(changed = create, from = call, to = "invoke-virtual {p3}, $shortcutKey"), gate))
+        val loose = "Lfixture/LooseKey;->id(Ljava/lang/Object;)Ljava/lang/String;"
+        assertNull(findNativeBubbleRoutes(routes(changed = create, from = call, to = "invoke-static {p3}, $loose") +
+            fixtureClass("Lfixture/LooseKey;", listOf(fixtureMethod(loose, "const-string v0, \"thread_shortcut_\"\nreturn-object v0", 2,
+                AccessFlags.PUBLIC.value or AccessFlags.STATIC.value))), gate))
         // The helper has to be in the app; a call alone names nothing.
-        assertNull(findNativeBubbleRoutes(routes(changed = create, from = inline, to = "invoke-static {p3}, $key"), gate))
+        assertNull(findNativeBubbleRoutes(routes().filter { it.type != "Lfixture/Key;" }, gate))
     }
 
     @Test fun aStaticGateHelperCountsOnlyWhenItReturnsTheGateForThePassedSession() {
