@@ -2,9 +2,11 @@ package app.hushmessenger.extension;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
@@ -67,6 +69,24 @@ final class SettingsReopen {
         return page == null || at < 0 || age < 0 || age >= MAX_AGE_MS ? null : page(page);
     }
 
+    /** True when this install has the app drawer entry and it isn't hidden, so a tap on it can reach settings. */
+    static boolean drawerEntryOn(Context context) {
+        ComponentName alias = new ComponentName(context.getPackageName(), SettingsActivity.DRAWER_ALIAS);
+        PackageManager packages = context.getPackageManager();
+        try {
+            return packages.getComponentEnabledSetting(alias) != PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                && packages.resolveActivity(new Intent().setComponent(alias), 0) != null;
+        } catch (IllegalArgumentException | SecurityException missing) {
+            return false;
+        }
+    }
+
+    /** Makes [settings] the intent a tap on the app drawer entry sends. Its extras and flags stay as they are. */
+    static Intent asDrawerLaunch(Intent settings) {
+        return settings.setClassName(settings.getComponent().getPackageName(), SettingsActivity.DRAWER_ALIAS)
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+    }
+
     /** HostScreens hands over Messenger's Application here. The first screen this process shows checks the marker once. */
     static void watch(Application app) {
         app.registerActivityLifecycleCallbacks(new FirstScreen(app));
@@ -93,7 +113,12 @@ final class SettingsReopen {
                 // in it. Opened from the app drawer, that screen's intent names the launcher alias, so this one would be
                 // stacked on top and Back would show the older copy. Emptying the task first leaves one settings screen.
                 // A Root Mount install's settings are a document task inside the stock host, which is left as it is.
-                if (!HostScreens.hosted(activity)) settings.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                if (!HostScreens.hosted(activity)) {
+                    settings.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    // The task's first intent decides what a later tap on the app drawer entry does: the same intent
+                    // brings this task forward, and any other one stacks a second settings screen on it.
+                    if (drawerEntryOn(activity)) asDrawerLaunch(settings);
+                }
                 activity.startActivity(settings);
             } catch (RuntimeException | LinkageError error) {
                 // Messenger's first screen is a fine place to land; the restart itself already worked.
