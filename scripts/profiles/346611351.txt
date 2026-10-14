@@ -145,6 +145,8 @@ hook people_list_end LX/2I0;->A02()Z
 hook people_search LX/CgG;->DUP(LX/EHW;Ljava/lang/Object;)LX/EJT;
 hook people_story Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;->A0b(Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;)V
 hook people_tab LX/Nvy;->A01(LX/Nvy;)V
+hook phone_id_sync LX/1Au;->A03(LX/1Au;)Ljava/util/ArrayList;
+hook phone_id_sync LX/1Au;->A06(Ljava/lang/String;)V
 hook pinned_chats LX/2nP;->A00(Lcom/facebook/auth/usersession/FbUserSession;)I
 hook reels_badge LX/4AD;->A09(LX/4AD;)Z
 hook reply_read LX/9pk;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/572;LX/4qK;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/Ccn;LX/5AX;LX/571;LX/CaI;LX/5rZ;LX/5Td;LX/5M3;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/4qS;Ljava/lang/String;)V

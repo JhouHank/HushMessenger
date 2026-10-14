@@ -129,7 +129,7 @@ public final class SettingsActivity extends Activity {
     private static Toast toast;
     static final String SUPPORT_PAGE = "https://ko-fi.com/X8K126YVER";
     /** Switches whose effect hasn't been confirmed on a phone. Each shows the Experimental badge. */
-    static final Set<String> EXPERIMENTAL = Set.of("ads", "pinned_chats", "nearby_scans");
+    static final Set<String> EXPERIMENTAL = Set.of("ads", "pinned_chats", "nearby_scans", "phone_id_sync");
     static final String[][] CONTROLS = {
         {"ads", "Hide inbox ads", "Hides ad cards in your chat list. Meta stopped selling these ads in November 2025, so this only matters if they come back.", "inbox"},
         {"people", "Hide People You May Know", "Hides suggested people in chats, search and stories, and on the People and Notifications tabs. Good if you only want people you know.", "inbox"},
@@ -173,6 +173,7 @@ public final class SettingsActivity extends Activity {
         {"ad_events", "Stop inbox and ad link logging", "Stops two reports Messenger logs. One says which part of your chat list was on screen, which Messenger files under inbox ads. The other says which ad brought you in when a link from an ad opens a chat.", "privacy"},
         {"mqtt_telemetry", "Stop MQTT logging", "Drops the health reports and push logging Messenger's MQTT client sends. Messenger sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working.", "privacy"},
         {"nearby_scans", "Stop nearby scans", "Stops Messenger from reading the list of Wi-Fi networks around you, and hides the name and hardware address of the one you're connected to, the way Android does when Messenger can't see your location. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices.", "privacy"},
+        {"phone_id_sync", "Stop app list and device ID sharing", "Stops Messenger from going through the apps on your phone to find other Meta apps, and from asking them for the device ID Meta uses to link the apps on one phone. Messenger keeps the ID it already has.", "privacy"},
         {"message_log", "Keep a message log", "Saves each message when its notification arrives, so you can read it after it's unsent. Works in encrypted chats. Stays on your phone. In a chat with disappearing messages on, Messenger leaves the words out of its notification, so those messages aren't logged.", "privacy"},
         {"allow_screenshot", "Allow screenshots", "Lets you screenshot protected chat media, such as view-once photos and Quicksnap, and stops screenshot notices. It doesn't add replay or saving.", "privacy"},
         {"hide_read_receipts", "Hide read receipts", "Opening a chat no longer tells people you read their message, and the chat stays unread here. Marking it read yourself or replying marks it read and shows Seen, like Messenger does. Group chats aren't tested. Messenger's own Read receipts setting under Privacy & safety marks chats read without Seen.", "privacy"},

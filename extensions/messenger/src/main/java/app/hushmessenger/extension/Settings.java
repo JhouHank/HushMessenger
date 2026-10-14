@@ -349,6 +349,12 @@ public final class Settings {
      */
     public static boolean stopNearbyScans() { return enabled("nearby_scans"); }
 
+    /**
+     * Asked when Messenger is about to list the installed apps to find other Meta apps, and when it's about to ask them
+     * for their family device ID. True gives it an empty list and skips the request.
+     */
+    public static boolean stopPhoneIdSync() { return enabled("phone_id_sync"); }
+
     /** What Android tells an app that can't see the phone's location about the Wi-Fi network it's on. */
     static final String HIDDEN_WIFI_NAME = "<unknown ssid>";
     static final String HIDDEN_WIFI_BSSID = "02:00:00:00:00:00";

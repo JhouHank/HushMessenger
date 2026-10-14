@@ -6,6 +6,7 @@
 
 - [#57](https://github.com/SysAdminDoc/HushMessenger/issues/57) **Fix shared videos with xHE-AAC sound** now also works on a video you pick inside a chat, not only one you share into Messenger from another app. Its xHE-AAC sound is converted to regular AAC in a copy in Messenger's cache, so the video sends instead of failing with "Unable to send". Your original file isn't changed, and old copies get cleaned up as new ones are made.
 - [#28](https://github.com/SysAdminDoc/HushMessenger/issues/28) **Slide chats in and out** measures Messenger's short freezes against your screen's own refresh rate now, instead of assuming 60 Hz. On a 90 or 120 Hz screen a freeze of a few frames gets skipped over rather than counted as part of the slide.
+- [#59](https://github.com/SysAdminDoc/HushMessenger/issues/59) New **Stop app list and device ID sharing** switch under Privacy. Messenger goes through your installed apps looking for other Meta apps like Facebook and Instagram, then asks them for the device ID Meta uses to link its apps on one phone. With this on it gets an empty app list and skips the asking, so it keeps the ID it already has. It's experimental and starts off.
 
 ### Changed and fixed
 

@@ -202,6 +202,7 @@ public class CompatReport {
         PATCHES.put("Stop inbox and ad link logging", List.of("ad_events"));
         PATCHES.put("Stop MQTT logging", List.of("mqtt_telemetry"));
         PATCHES.put("Stop nearby scans", List.of("nearby_scans", "wifi_identity"));
+        PATCHES.put("Stop app list and device ID sharing", List.of("phone_id_sync"));
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
@@ -3537,6 +3538,61 @@ public class CompatReport {
         return readers;
     }
 
+    static final String PHONE_ID_PROVIDER = ".provider.phoneid";
+    static final String GET_PHONE_ID = "com.facebook.GET_PHONE_ID";
+    static final String INSTALLED_PACKAGES = "Landroid/content/pm/PackageManager;->getInstalledPackages(I)Ljava/util/List;";
+
+    static List<String> methodCalls(Method method) {
+        var called = new ArrayList<String>();
+        for (var i : instructions(method))
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference call) called.add(call.toString());
+        return called;
+    }
+
+    static List<String> params(Method method) {
+        var params = new ArrayList<String>();
+        for (var t : method.getParameterTypes()) params.add(t.toString());
+        return params;
+    }
+
+    /**
+     * phone_id_sync: the phoneid requester's static (requester)ArrayList with one getInstalledPackages call, and its
+     * instance (String)V that sends GET_PHONE_ID as an ordered broadcast. Taken only while one class holds every
+     * phoneid provider query, the sync takes the list and is the app's only GET_PHONE_ID sender, and every other caller
+     * of a query also calls the list. Mirrors PhoneIdSync.kt.
+     */
+    static List<Method> phoneIdSync(List<ClassDef> classes) {
+        var requesters = new ArrayList<ClassDef>();
+        for (var cls : classes) for (var method : cls.getMethods())
+            if (literals(method).contains(PHONE_ID_PROVIDER)) { requesters.add(cls); break; }
+        if (requesters.size() != 1) return List.of();
+        var requester = requesters.get(0);
+        var lists = new ArrayList<Method>();
+        var syncs = new ArrayList<Method>();
+        var queries = new HashSet<String>();
+        for (var method : requester.getMethods()) {
+            boolean isStatic = AccessFlags.STATIC.isSet(method.getAccessFlags());
+            var called = methodCalls(method);
+            if (isStatic && "Ljava/util/ArrayList;".equals(method.getReturnType()) && params(method).equals(List.of(requester.getType())) &&
+                called.stream().filter(INSTALLED_PACKAGES::equals).count() == 1) lists.add(method);
+            if (!isStatic && "V".equals(method.getReturnType()) && params(method).equals(List.of("Ljava/lang/String;")) &&
+                literals(method).contains(GET_PHONE_ID) && called.stream().anyMatch(c -> c.contains(";->sendOrderedBroadcast("))) syncs.add(method);
+            if (literals(method).contains(PHONE_ID_PROVIDER)) queries.add(hookId(method));
+        }
+        if (lists.size() != 1 || syncs.size() != 1) return List.of();
+        String list = hookId(lists.get(0)), sync = hookId(syncs.get(0));
+        if (!methodCalls(syncs.get(0)).contains(list)) return List.of();
+        var senders = new ArrayList<String>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (literals(method).contains(GET_PHONE_ID)) senders.add(hookId(method));
+            var called = methodCalls(method);
+            if (queries.contains(hookId(method)) || called.stream().noneMatch(queries::contains)) continue;
+            if (!hookId(method).equals(sync) && !called.contains(list)) return List.of();
+        }
+        if (!senders.equals(List.of(sync))) return List.of();
+        return List.of(lists.get(0), syncs.get(0));
+    }
+
     /**
      * The scan-result reader's shape: an instance (Z)ArrayList with one getScanResults call that also returns a register
      * it loads with null, the answer it gives when Messenger may not read the list.
@@ -3585,6 +3641,7 @@ public class CompatReport {
         found.get("pinned_chats").addAll(pinnedChatLimit(classes));
         found.get("nearby_scans").addAll(nearbyScans(classes));
         found.get("wifi_identity").addAll(wifiIdentityReads(classes));
+        found.get("phone_id_sync").addAll(phoneIdSync(classes));
         found.get("text_style").addAll(textStyleField(classes));
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));
@@ -4167,7 +4224,7 @@ public class CompatReport {
     static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
         "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
         "disappearing_swipe", "facebook", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
-        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "people_tab", "stories", "system_camera", "typing",
+        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "stories", "system_camera", "typing",
         "unsent_indicator");
 
     /** More registers than the parameters take, as ControlHooks.kt's validateScratch asks. */
