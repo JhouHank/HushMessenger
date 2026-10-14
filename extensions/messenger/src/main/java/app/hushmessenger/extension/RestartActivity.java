@@ -1,6 +1,7 @@
 package app.hushmessenger.extension;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -9,6 +10,7 @@ import android.content.res.ColorStateList;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.DisplayCutout;
@@ -181,7 +183,7 @@ public class RestartActivity extends Activity {
             // Settings come back after a restart asked for from them, so their task goes now, while this process can
             // still close every screen in it. One left in a dead process outlived the reopen's FLAG_ACTIVITY_CLEAR_TASK
             // on One UI and showed on Back. A Root Mount install's settings live inside the stock host and stay.
-            if (getIntent().getStringExtra(SettingsReopen.EXTRA) != null && !HostScreens.hosted(this)) finishAndRemoveTask();
+            if (getIntent().getStringExtra(SettingsReopen.EXTRA) != null && !HostScreens.hosted(this)) removeTask();
             else finish();
             exitProcess();
         } catch (android.content.ActivityNotFoundException | SecurityException error) {
@@ -192,6 +194,27 @@ public class RestartActivity extends Activity {
     }
 
     void exitProcess() { System.exit(0); }
+
+    /**
+     * Closes this screen's whole task. Activity.finishAndRemoveTask only does that from the task's first screen, and
+     * this one sits on top of settings, so the task is found by its id. Without it, this screen alone finishes.
+     */
+    void removeTask() {
+        try {
+            ActivityManager activities = getSystemService(ActivityManager.class);
+            if (activities != null) for (ActivityManager.AppTask task : activities.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                @SuppressWarnings("deprecation") int id = Build.VERSION.SDK_INT >= 29 ? info.taskId : info.persistentId;
+                if (id == getTaskId()) {
+                    task.finishAndRemoveTask();
+                    return;
+                }
+            }
+        } catch (RuntimeException gone) {
+            Log.w("HushMessenger", "Couldn't close the settings task before the restart", gone);
+        }
+        finish();
+    }
 
     private void fail(String message) {
         Log.e("HushMessenger", message);

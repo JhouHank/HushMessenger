@@ -29,12 +29,21 @@ public class RestartActivityTest {
     public static class Probe extends RestartActivity {
         boolean exited, denied, changing, removedTask;
         @Override void exitProcess() { exited = true; }
-        @Override public void finishAndRemoveTask() { removedTask = true; super.finishAndRemoveTask(); }
+        @Override void removeTask() { removedTask = true; super.removeTask(); }
         @Override public boolean isChangingConfigurations() { return changing || super.isChangingConfigurations(); }
         @Override public void startActivity(Intent intent) {
             if (denied) throw new SecurityException("Launcher disabled during restart");
             super.startActivity(intent);
         }
+    }
+
+    private static android.app.ActivityManager.AppTask appTask(int id) {
+        var task = org.robolectric.shadows.ShadowAppTask.newInstance();
+        var info = new android.app.ActivityManager.RecentTaskInfo();
+        info.persistentId = id;
+        if (android.os.Build.VERSION.SDK_INT >= 29) info.taskId = id;
+        Shadows.shadowOf(task).setTaskInfo(info);
+        return task;
     }
 
     private ResolveInfo entry(String name, String target) {
@@ -230,9 +239,21 @@ public class RestartActivityTest {
      */
     @Test public void aRestartFromSettingsClosesTheirTask() {
         var fromSettings = Robolectric.buildActivity(Probe.class, new Intent().putExtra(SettingsReopen.EXTRA, "controls")).get();
+        var other = appTask(fromSettings.getTaskId() + 1);
+        var settingsTask = appTask(fromSettings.getTaskId());
+        var tasks = Shadows.shadowOf(fromSettings.getSystemService(android.app.ActivityManager.class));
+        tasks.setAppTasks(java.util.List.of(other, settingsTask));
         fromSettings.completeRestart(new Intent(Intent.ACTION_MAIN), true);
         assertTrue(fromSettings.removedTask);
+        // The whole task goes, found by its id, since this screen isn't the first in it. Messenger's own task stays.
+        assertTrue(Shadows.shadowOf(settingsTask).isFinishedAndRemoved());
+        assertFalse(Shadows.shadowOf(other).isFinishedAndRemoved());
         assertTrue(fromSettings.exited);
+        // A task that can't be found leaves an ordinary finish.
+        tasks.setAppTasks(java.util.List.of(other));
+        var unlisted = Robolectric.buildActivity(Probe.class, new Intent().putExtra(SettingsReopen.EXTRA, "app")).get();
+        unlisted.completeRestart(new Intent(Intent.ACTION_MAIN), true);
+        assertTrue(unlisted.isFinishing());
         var fromShortcut = Robolectric.buildActivity(Probe.class).get();
         fromShortcut.completeRestart(new Intent(Intent.ACTION_MAIN), true);
         assertFalse(fromShortcut.removedTask);
