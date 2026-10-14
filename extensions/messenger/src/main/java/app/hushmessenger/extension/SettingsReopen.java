@@ -89,14 +89,23 @@ final class SettingsReopen {
             .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
     }
 
+    /** True for a screen launched as Messenger's start screen, whatever class came up for it. */
+    static boolean isStartScreen(Activity activity) {
+        Intent launch = activity.getIntent();
+        ComponentName name = launch != null ? launch.getComponent() : null;
+        return name != null && START_SCREEN.equals(name.getClassName());
+    }
+
     /** HostScreens hands over Messenger's Application here. The first screen this process shows checks the marker once. */
     static void watch(Application app) {
         app.registerActivityLifecycleCallbacks(new FirstScreen(app));
     }
 
     /**
-     * Messenger's launcher screen. It picks where Messenger opens (the chat list, a sign-in, the chat restore prompt),
-     * starts that screen and finishes, so settings opened from it end up behind the screen it hands over to.
+     * Messenger's launcher screen. It picks where Messenger opens (the chat list, a sign-in, the chat restore prompt)
+     * and starts that screen, so settings opened from it end up behind the screen it hands over to. In 583 it's an
+     * alias of the main screen, and a cold start shows a splash class in its place first, so only the name it was
+     * launched under says which screen it is.
      */
     static final String START_SCREEN = "com.facebook.orca.auth.StartScreenActivity";
     /** How long the start screen may stay in front before settings open over it anyway, as on a sign-in it shows itself. */
@@ -133,7 +142,7 @@ final class SettingsReopen {
                 }
                 // A settings screen that is already up is where the restart meant to go.
                 if (activity instanceof SettingsActivity || activity instanceof RestartActivity) { done(); return; }
-                if (START_SCREEN.equals(activity.getClass().getName())) {
+                if (isStartScreen(activity)) {
                     // The screen it hands over to opens them. If it stays in front instead, they open over it.
                     startScreen = activity;
                     main.removeCallbacks(stayedInFront);
