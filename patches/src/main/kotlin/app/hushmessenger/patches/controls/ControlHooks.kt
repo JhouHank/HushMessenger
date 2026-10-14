@@ -1477,10 +1477,7 @@ internal fun MutableMethod.validateStorySave(): StorySave {
         val result = answer(i)
         op(result) == Opcode.MOVE_RESULT && reg(result) == reg(i) && op(result - 1) == Opcode.INVOKE_VIRTUAL &&
             call(result - 1)?.returnType == "Z" && params(result - 1)?.isEmpty() == true &&
-            args(result - 1) == listOf((code[i + 1] as TwoRegisterInstruction).registerB) &&
-            // The menu is built right before the question. 582's 346415706 family merges a fragment manager check of
-            // the same shape into this onClick, without a menu.
-            op(result - 2) == Opcode.MOVE_RESULT_OBJECT && op(result - 3) == Opcode.INVOKE_STATIC
+            args(result - 1) == listOf((code[i + 1] as TwoRegisterInstruction).registerB)
     }.singleOrNull() ?: fail("no longer asks once whether the story is yours")
     val result = answer(own)
     val flag = reg(own)

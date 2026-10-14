@@ -253,8 +253,9 @@ class SaveStoriesTest {
         assertFailsWith<PatchException> { fixtureMethod("LX/JgG;->A01(Landroid/view/View;)V", body, registers = 16).validateStorySave() }
     }
 
-    @Test fun aMergedCheckOfTheSameShapeWithoutAMenuIsIgnored() {
-        // 582's 346611351 family asks its fragment manager the same way later in this merged onClick.
+    @Test fun a582MergedCheckOfTheSameShapeWithoutAMenuIsRefused() {
+        // 582's 346415706 family asked its fragment manager the same way later in this merged onClick. Every 583 build
+        // asks just once, so a second question means the menu moved.
         val decoy = listOf(
             "invoke-virtual {p1}, Landroidx/fragment/app/Fragment;->getParentFragmentManager()LX/0XE;",
             "move-result-object v8",
@@ -267,9 +268,8 @@ class SaveStoriesTest {
             ":done",
             "return-void",
         ).joinToString("\n")
-        val save = builder(builderBody().replace("return-void", decoy)).validateStorySave()
-        assertEquals(14, save.others)
-        assertEquals(SAVE_ID, save.id)
+        assertEquals(14, builder().validateStorySave().others)
+        assertFailsWith<PatchException> { builder(builderBody().replace("return-void", decoy)).validateStorySave() }
     }
 
     @Test fun theHandlerMustSaveTheItemTheMenuAdds() {
