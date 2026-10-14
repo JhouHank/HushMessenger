@@ -332,8 +332,8 @@ class NearbyScansTest {
                 assertEquals(before.opcodes(), after.filterIndexed { i, _ -> i !in filters && i - 1 !in filters }.opcodes(), code)
                 reads += sites
             }
-            // Three names and three addresses on every 583 build.
-            assertEquals(6, reads, code)
+            // Four names and five addresses on every 583 build: the diagnostics snapshot and the logger read the address twice.
+            assertEquals(9, reads, code)
         }
     }
 
