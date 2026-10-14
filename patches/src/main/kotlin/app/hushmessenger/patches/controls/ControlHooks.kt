@@ -960,25 +960,34 @@ internal fun MutableMethod.injectMenuDrawerAdd() {
 private const val IMMUTABLE_LIST_BUILDER = "Lcom/google/common/collect/ImmutableList\$Builder;"
 
 /**
- * Builds that fill the keyboard's tab list inline add a local ArrayList of tab items to an ImmutableList.Builder
- * once, and the next instruction hands that builder to one static (ImmutableList.Builder) -> ImmutableList call.
- * Returns the addAll's index and list register.
+ * Builds that fill the keyboard's tab list inline copy a local ArrayList of tab items into an ImmutableList.Builder
+ * once. 583 hands the builder and the list to one static (ImmutableList.Builder, Iterable) -> ImmutableList call.
+ * 582 called the builder's addAll, and the next instruction handed that builder to one static (ImmutableList.Builder)
+ * -> ImmutableList call. Returns the copy's index and list register.
  */
 internal fun MutableMethod.validateKeyboardTabsInline(): Pair<Int, Int> {
+    fun changed(): Nothing = throw PatchException("Messenger controls: the sticker keyboard tab list differs from the tested build")
     val code = implementation!!.instructions.toList()
     val adds = code.indices.filter { index ->
         code[index].opcode == Opcode.INVOKE_VIRTUAL && (code[index] as ReferenceInstruction).reference.toString() ==
             "$IMMUTABLE_LIST_BUILDER->addAll(Ljava/lang/Iterable;)$IMMUTABLE_LIST_BUILDER"
     }
-    val build = adds.singleOrNull()?.let { code.getOrNull(it + 1) }
-    val ref = (build as? ReferenceInstruction)?.reference as? DexMethodReference
-    // Code inserted before a jump target would be skipped by whatever jumps there.
-    if (returnType != "V" || adds.size != 1 || adds.single() in jumpTargets() || build?.opcode != Opcode.INVOKE_STATIC ||
-        ref == null || ref.returnType != IMMUTABLE_LIST || ref.parameterTypes.map { it.toString() } != listOf(IMMUTABLE_LIST_BUILDER) ||
-        (build as FiveRegisterInstruction).registerC != (code[adds.single()] as FiveRegisterInstruction).registerC) {
-        throw PatchException("Messenger controls: the sticker keyboard tab list differs from the tested build")
+    val folded = code.indices.filter { index ->
+        val call = (code[index] as? ReferenceInstruction)?.reference as? DexMethodReference
+        code[index].opcode == Opcode.INVOKE_STATIC && call != null && call.returnType == IMMUTABLE_LIST &&
+            call.parameterTypes.map { it.toString() } == listOf(IMMUTABLE_LIST_BUILDER, "Ljava/lang/Iterable;")
     }
-    return adds.single() to (code[adds.single()] as FiveRegisterInstruction).registerD
+    val copy = (adds + folded).singleOrNull()
+    // Code inserted before a jump target would be skipped by whatever jumps there.
+    if (returnType != "V" || copy == null || copy in jumpTargets()) changed()
+    if (copy in adds) {
+        val build = code.getOrNull(copy + 1)
+        val ref = (build as? ReferenceInstruction)?.reference as? DexMethodReference
+        if (build?.opcode != Opcode.INVOKE_STATIC || ref == null || ref.returnType != IMMUTABLE_LIST ||
+            ref.parameterTypes.map { it.toString() } != listOf(IMMUTABLE_LIST_BUILDER) ||
+            (build as FiveRegisterInstruction).registerC != (code[copy] as FiveRegisterInstruction).registerC) changed()
+    }
+    return copy to (code[copy] as FiveRegisterInstruction).registerD
 }
 
 /** Drops the avatar tab from the list just before Messenger adds it to the builder; the list is a local. */

@@ -58,7 +58,7 @@ private val HOLDER_INIT_BODY = """
 private const val SNIPPET = "LX/2jP;"
 private const val SNIPPET_INIT = "$SNIPPET-><init>(Ljava/lang/CharSequence;)V"
 
-/** 346415686's LastMessageSnippetImpl.A01 cut down: it wraps a copy in a SpannableString, then builds the snippet. */
+/** 346611369's LastMessageSnippetImpl.A01 cut down: it wraps a copy in a SpannableString, then builds the snippet. */
 private val MAKER_BODY = """
     new-instance v0, Landroid/text/SpannableString;
     invoke-direct {v0, p1}, Landroid/text/SpannableString;-><init>(Ljava/lang/CharSequence;)V

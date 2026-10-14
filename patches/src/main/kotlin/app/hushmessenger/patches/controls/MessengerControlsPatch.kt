@@ -415,7 +415,7 @@ val stopAdEventsPatch = controlPatch("ad_events", "Stop inbox and ad link loggin
     "Stops two reports Messenger logs. One says which part of your chat list was on screen, which Messenger files under inbox ads. The other says which ad brought you in when a link from an ad opens a chat.", "Privacy")
 @Suppress("unused")
 val stopMqttLoggingPatch = controlPatch("mqtt_telemetry", "Stop MQTT logging",
-    "Drops the health reports and push logging Messenger's MQTT client sends. Messenger 582 sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working.", "Privacy")
+    "Drops the health reports and push logging Messenger's MQTT client sends. Messenger sends most of its traffic another way, so there's often little for it to drop. Messages, calls and active status keep working.", "Privacy")
 @Suppress("unused")
 val stopNearbyScansPatch = controlPatch("nearby_scans", "Stop nearby scans",
     "Stops Messenger from reading the list of Wi-Fi networks around you. Also stops the timer it can run while it's open to check your location and scan for Wi-Fi networks and Bluetooth devices.", "Privacy")

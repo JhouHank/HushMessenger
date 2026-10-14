@@ -7,7 +7,7 @@ package app.hushmessenger.patches.coexist
 
 import app.hushmessenger.patches.MessengerTarget
 import app.hushmessenger.patches.controls.BASE_PROFILE
-import app.hushmessenger.patches.controls.PROFILE_346415706
+import app.hushmessenger.patches.controls.PROFILE_346611351
 import app.hushmessenger.patches.controls.controlProfileFor
 import app.hushmessenger.patches.controls.hookId
 import app.hushmessenger.patches.controls.resolveShortcutsPath
@@ -298,15 +298,15 @@ private const val CLICK = "->onClick(Landroid/view/View;)V"
 /**
  * Each build family's backup lookup and attachment check, then every setPackage call that sends Messenger to itself:
  * the in-app broadcast sender, the push notification's click and link intents, the bulk delete link in the inbox and
- * the story link button. The native test checks them on all 14 builds.
+ * the story link button. The native test checks them on every supported build.
  */
 internal fun expectedCloneSitesFor(versionCode: String): Set<String> {
     validateVersionCode(versionCode)
     return when (controlProfileFor(versionCode)) {
-        BASE_PROFILE -> setOf("LX/J7q;-><init>()V", "LX/4KQ;$ATTACHMENT_CHECK", "LX/391;$BROADCAST@1", "LX/Q85;${NOTIFICATION}LX/RZC;@228",
-            "LX/Q85;${NOTIFICATION}LX/RZC;@321", "LX/C9t;$CLICK@81", "LX/MH9;$CLICK@160")
-        PROFILE_346415706 -> setOf("LX/Umq;-><init>()V", "LX/4Is;$ATTACHMENT_CHECK", "LX/38v;$BROADCAST@1", "LX/Q2n;${NOTIFICATION}LX/RWk;@225",
-            "LX/Q2n;${NOTIFICATION}LX/RWk;@318", "LX/C98;$CLICK@81", "LX/JL0;$CLICK@104")
+        BASE_PROFILE -> setOf("LX/EIF;-><init>()V", "LX/4K8;$ATTACHMENT_CHECK", "LX/38o;$BROADCAST@1", "LX/T9J;${NOTIFICATION}LX/Uh6;@227",
+            "LX/T9J;${NOTIFICATION}LX/Uh6;@321", "LX/CBZ;$CLICK@79", "LX/JpW;$CLICK@176")
+        PROFILE_346611351 -> setOf("LX/EEi;-><init>()V", "LX/4HM;$ATTACHMENT_CHECK", "LX/38n;$BROADCAST@1", "LX/KRb;${NOTIFICATION}LX/Lpm;@231",
+            "LX/KRb;${NOTIFICATION}LX/Lpm;@328", "LX/C7O;$CLICK@79", "LX/JmU;$CLICK@108")
         else -> fail("version code $versionCode has no checked clone sites")
     }
 }

@@ -18,7 +18,7 @@ import java.security.MessageDigest
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.*
 
-/** Emoji drawer flag reads in each 582 build, across its nine drawer hooks. */
+/** Emoji drawer flag reads in each 583 build, across its nine drawer hooks. */
 private const val EMOJI_DRAWER_READS = 10
 
 /** [resumeTail] pads onResume after the guarded part: 22 instructions in 582, two more in older releases. */
@@ -226,7 +226,7 @@ class NativeMediaControlsTest {
         val found = findControls(listOf(fixtureClass(payment.definingClass, listOf(payment)), fixtureClass(cleanup.definingClass, listOf(cleanup))))
         assertTrue(found.getValue("screenshot_viewers").isEmpty())
         assertEquals(before, listOf(payment, cleanup).map { it.implementation!!.instructions.toList() })
-        activeProfile = PROFILE_346415706
+        activeProfile = PROFILE_346611351
         assertFailsWith<PatchException> { screenshotViewerFixture("$EPHEMERAL_VIEWER->A1D(Landroid/os/Bundle;)Landroid/app/Dialog;").injectScreenshotViewer() }
     }
 
@@ -262,22 +262,25 @@ class NativeMediaControlsTest {
         }
     }
 
-    /** No recorded profile names 583's cell yet, so this one names it to check the injection compares 583's own label. */
+    /** Both 583 namings' cells, each under its own name, to check the injection compares 583's own label. */
     @Test fun the583CellComparesItsOwnLabel() {
-        val cell = aiCells.single { it.label == GENERATE_AI_LABEL_583 }
-        val base = SYNTHETIC_PROFILE
-        activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,
-            base.peopleKey, base.peopleFlagCheck, base.subtabsSupplier, base.browserPreferenceKey, base.browserPreferenceIndex,
-            base.adFilterSize, base.adFilterExits, base.bubbleCapabilityGetter, base.bubbleRolloutGetter, base.nativeBubbleRoutes,
-            base.nativeCommunityInbox)
-        val method = findAiStickerCells(aiStickerCellFixture(cell.render)).single() as MutableMethod
-        val before = method.implementation!!.instructions.toList()
-        method.injectAiStickerCell()
-        val after = method.implementation!!.instructions.toList()
-        assertEquals(before, after.drop(10))
-        assertEquals(GENERATE_AI_LABEL_583, (after[2] as NarrowLiteralInstruction).narrowLiteral)
-        assertEquals(10, after.branchTarget(3))
-        assertEquals(10, after.branchTarget(7))
+        val cells = aiCells.filter { it.label == GENERATE_AI_LABEL_583 }
+        assertEquals(2, cells.size)
+        for (cell in cells) {
+            val base = SYNTHETIC_PROFILE
+            activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,
+                base.peopleKey, base.peopleFlagCheck, base.subtabsSupplier, base.browserPreferenceKey, base.browserPreferenceIndex,
+                base.adFilterSize, base.adFilterExits, base.bubbleCapabilityGetter, base.bubbleRolloutGetter, base.nativeBubbleRoutes,
+                base.nativeCommunityInbox)
+            val method = findAiStickerCells(aiStickerCellFixture(cell.render)).single() as MutableMethod
+            val before = method.implementation!!.instructions.toList()
+            method.injectAiStickerCell()
+            val after = method.implementation!!.instructions.toList()
+            assertEquals(before, after.drop(10), cell.type)
+            assertEquals(GENERATE_AI_LABEL_583, (after[2] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(10, after.branchTarget(3))
+            assertEquals(10, after.branchTarget(7))
+        }
     }
 
     @Test fun disconnectedOrChangedAiLabelSourcesAndFieldsFailDiscovery() {

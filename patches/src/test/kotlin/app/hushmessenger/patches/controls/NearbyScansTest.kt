@@ -111,7 +111,7 @@ class NearbyScansTest {
     }
 
     @Test fun everyProfileHooksTheSameSchedulerAndItsOwnMappingsReader() {
-        for (profile in listOf(SYNTHETIC_PROFILE, BASE_PROFILE, PROFILE_346415706)) {
+        for (profile in listOf(SYNTHETIC_PROFILE, BASE_PROFILE, PROFILE_346611351)) {
             val hooks = profile.hooks.getValue(NEARBY_SCANS)
             val readerId = hooks.single { it != SYNTHETIC_NEARBY_SCAN_SCHEDULER }
             assertEquals(setOf(SYNTHETIC_NEARBY_SCAN_SCHEDULER, readerId), hooks)

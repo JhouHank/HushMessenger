@@ -37,13 +37,13 @@ internal const val SYNTHETIC_MENU_TITLE_LONG_PRESS = "$MORE_TITLE->CY1(Landroid/
 private val FINAL_PUBLIC = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value
 
 /**
- * Where the Chats and Menu titles' long press handlers live in the real builds: 2R7.CY1 and 3E4.CY1 in twelve, 2R6.CXu
- * and 3Da.CXu in 706 and 707.
+ * Where the Chats and Menu titles' long press handlers live in the real builds: 2R3.Ccw and 3Df.Ccw in five, 2R3.Ccn
+ * and 3DZ.Ccn in 346611351.
  */
-private const val NATIVE_LOGO_LONG_PRESS = "LX/2R7;->CY1(Landroid/content/Context;)V"
-private const val NATIVE_LOGO_LONG_PRESS_706 = "LX/2R6;->CXu(Landroid/content/Context;)V"
-private const val NATIVE_MENU_TITLE_LONG_PRESS = "LX/3E4;->CY1(Landroid/content/Context;)V"
-private const val NATIVE_MENU_TITLE_LONG_PRESS_706 = "LX/3Da;->CXu(Landroid/content/Context;)V"
+private const val NATIVE_LOGO_LONG_PRESS = "LX/2R3;->Ccw(Landroid/content/Context;)V"
+private const val NATIVE_LOGO_LONG_PRESS_351 = "LX/2R3;->Ccn(Landroid/content/Context;)V"
+private const val NATIVE_MENU_TITLE_LONG_PRESS = "LX/3Df;->Ccw(Landroid/content/Context;)V"
+private const val NATIVE_MENU_TITLE_LONG_PRESS_351 = "LX/3DZ;->Ccn(Landroid/content/Context;)V"
 
 /**
  * The Chats title's long press handler as 582 writes it: a null check, then the TitleShortcut plugin lookup with the
@@ -84,7 +84,7 @@ private fun titleClass(handler: MutableMethod, field: String = FB_USER_SESSION, 
         extraFields = listOf(ImmutableField(handler.definingClass, "A00", field, AccessFlags.FINAL.value, null, null, null)))
 
 /**
- * The Chats and Menu tabs' title long press handlers as every 582 build has them, and a class that holds the session and
+ * The Chats and Menu tabs' title long press handlers as every supported build has them, and a class that holds the session and
  * takes a Context but never asks the title shortcut plugin.
  */
 internal fun chatsTitleClasses(chats: MutableMethod = titleHandler()): List<MutableClass> = listOf(
@@ -221,12 +221,12 @@ class LogoLongPressTest {
         assertEquals(controlProfiles.size, apks.size)
         for (apk in apks) {
             val code = apk.fileName.toString().substringBeforeLast(".apk").substringAfterLast('-')
-            val in706 = controlProfileFor(code) === PROFILE_346415706
+            val in351 = controlProfileFor(code) === PROFILE_346611351
             val dex = DexFileFactory.loadDexContainer(apk.toFile(), Opcodes.forApi(35))
             val classes = dex.dexEntryNames.flatMap { dex.getEntry(it)!!.dexFile.classes }
             for ((title, expected) in listOf(
-                CHATS_TAB_TITLE to if (in706) NATIVE_LOGO_LONG_PRESS_706 else NATIVE_LOGO_LONG_PRESS,
-                MENU_TAB_TITLE to if (in706) NATIVE_MENU_TITLE_LONG_PRESS_706 else NATIVE_MENU_TITLE_LONG_PRESS,
+                CHATS_TAB_TITLE to if (in351) NATIVE_LOGO_LONG_PRESS_351 else NATIVE_LOGO_LONG_PRESS,
+                MENU_TAB_TITLE to if (in351) NATIVE_MENU_TITLE_LONG_PRESS_351 else NATIVE_MENU_TITLE_LONG_PRESS,
             )) {
                 val sites = findLogoLongPress(classes, title)
                 assertEquals(listOf(expected), sites.map { it.hookId() }, "$code ${title.handler}")

@@ -343,7 +343,20 @@ public class CompatReport {
         return builds;
     }
 
-    /** "582.0.0.61.92 (version code 346415686 or 346415687)", joined with " or " across version names. */
+    /**
+     * How many times a method copies a list into an ImmutableList.Builder: 582's addAll on the builder, or 583's one
+     * static (ImmutableList.Builder, Iterable) -> ImmutableList call. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
+     */
+    static long keyboardTabCopies(Collection<Object> refs) {
+        String builder = "Lcom/google/common/collect/ImmutableList$Builder;", iterable = "Ljava/lang/Iterable;";
+        return refs.stream().filter(r -> r instanceof MethodReference m && (
+            builder.equals(m.getDefiningClass()) && "addAll".equals(m.getName()) &&
+                m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(iterable)) ||
+            IMMUTABLE_LIST.equals(m.getReturnType()) &&
+                m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable)))).count();
+    }
+
+    /** "583.0.0.29.95 (version code 346611351 or 346611369)", joined with " or " across version names. */
     static String supported(Map<String, Profile> builds) {
         var codes = new TreeMap<String, List<String>>();
         for (var build : builds.values()) codes.computeIfAbsent(build.version, v -> new ArrayList<>()).add(build.code);
@@ -1606,7 +1619,7 @@ public class CompatReport {
         } else if (method.getDefiningClass().equals(QUICKSNAP_VIEWER) && method.getName().equals("onCreateView") &&
                 p.equals(List.of("Landroid/view/LayoutInflater;", "Landroid/view/ViewGroup;", "Landroid/os/Bundle;")) && method.getReturnType().equals("Landroid/view/View;")) {
             sites = List.of(32);
-            valid = impl.getRegisterCount() == 23 && Set.of(438, 441, 450).contains(c.size()) && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
+            valid = impl.getRegisterCount() == 23 && Set.of(438, 441, 449, 450).contains(c.size()) && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
                 mediaNull(c, 27, 0, 33) && mediaWindow(c, 28, "Landroid/app/Dialog;", 0, 1, 33) && mediaLiteral(c, 31, 0) && mediaCall(c, 32, ADD_FLAGS, 1, 0);
         } else return List.of();
         var setters = new ArrayList<Integer>();
@@ -1620,7 +1633,7 @@ public class CompatReport {
 
     /**
      * Mirrors NativeMediaControls.kt: each build's cell, its label, how many renders offer that label and its render's
-     * size (24 registers in every build). 582 offers the label from five renders of 105; 583 from four, of 104.
+     * size (24 registers in every build). 582 offers the label from five renders of 105; 583 from four, of 104 or 105.
      */
     record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size) {
         String render() { return type + "->render(" + scope + ")" + component; }
@@ -1628,7 +1641,8 @@ public class CompatReport {
     static List<Method> findAiStickerCells(List<ClassDef> classes) {
         var shapes = List.of(new AiCell("LX/CoQ;", "LX/1N9;", "LX/2Cg;", "LX/1GU;", GENERATE_AI_LABEL, 5, 105),
             new AiCell("LX/EyW;", "LX/1N8;", "LX/2Cf;", "LX/1GT;", GENERATE_AI_LABEL, 5, 105),
-            new AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, 4, 104));
+            new AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, 4, 104),
+            new AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, 4, 105));
         var result = new ArrayList<Method>();
         for (var shape : shapes) {
             var matching = classes.stream().filter(c -> c.getType().equals(shape.type())).toList();
@@ -3215,7 +3229,7 @@ public class CompatReport {
             int loads = 0, returns = 0;
             boolean jumps = method.getImplementation().getTryBlocks().iterator().hasNext();
             for (var i : code) {
-                if (i.getOpcode() == Opcode.CONST_WIDE && ((WideLiteralInstruction) i).getWideLiteral() == 0x8205c50002109fL) loads++;
+                if (i.getOpcode() == Opcode.CONST_WIDE && ((WideLiteralInstruction) i).getWideLiteral() == 0x8205c10002107bL) loads++;
                 if (i.getOpcode() == Opcode.RETURN || i.getOpcode() == Opcode.RETURN_VOID || i.getOpcode() == Opcode.RETURN_OBJECT ||
                     i.getOpcode() == Opcode.RETURN_WIDE) returns++;
                 if (i instanceof OffsetInstruction) jumps = true;
@@ -3783,8 +3797,9 @@ public class CompatReport {
                     found.get("people_inbox_refresh").add(method);
                 }
 
-                // avatar_tabs: the sticker keyboard's tab list, filled inline in a void composer factory method.
-                if ("V".equals(method.getReturnType()) &&
+                // avatar_tabs: the sticker keyboard's tab list, filled inline in a void composer factory method
+                // that copies it into a builder once.
+                if ("V".equals(method.getReturnType()) && keyboardTabCopies(refs) == 1 &&
                     "Lcom/facebook/messaging/msys/thread/composer/configuration/xapp/BaseXappComposerConfigurationFactory;".equals(cls.getType()) &&
                     refs.stream().anyMatch(r -> r.toString().startsWith(
                         "Lcom/facebook/xapp/messaging/composer/avatar/composertab/event/ActivateAvatarSticker;->")) &&

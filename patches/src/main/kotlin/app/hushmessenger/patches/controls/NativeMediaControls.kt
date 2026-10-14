@@ -84,7 +84,7 @@ internal fun Method.screenshotViewerSites(): List<Int> {
             parameterTypes.map { it.toString() } == listOf("Landroid/view/LayoutInflater;", "Landroid/view/ViewGroup;", "Landroid/os/Bundle;") &&
             returnType == "Landroid/view/View;" -> {
             sites = listOf(32); allowedJumps = emptySet()
-            implementation!!.registerCount == 23 && code.size in setOf(438, 441, 450) &&
+            implementation!!.registerCount == 23 && code.size in setOf(438, 441, 449, 450) &&
                 result(26, "Landroid/app/Dialog;", 0) && nullCheck(27, 0, 33) && window(28, "Landroid/app/Dialog;", 0, 1, 33) &&
                 literal(31, 0) && call(32, ADD_FLAGS, listOf(1, 0))
         }
@@ -127,6 +127,7 @@ internal val aiCells = listOf(
     AiCell("LX/CoQ;", "LX/1N9;", "LX/2Cg;", "LX/1GU;"),
     AiCell("LX/EyW;", "LX/1N8;", "LX/2Cf;", "LX/1GT;"),
     AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, sources = 4, size = 104),
+    AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, sources = 4),
 )
 internal const val AI_CELL_SIZE = 105
 internal const val AI_CELL_REGISTERS = 24
