@@ -1977,26 +1977,13 @@ public class CompatReport {
         var n=instructions(keyPredicate); var a=instructions(keyAny);
         require(n.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IF_EQZ,Opcode.INVOKE_VIRTUAL,Opcode.MOVE_RESULT,Opcode.IF_EQZ,Opcode.CONST_4,Opcode.RETURN,Opcode.CONST_4,Opcode.RETURN)) &&
             keyPredicate.getImplementation().getRegisterCount()==1 && branch(keyPredicate,0)==6 && branch(keyPredicate,3)==6 && args(n.get(1)).equals(List.of(0)) && literal(n.get(4),0,1) && literal(n.get(6),0,0),"null/unknown key behavior changed");
-        // 582 asks a separate channel check first; 583 compares the key type with both channel types inline.
-        Method keyChannel=null; String channelType, announcementType, keyField;
-        if (a.size()==10) {
-            var channel=definition(single(calls(keyAny).stream().filter(m->m.getDefiningClass().equals(KEY) && m.getParameterTypes().isEmpty() && m.getReturnType().equals("Z")).toList(),"community channel predicate"));
-            require(calls(keyAny).stream().anyMatch(m->id(m).equals(id(channel))) && instructions(channel).size()==7,"community OR predicate changed");
-            keyChannel=channel;
-            var h=instructions(keyChannel);
-            require(a.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.INVOKE_VIRTUAL,Opcode.MOVE_RESULT,Opcode.IF_NEZ,Opcode.IGET_OBJECT,Opcode.SGET_OBJECT,Opcode.IF_EQ,Opcode.CONST_4,Opcode.RETURN,Opcode.CONST_4,Opcode.RETURN)) &&
-                branch(keyAny,2)==8 && branch(keyAny,5)==8 && args(a.get(0)).equals(List.of(2)) && literal(a.get(6),0,0) && literal(a.get(8),0,1),"community OR value flow changed");
-            require(h.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT,Opcode.SGET_OBJECT,Opcode.IF_NE,Opcode.CONST_4,Opcode.RETURN,Opcode.CONST_4,Opcode.RETURN)) &&
-                branch(keyChannel,2)==5 && literal(h.get(3),0,1) && literal(h.get(5),0,0) && Objects.toString(ref(h.get(0))).equals(Objects.toString(ref(a.get(3)))),"ordinary key behavior changed");
-            keyField=Objects.toString(ref(h.get(0))); channelType=Objects.toString(ref(h.get(1))); announcementType=Objects.toString(ref(a.get(4)));
-        } else {
-            require(a.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT,Opcode.SGET_OBJECT,Opcode.IF_EQ,Opcode.SGET_OBJECT,Opcode.IF_EQ,Opcode.CONST_4,Opcode.RETURN,Opcode.CONST_4,Opcode.RETURN)) &&
-                keyAny.getImplementation().getRegisterCount()==3 && branch(keyAny,2)==7 && branch(keyAny,4)==7 && literal(a.get(5),0,0) && literal(a.get(7),0,1) &&
-                ((TwoRegisterInstruction)a.get(0)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(0)).getRegisterB()==2 && register(a.get(1))==0 && register(a.get(3))==0 &&
-                ((TwoRegisterInstruction)a.get(2)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(2)).getRegisterB()==0 &&
-                ((TwoRegisterInstruction)a.get(4)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(4)).getRegisterB()==0,"inline community OR predicate changed");
-            keyField=Objects.toString(ref(a.get(0))); channelType=Objects.toString(ref(a.get(1))); announcementType=Objects.toString(ref(a.get(3)));
-        }
+        // The community check compares the key type with both channel types inline.
+        require(a.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT,Opcode.SGET_OBJECT,Opcode.IF_EQ,Opcode.SGET_OBJECT,Opcode.IF_EQ,Opcode.CONST_4,Opcode.RETURN,Opcode.CONST_4,Opcode.RETURN)) &&
+            keyAny.getImplementation().getRegisterCount()==3 && branch(keyAny,2)==7 && branch(keyAny,4)==7 && literal(a.get(5),0,0) && literal(a.get(7),0,1) &&
+            ((TwoRegisterInstruction)a.get(0)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(0)).getRegisterB()==2 && register(a.get(1))==0 && register(a.get(3))==0 &&
+            ((TwoRegisterInstruction)a.get(2)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(2)).getRegisterB()==0 &&
+            ((TwoRegisterInstruction)a.get(4)).getRegisterA()==1 && ((TwoRegisterInstruction)a.get(4)).getRegisterB()==0,"inline community OR predicate changed");
+        String keyField=Objects.toString(ref(a.get(0))), channelType=Objects.toString(ref(a.get(1))), announcementType=Objects.toString(ref(a.get(3)));
         var keyType=single(fieldsOf(KEY, keyField.substring(keyField.lastIndexOf(':')+1)),"typed key enum"); var enums=enumMembers(keyType.getType());
         require(keyField.equals(keyType.toString()) && channelType.equals(enums.get("COMMUNITY_CHANNEL").toString()) && announcementType.equals(enums.get("COMMUNITY_ANNOUNCEMENT_CHANNEL").toString()),"joined predicate accepts other types");
         String rowType=single(renderCode.stream().filter(i->i.getOpcode()==Opcode.INSTANCE_OF).map(i->((TypeReference)ref(i)).getType()).distinct().filter(t->fieldsOf(t,SUMMARY).size()==1).toList(),"native row type");
@@ -2004,7 +1991,6 @@ public class CompatReport {
         require(AccessFlags.PUBLIC.isSet(classes.get(rowType).getAccessFlags()) && AccessFlags.PUBLIC.isSet(rowSummary.getAccessFlags()) && AccessFlags.FINAL.isSet(rowSummary.getAccessFlags()) &&
             AccessFlags.PUBLIC.isSet(classes.get(predicate.getDefiningClass()).getAccessFlags()) && AccessFlags.PUBLIC.isSet(predicate.getAccessFlags()) && AccessFlags.STATIC.isSet(predicate.getAccessFlags()),"typed native contract inaccessible");
         var identityParts=new ArrayList<>(List.of(id(render),id(ctor),id(scopeGetter),id(folderOverride),rowSummary.toString(),id(predicate),id(keyPredicate),id(keyAny)));
-        if (keyChannel!=null) identityParts.add(id(keyChannel));
         identityParts.add(requests.toString()); identityParts.add(prefix.toString());
         currentPath.forEach(f->identityParts.add(f.toString())); identityParts.add(id(folderGetter)); identityParts.add(folders.get("INBOX").toString());
         String identity=String.join("|",identityParts);
