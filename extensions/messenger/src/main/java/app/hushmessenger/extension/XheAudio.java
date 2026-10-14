@@ -416,6 +416,20 @@ public final class XheAudio {
     }
 
     /**
+     * How far to move every sample so the earliest first sample lands at zero. A track that starts below zero (an
+     * encoder-delay edit list) moves both tracks by the same amount, so picture and sound stay in sync.
+     */
+    static long startShift(boolean pictureLeft, long firstPicture, boolean soundLeft, long firstSound) {
+        long first = Math.min(pictureLeft ? firstPicture : 0L, soundLeft ? firstSound : 0L);
+        return first < 0 ? -first : 0L;
+    }
+
+    /** Whether the picture's next sample goes first: it's the earlier of the two, or the sound has run out. */
+    static boolean takePicture(boolean pictureLeft, long nextPicture, boolean soundLeft, long nextSound) {
+        return !soundLeft || (pictureLeft && nextPicture <= nextSound);
+    }
+
+    /**
      * Writes [picture]'s picture tracks and [sound]'s one sound track into [out], each sample as it was, taking the
      * earlier of the two next samples each time so the file stays interleaved. Keeps the picture's rotation.
      */
@@ -450,18 +464,21 @@ public final class XheAudio {
 
             ByteBuffer buffer = ByteBuffer.allocateDirect(SAMPLE_BYTES);
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            long shift = startShift(pictures.getSampleTrackIndex() >= 0, pictures.getSampleTime(),
+                sounds.getSampleTrackIndex() >= 0, sounds.getSampleTime());
             while (true) {
-                long nextPicture = pictures.getSampleTime();
-                long nextSound = sounds.getSampleTime();
-                if (nextPicture < 0 && nextSound < 0) break;
-                boolean takePicture = nextSound < 0 || (nextPicture >= 0 && nextPicture <= nextSound);
+                // A sample time can be below zero (an encoder-delay edit list), so only the track index marks the end.
+                boolean pictureLeft = pictures.getSampleTrackIndex() >= 0;
+                boolean soundLeft = sounds.getSampleTrackIndex() >= 0;
+                if (!pictureLeft && !soundLeft) break;
+                boolean takePicture = takePicture(pictureLeft, pictures.getSampleTime(), soundLeft, sounds.getSampleTime());
                 MediaExtractor from = takePicture ? pictures : sounds;
                 int track = takePicture ? pictureOut.get(pictureTracks.indexOf(from.getSampleTrackIndex())) : soundOut;
                 buffer.clear();
                 int size = from.readSampleData(buffer, 0);
                 if (size < 0) break;
                 boolean sync = (from.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
-                info.set(0, size, from.getSampleTime(), sync ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
+                info.set(0, size, from.getSampleTime() + shift, sync ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
                 muxer.writeSampleData(track, buffer, info);
                 from.advance();
             }

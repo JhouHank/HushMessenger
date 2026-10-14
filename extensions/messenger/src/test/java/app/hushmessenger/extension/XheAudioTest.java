@@ -54,6 +54,18 @@ public class XheAudioTest {
         assertEquals("the format's own buffer isn't moved", 0, shared.position());
     }
 
+    @Test public void aSoundTrackStartingBelowZeroIsKeptAndBothTracksMoveTogether() {
+        // ffmpeg's AAC encoder delay: the sound's first sample sits at -23219 us, the picture's at 0.
+        assertEquals(23_219L, XheAudio.startShift(true, 0L, true, -23_219L));
+        assertEquals(23_219L, XheAudio.startShift(false, -1L, true, -23_219L));
+        assertEquals(0L, XheAudio.startShift(true, 0L, true, 0L));
+        assertEquals("a finished track's -1 isn't a start", 0L, XheAudio.startShift(true, 0L, false, -1L));
+        assertFalse("the negative sound sample goes first", XheAudio.takePicture(true, 0L, true, -23_219L));
+        assertFalse("the sound isn't over just because its time is negative", XheAudio.takePicture(false, -1L, true, -23_219L));
+        assertTrue(XheAudio.takePicture(true, 0L, true, 0L));
+        assertTrue(XheAudio.takePicture(true, 40_000L, false, -1L));
+    }
+
     @Test public void aCopyThatCantBeReadStaysAsItWasAndLeavesNothingBehind() throws Exception {
         File copy = folder.newFile("orca_share_media123.mp4");
         byte[] bytes = "not a video".getBytes();
