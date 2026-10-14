@@ -1421,9 +1421,8 @@ internal class StorySave(
     val fragmentType: String,
     val menuType: String,
     val controller: String,
-    /** Card controllers the item is offered for, in builds that list them; empty where [canSave] answers instead. */
+    /** Card controllers the item is offered for. */
     val saveable: List<String>,
-    val canSave: String?,
     val id: Long,
     val label: Long,
     val labelOf: String,
@@ -1491,31 +1490,19 @@ internal fun MutableMethod.validateStorySave(): StorySave {
     }
     val card = reg(entry + 3)
     val saveable = mutableListOf<String>()
-    var canSave: String? = null
     var add = entry + 4
-    if (op(add) == Opcode.INSTANCE_OF) {
-        // Older builds list the card types: a match jumps to the item, the last miss skips it.
-        while (op(add) == Opcode.INSTANCE_OF) {
-            val test = code[add] as TwoRegisterInstruction
-            if (test.registerB != card || reg(add + 1) != test.registerA) fail("Save item's card test no longer matches the tested build")
-            saveable += ((code[add] as ReferenceInstruction).reference as TypeReference).type
-            add += 2
-            if (op(add - 1) == Opcode.IF_EQZ && branch(add - 1) == skip) break
-            if (op(add - 1) != Opcode.IF_NEZ) fail("Save item's card test no longer matches the tested build")
-        }
-        if (op(add - 1) != Opcode.IF_EQZ || (entry + 5 until add - 1 step 2).any { branch(it) != add }) {
-            fail("Save item's card test no longer matches the tested build")
-        }
-    } else {
-        // Newer builds ask the card's controller.
-        val test = call(add)
-        if (op(add) != Opcode.INVOKE_VIRTUAL || test == null || test.returnType != "Z" || test.parameterTypes.isNotEmpty() ||
-            args(add) != listOf(card) || op(add + 1) != Opcode.MOVE_RESULT || op(add + 2) != Opcode.IF_EQZ ||
-            reg(add + 2) != reg(add + 1) || branch(add + 2) != skip) {
-            fail("Save item's card test no longer matches the tested build")
-        }
-        canSave = test.toString()
-        add += 3
+    // 583 lists the card types: a match jumps to the item, the last miss skips it.
+    if (op(add) != Opcode.INSTANCE_OF) fail("Save item's card test no longer matches the tested build")
+    while (op(add) == Opcode.INSTANCE_OF) {
+        val test = code[add] as TwoRegisterInstruction
+        if (test.registerB != card || reg(add + 1) != test.registerA) fail("Save item's card test no longer matches the tested build")
+        saveable += ((code[add] as ReferenceInstruction).reference as TypeReference).type
+        add += 2
+        if (op(add - 1) == Opcode.IF_EQZ && branch(add - 1) == skip) break
+        if (op(add - 1) != Opcode.IF_NEZ) fail("Save item's card test no longer matches the tested build")
+    }
+    if (op(add - 1) != Opcode.IF_EQZ || (entry + 5 until add - 1 step 2).any { branch(it) != add }) {
+        fail("Save item's card test no longer matches the tested build")
     }
     val id = literal(add)
     val label = literal(add + 1)
@@ -1539,7 +1526,7 @@ internal fun MutableMethod.validateStorySave(): StorySave {
     }
     val handler = handlers.singleOrNull() ?: fail("no longer sends its clicks to one handler")
     return StorySave(
-        others, fragment, menu, fragmentType, menuType, controller.toString(), saveable, canSave, id, label,
+        others, fragment, menu, fragmentType, menuType, controller.toString(), saveable, id, label,
         labelOf.toString(), icon.toString(), addItem.toString(), ((code[handler] as ReferenceInstruction).reference as TypeReference).type,
     )
 }
@@ -1563,10 +1550,9 @@ internal fun ClassDef.validateStoryMenuHandler(save: StorySave) {
 
 /** Offers Save on someone else's story the way the menu offers it on yours, while the switch is on. */
 internal fun storySaveHelper(definingClass: String, save: StorySave): MutableMethod {
-    val test = save.canSave?.let { "invoke-virtual {v0}, $it\nmove-result v1\nif-eqz v1, :done" }
-        ?: save.saveable.mapIndexed { i, type ->
-            "instance-of v1, v0, $type\n" + if (i == save.saveable.lastIndex) "if-eqz v1, :done" else "if-nez v1, :add"
-        }.joinToString("\n")
+    val test = save.saveable.mapIndexed { i, type ->
+        "instance-of v1, v0, $type\n" + if (i == save.saveable.lastIndex) "if-eqz v1, :done" else "if-nez v1, :add"
+    }.joinToString("\n")
     val parameters = listOf(save.fragmentType, save.menuType).map { ImmutableMethodParameter(it, null, null) }
     return MutableMethod(ImmutableMethod(definingClass, STORY_SAVE_HELPER, parameters, "V",
         AccessFlags.PUBLIC.value or AccessFlags.STATIC.value, null, null, ImmutableMethodImplementation(6, emptyList(), null, null)))
