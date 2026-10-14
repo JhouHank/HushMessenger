@@ -45,7 +45,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
         "LX/8xp;->onScreenCaptured()V",
         "LX/4nW;->A00(Landroid/view/Window;)V",
     ),
-    "screenshot_viewers" to screenshotViewerHooks("A1D"),
+    "screenshot_viewers" to screenshotViewerHooks(),
     HIDE_READ_RECEIPTS to setOf(SYNTHETIC_CHAT_SEEN),
     REPLY_READ to setOf(SYNTHETIC_SEND_EVENT),
     "keep_unsent" to setOf("LX/SH3;->A01(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;)V"),

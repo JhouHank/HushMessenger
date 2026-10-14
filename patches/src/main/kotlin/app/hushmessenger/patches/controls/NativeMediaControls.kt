@@ -17,15 +17,15 @@ internal const val EPHEMERAL_VIEWER = "Lcom/facebook/messaging/media/ephemeralme
 internal const val QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;"
 /** "Generate AI stickers" in Messenger 583's string pack. */
 internal const val GENERATE_AI_LABEL = 0x7f140560
-/** The viewer's onCreateDialog override: A1D, or A1F in builds 346415706 and 346415707. */
-internal val EPHEMERAL_DIALOGS = setOf("A1D", "A1F")
+/** The viewer's onCreateDialog override, A1F in every 583 build. */
+internal const val EPHEMERAL_DIALOG = "A1F"
 private const val WINDOW = "Landroid/view/Window;"
 private const val SET_FLAGS = "$WINDOW->setFlags(II)V"
 private const val ADD_FLAGS = "$WINDOW->addFlags(I)V"
 private const val SECURE = 0x2000
 
-internal fun screenshotViewerHooks(dialogMethod: String) = setOf(
-    "$EPHEMERAL_VIEWER->$dialogMethod(Landroid/os/Bundle;)Landroid/app/Dialog;",
+internal fun screenshotViewerHooks() = setOf(
+    "$EPHEMERAL_VIEWER->$EPHEMERAL_DIALOG(Landroid/os/Bundle;)Landroid/app/Dialog;",
     "$EPHEMERAL_VIEWER->onResume()V",
     "$QUICKSNAP_VIEWER->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;",
 )
@@ -63,7 +63,7 @@ internal fun Method.screenshotViewerSites(): List<Int> {
     val allowedJumps: Set<Int>
     var jumpSources = emptySet<Int>()
     val valid = when {
-        definingClass == EPHEMERAL_VIEWER && name in EPHEMERAL_DIALOGS &&
+        definingClass == EPHEMERAL_VIEWER && name == EPHEMERAL_DIALOG &&
             parameterTypes.map { it.toString() } == listOf("Landroid/os/Bundle;") && returnType == "Landroid/app/Dialog;" -> {
             sites = listOf(9); allowedJumps = emptySet()
             implementation!!.registerCount == 5 && code.size == 15 && result(4, "Landroid/app/Dialog;", 2) && window(5, "Landroid/app/Dialog;", 2, 1, 10) &&

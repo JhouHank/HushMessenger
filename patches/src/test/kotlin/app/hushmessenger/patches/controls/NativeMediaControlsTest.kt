@@ -193,6 +193,10 @@ class NativeMediaControlsTest {
         val mask = screenshotViewerFixture(resume).apply { replaceInstruction(9, "const/16 v1, 0x80") }
         assertFailsWith<PatchException> { mask.screenshotViewerSites() }
         assertEquals(listOf(9), screenshotViewerFixture("$EPHEMERAL_VIEWER->A1F(Landroid/os/Bundle;)Landroid/app/Dialog;").screenshotViewerSites())
+        // 582's A1D override, same body, is refused.
+        assertFailsWith<PatchException> {
+            screenshotViewerFixture("$EPHEMERAL_VIEWER->A1D(Landroid/os/Bundle;)Landroid/app/Dialog;").screenshotViewerSites()
+        }
         val quick = "$QUICKSNAP_VIEWER->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;"
         // Messenger 583 runs it to 449, or 450 in 346611351, with the same guarded prefix.
         assertEquals(listOf(32), screenshotViewerFixture(quick, 449).screenshotViewerSites())

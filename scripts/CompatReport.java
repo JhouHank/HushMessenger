@@ -1542,7 +1542,8 @@ public class CompatReport {
     static final String WINDOW = "Landroid/view/Window;";
     static final String SET_FLAGS = WINDOW + "->setFlags(II)V", ADD_FLAGS = WINDOW + "->addFlags(I)V";
     static final int GENERATE_AI_LABEL = 0x7f140560;
-    static final Set<String> EPHEMERAL_DIALOGS = Set.of("A1D", "A1F");
+    // The viewer's onCreateDialog override, A1F in every 583 build
+    static final String EPHEMERAL_DIALOG = "A1F";
 
     static int mediaTarget(List<Instruction> code, int at) {
         if (!(code.get(at) instanceof OffsetInstruction jump)) return -1;
@@ -1598,7 +1599,7 @@ public class CompatReport {
         var impl = method.getImplementation(); var c = instructions(method); var p = bubbleParameters(method);
         if (impl == null || AccessFlags.STATIC.isSet(method.getAccessFlags()) || !impl.getTryBlocks().isEmpty()) return List.of();
         List<Integer> sites; boolean valid, resume = false;
-        if (method.getDefiningClass().equals(EPHEMERAL_VIEWER) && EPHEMERAL_DIALOGS.contains(method.getName()) &&
+        if (method.getDefiningClass().equals(EPHEMERAL_VIEWER) && EPHEMERAL_DIALOG.equals(method.getName()) &&
                 p.equals(List.of("Landroid/os/Bundle;")) && method.getReturnType().equals("Landroid/app/Dialog;")) {
             sites = List.of(9);
             valid = impl.getRegisterCount() == 5 && c.size() == 15 && mediaResult(c, 4, "Landroid/app/Dialog;", 2) &&
