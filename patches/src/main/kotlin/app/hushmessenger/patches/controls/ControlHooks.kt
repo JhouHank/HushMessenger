@@ -234,7 +234,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 refs.any { it.toString() == "Landroid/app/ActivityManager;->isLowRamDevice()Z" }) add("bubbles")
             if (!AccessFlags.STATIC.isSet(method.accessFlags) && method.returnType == "Z" &&
                 method.parameterTypes == listOf(BUBBLE_SESSION) && instructions.any {
-                    it.opcode == Opcode.CONST_WIDE && (it as? WideLiteralInstruction)?.wideLiteral?.let { flag -> flag in BUBBLE_ROLLOUTS } == true
+                    it.opcode == Opcode.CONST_WIDE && (it as? WideLiteralInstruction)?.wideLiteral == BUBBLE_ROLLOUT
                 }) add("bubble_mode")
             // The external-browser check is the launcher's own (Uri, session) instance check; it logs no skip reason.
             if (method.returnType == "Z" && cls.type == MESSENGER_BROWSER_LAUNCHER && !AccessFlags.STATIC.isSet(method.accessFlags) &&

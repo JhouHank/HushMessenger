@@ -578,9 +578,8 @@ public class CompatReport {
     }
 
     static final String BUBBLE_SESSION = "Lcom/facebook/auth/usersession/FbUserSession;";
-    /** The specifier of the bubble rollout read. Each release renumbers it; only 582's and 583's are accepted, as in NativeBubbles.kt. */
-    static final long BUBBLE_ROLLOUT = 36312020047499274L;
-    static final Set<Long> BUBBLE_ROLLOUTS = Set.of(BUBBLE_ROLLOUT, 36312015752531975L);
+    /** The specifier of the bubble rollout read as 583 numbers it. Each release renumbers it, as in NativeBubbles.kt. */
+    static final long BUBBLE_ROLLOUT = 36312015752531975L;
     static final String BUBBLE_ACTIVITY = "com.facebook.messaging.msys.thread.bubbles.activity.StaxThreadViewBubblesActivity";
     static final String SHORTCUT_BUILDER = "Landroid/content/pm/ShortcutInfo$Builder;";
     static final String MESSAGING_STYLE = "Landroidx/core/app/NotificationCompat$MessagingStyle;";
@@ -635,7 +634,7 @@ public class CompatReport {
             register(c.get(10)) == 0 && ((NarrowLiteralInstruction)c.get(10)).getNarrowLiteral() == 28 &&
             capability.equals(ref(c.get(11))) && calls(c.get(11),1,4,0) && register(c.get(12)) == 0 &&
             register(c.get(13)) == 0 && jumpsTo(c,13,24) && register(c.get(18)) == 2 && register(c.get(19)) == 0 &&
-            BUBBLE_ROLLOUTS.contains(((WideLiteralInstruction)c.get(19)).getWideLiteral()) && register(c.get(20)) == 2 &&
+            ((WideLiteralInstruction)c.get(19)).getWideLiteral() == BUBBLE_ROLLOUT && register(c.get(20)) == 2 &&
             "Lcom/facebook/mobileconfig/factory/MobileConfigUnsafeContext;".equals(ref(c.get(20))) &&
             rollout.equals(ref(c.get(21))) && calls(c.get(21),2,0,1) && register(c.get(22)) == 0 &&
             register(c.get(23)) == 0 && register(c.get(24)) == 2;
@@ -3609,7 +3608,7 @@ public class CompatReport {
                 if (!isStatic && "Z".equals(method.getReturnType()) &&
                     paramTypes.equals(List.of(BUBBLE_SESSION)) && instructions.stream().anyMatch(i ->
                         i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag &&
-                        BUBBLE_ROLLOUTS.contains(flag.getWideLiteral()))) found.get("bubble_mode").add(method);
+                        flag.getWideLiteral() == BUBBLE_ROLLOUT)) found.get("bubble_mode").add(method);
 
                 // browser: the launcher's own (Uri, session) instance check, which logs no skip reason
                 if ("Z".equals(method.getReturnType()) && MESSENGER_BROWSER_LAUNCHER.equals(cls.getType()) && !isStatic &&
