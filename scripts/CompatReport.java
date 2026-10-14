@@ -344,16 +344,13 @@ public class CompatReport {
     }
 
     /**
-     * How many times a method copies a list into an ImmutableList.Builder: 582's addAll on the builder, or 583's one
-     * static (ImmutableList.Builder, Iterable) -> ImmutableList call. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
+     * How many times a method copies a list into an ImmutableList.Builder through 583's one static
+     * (ImmutableList.Builder, Iterable) -> ImmutableList call. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
      */
     static long keyboardTabCopies(Collection<Object> refs) {
         String builder = "Lcom/google/common/collect/ImmutableList$Builder;", iterable = "Ljava/lang/Iterable;";
-        return refs.stream().filter(r -> r instanceof MethodReference m && (
-            builder.equals(m.getDefiningClass()) && "addAll".equals(m.getName()) &&
-                m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(iterable)) ||
-            IMMUTABLE_LIST.equals(m.getReturnType()) &&
-                m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable)))).count();
+        return refs.stream().filter(r -> r instanceof MethodReference m && IMMUTABLE_LIST.equals(m.getReturnType()) &&
+            m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable))).count();
     }
 
     /** "583.0.0.29.95 (version code 346611351 or 346611369)", joined with " or " across version names. */

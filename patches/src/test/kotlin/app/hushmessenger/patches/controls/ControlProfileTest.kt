@@ -71,16 +71,14 @@ class ControlProfileTest {
     private val build = "LX/34B;->A01($builder)Lcom/google/common/collect/ImmutableList;"
     private val folded = "LX/34B;->A0l(${builder}Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableList;"
 
-    // Shaped like 582's BaseXappComposerConfigurationFactory.A6X: addAll the local list, then build. [foldedCopy] is
-    // 583's A6l, where one call takes the builder and the list.
+    // Shaped like 583's BaseXappComposerConfigurationFactory.A6l, where one call takes the builder and the local list.
+    // [addAllCopy] is 582's form instead: the builder's addAll, then a build.
     private fun inlineTabs(
         extraCopy: Boolean = false,
         branchIntoCopy: Boolean = false,
         switchIntoCopy: Boolean = false,
         catchIntoCopy: Boolean = false,
-        buildsAnotherBuilder: Boolean = false,
-        noBuild: Boolean = false,
-        foldedCopy: Boolean = false,
+        addAllCopy: Boolean = false,
     ) = fixtureMethod("$COMPOSER_FACTORY->A6X(LX/5vA;)V", """
             new-instance v12, Ljava/util/ArrayList;
             invoke-direct {v12}, Ljava/util/ArrayList;-><init>()V
@@ -90,24 +88,23 @@ class ControlProfileTest {
             const/4 v4, 0x0
             ${if (switchIntoCopy) "packed-switch v4, :cases" else "nop"}
             :copy
-            ${if (foldedCopy) "invoke-static {v2, v12}, $folded" else "invoke-virtual {v2, v12}, $copy"}
-            ${if (noBuild || foldedCopy) "nop" else "invoke-static {${if (buildsAnotherBuilder) "v5" else "v2"}}, $build"}
+            ${if (addAllCopy) "invoke-virtual {v2, v12}, $copy\ninvoke-static {v2}, $build" else "invoke-static {v2, v12}, $folded"}
             move-result-object v3
-            ${if (extraCopy) "invoke-virtual {v2, v12}, $copy" else "nop"}
+            ${if (extraCopy) "invoke-static {v2, v12}, $folded" else "nop"}
             return-void
             ${if (switchIntoCopy) ":cases\n.packed-switch 0x1\n:copy\n.end packed-switch" else ""}
         """.trimIndent(), registers = 16).apply {
             // Instruction snippets carry no try blocks, so the handler is added directly.
             if (catchIntoCopy) implementation!!.run {
-                val copyIndex = instructions.indexOfFirst { (it as? ReferenceInstruction)?.reference.toString() == copy }
+                val copyIndex = instructions.indexOfFirst { (it as? ReferenceInstruction)?.reference.toString() == folded }
                 addCatch(newLabelForIndex(2), newLabelForIndex(4), newLabelForIndex(copyIndex))
             }
         }
 
-    @Test fun anInlineTabListIsFilteredJustBeforeItIsCopied() {
+    @Test fun anInlineTabListIsFilteredJustBeforeItsOneCallCopiesAndBuildsIt() {
         val method = inlineTabs()
         val copyIndex = method.implementation!!.instructions.indexOfFirst {
-            (it as? ReferenceInstruction)?.reference.toString() == copy
+            (it as? ReferenceInstruction)?.reference.toString() == folded
         }
         method.injectKeyboardTabsInline()
         val call = method.getInstruction(copyIndex)
@@ -117,32 +114,17 @@ class ControlProfileTest {
         val range = call as com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
         assertEquals(12, range.startRegister)
         assertEquals(1, range.registerCount)
-        assertEquals(copy, (method.getInstruction(copyIndex + 1) as ReferenceInstruction).reference.toString())
-        assertEquals(build, (method.getInstruction(copyIndex + 2) as ReferenceInstruction).reference.toString())
-    }
-
-    @Test fun a583TabListIsFilteredJustBeforeItsOneCallCopiesAndBuildsIt() {
-        val method = inlineTabs(foldedCopy = true)
-        val copyIndex = method.implementation!!.instructions.indexOfFirst {
-            (it as? ReferenceInstruction)?.reference.toString() == folded
-        }
-        method.injectKeyboardTabsInline()
-        val call = method.getInstruction(copyIndex)
-        assertEquals("$SETTINGS->removeAvatarTabs(Ljava/lang/Iterable;)V", (call as ReferenceInstruction).reference.toString())
-        assertEquals(12, (call as com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction).startRegister)
         assertEquals(folded, (method.getInstruction(copyIndex + 1) as ReferenceInstruction).reference.toString())
-        // A second copy of either kind, or a jump into the call, is refused.
-        assertFailsWith<PatchException> { inlineTabs(foldedCopy = true, extraCopy = true).injectKeyboardTabsInline() }
-        assertFailsWith<PatchException> { inlineTabs(foldedCopy = true, branchIntoCopy = true).injectKeyboardTabsInline() }
-        assertFailsWith<PatchException> { inlineTabs(foldedCopy = true, switchIntoCopy = true).injectKeyboardTabsInline() }
     }
 
-    @Test fun anInlineTabListWithTwoCopiesOrABranchIntoTheCopyIsRefused() {
+    @Test fun anInlineTabListWithTwoCopiesOrAJumpIntoTheCopyIsRefused() {
         assertFailsWith<PatchException> { inlineTabs(extraCopy = true).injectKeyboardTabsInline() }
         assertFailsWith<PatchException> { inlineTabs(branchIntoCopy = true).injectKeyboardTabsInline() }
         assertFailsWith<PatchException> { inlineTabs(switchIntoCopy = true).injectKeyboardTabsInline() }
         assertFailsWith<PatchException> { inlineTabs(catchIntoCopy = true).injectKeyboardTabsInline() }
-        assertFailsWith<PatchException> { inlineTabs(buildsAnotherBuilder = true).injectKeyboardTabsInline() }
-        assertFailsWith<PatchException> { inlineTabs(noBuild = true).injectKeyboardTabsInline() }
+    }
+
+    @Test fun a582TabListCopiedThroughTheBuildersAddAllIsRefused() {
+        assertFailsWith<PatchException> { inlineTabs(addAllCopy = true).injectKeyboardTabsInline() }
     }
 }
