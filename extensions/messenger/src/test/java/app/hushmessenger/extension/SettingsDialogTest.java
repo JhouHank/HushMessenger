@@ -194,6 +194,76 @@ public class SettingsDialogTest {
         }
     }
 
+    @Test public void aLongLogBuildsItsCardsAPageAtATimeAsItScrolls() throws Exception {
+        int page = SettingsActivity.MESSAGE_LOG_PAGE, count = 3 * page + 5;
+        long now = System.currentTimeMillis();
+        List<MessageLog.Entry> entries = new ArrayList<>();
+        for (int i = 0; i < count; i++) entries.add(new MessageLog.Entry(now - (count - i) * 1000L, "t", "Message " + i));
+        MessageLog.write(Settings.appContext, entries);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            screen.get().getWindow().getDecorView().findViewWithTag("message_log_view").performClick();
+            View root = ShadowDialog.getLatestDialog().getWindow().getDecorView();
+            awaitText(root, "Message " + (count - 1));
+            layout(root);
+            ScrollView scroll = root.findViewWithTag("dialog_scroll");
+            LinearLayout list = (LinearLayout) ((ViewGroup) scroll.getChildAt(0)).getChildAt(0);
+            // The retention line, then one page.
+            assertEquals(1 + page, list.getChildCount());
+            for (int built = page; built < count; built = Math.min(count, built + page)) {
+                scroll.scrollTo(0, scroll.getChildAt(0).getHeight());
+                // Scrolled twice before the page it asked for is built, it still gets one page.
+                scroll.scrollTo(0, scroll.getScrollY() - 1);
+                Shadows.shadowOf(Looper.getMainLooper()).idle();
+                assertEquals(1 + Math.min(count, built + page), list.getChildCount());
+                // Scrolled again before that page is laid out, it doesn't take it for the end and pull in the next.
+                scroll.scrollTo(0, scroll.getScrollY() - 1);
+                Shadows.shadowOf(Looper.getMainLooper()).idle();
+                assertEquals(1 + Math.min(count, built + page), list.getChildCount());
+                layout(root);
+            }
+            // Every entry is reachable, newest first.
+            for (int i = 0; i < count; i++) assertNotNull(findText(list.getChildAt(1 + i), "Message " + (count - 1 - i)));
+            // Cleared, the log shows nothing it built before, however far it's scrolled.
+            root.findViewWithTag("message_log_dialog_clear").performClick();
+            awaitText(root, new SettingsText(screen.get()).get("message_log_empty"));
+            layout(root);
+            scroll.scrollTo(0, scroll.getChildAt(0).getHeight());
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            for (int i = 0; i < count; i++) assertNull(findText(root, "Message " + i));
+        }
+    }
+
+    @Test public void aLogReopenedWhileAPageWaitsStartsFromItsFirstPage() throws Exception {
+        int page = SettingsActivity.MESSAGE_LOG_PAGE, count = 2 * page + 3;
+        long now = System.currentTimeMillis();
+        List<MessageLog.Entry> entries = new ArrayList<>();
+        for (int i = 0; i < count; i++) entries.add(new MessageLog.Entry(now - (count - i) * 1000L, "t", "Message " + i));
+        MessageLog.write(Settings.appContext, entries);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View settings = screen.get().getWindow().getDecorView();
+            settings.findViewWithTag("message_log_view").performClick();
+            Dialog first = ShadowDialog.getLatestDialog();
+            View root = first.getWindow().getDecorView();
+            awaitText(root, "Message " + (count - 1));
+            layout(root);
+            ScrollView scroll = root.findViewWithTag("dialog_scroll");
+            // The next page is asked for, then the log closes before it's built.
+            scroll.scrollTo(0, scroll.getChildAt(0).getHeight());
+            first.dismiss();
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            LinearLayout closed = (LinearLayout) ((ViewGroup) scroll.getChildAt(0)).getChildAt(0);
+            assertEquals(1 + page, closed.getChildCount());
+            settings.findViewWithTag("message_log_view").performClick();
+            Dialog second = ShadowDialog.getLatestDialog();
+            assertNotSame(first, second);
+            View reopened = second.getWindow().getDecorView();
+            awaitText(reopened, "Message " + (count - 1));
+            layout(reopened);
+            ScrollView again = reopened.findViewWithTag("dialog_scroll");
+            assertEquals(1 + page, ((ViewGroup) ((ViewGroup) again.getChildAt(0)).getChildAt(0)).getChildCount());
+        }
+    }
+
     @Test public void longRepliesGrowAndTheSheetCanReachTheirLastLine() {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             View root = open(screen.get()).getWindow().getDecorView();

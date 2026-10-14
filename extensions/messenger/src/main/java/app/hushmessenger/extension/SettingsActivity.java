@@ -1864,6 +1864,9 @@ public final class SettingsActivity extends Activity {
 
     private Dialog messageLogDialog;
     private LinearLayout messageLogList;
+    private ScrollView messageLogScroll;
+    /** Builds the log's next page of cards, while one is left. */
+    private Runnable messageLogMore;
     private Button messageLogClear;
     private long messageLogGeneration;
     private boolean messageLogClearFailed;
@@ -1904,11 +1907,17 @@ public final class SettingsActivity extends Activity {
             if (messageLogDialog == dismissed) {
                 messageLogDialog = null;
                 messageLogList = null;
+                messageLogScroll = null;
+                messageLogMore = null;
                 messageLogClear = null;
                 messageLogGeneration++;
             }
         });
         messageLogList = sheet.body;
+        messageLogScroll = sheet.scroll;
+        // Scrolling near the end builds the next page, and so does a layout that leaves the end in view.
+        sheet.scroll.setOnScrollChangeListener((view, x, y, oldX, oldY) -> moreMessageLogIfNear());
+        sheet.scroll.getViewTreeObserver().addOnGlobalLayoutListener(this::moreMessageLogIfNear);
         messageLogClear = ui.button(text.get("message_log_clear"));
         messageLogClear.setTag("message_log_dialog_clear");
         messageLogClear.setOnClickListener(clicked -> clearMessageLog());
@@ -1951,6 +1960,7 @@ public final class SettingsActivity extends Activity {
         final LinearLayout list = messageLogList;
         if (list == null) return;
         final long generation = ++messageLogGeneration;
+        messageLogMore = null;
         list.removeAllViews();
         TextView loading = ui.text(text.get("message_log_loading"), 14, ui.muted, false);
         loading.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -1999,9 +2009,35 @@ public final class SettingsActivity extends Activity {
                     }
                 }
                 if (!result.entries.isEmpty()) ui.add(list, ui.text(text.get("message_log_retention"), 13, ui.muted, false), list.getChildCount() > 0 ? 12 : 0);
-                for (MessageLog.Entry entry : result.entries) list.addView(messageLogEntry(entry));
+                showMessageLogPage(list, generation, result.entries, 0);
             });
         }, "HushMessageLogView").start();
+    }
+
+    /** Cards built at a time. A full log is 500 of them, and building them all at once froze the screen for two seconds. */
+    static final int MESSAGE_LOG_PAGE = 20;
+
+    private void showMessageLogPage(LinearLayout list, long generation, List<MessageLog.Entry> entries, int from) {
+        messageLogMore = null;
+        if (messageLogList != list || generation != messageLogGeneration) return;
+        int to = Math.min(entries.size(), from + MESSAGE_LOG_PAGE);
+        for (int i = from; i < to; i++) list.addView(messageLogEntry(entries.get(i)));
+        if (to < entries.size()) messageLogMore = () -> showMessageLogPage(list, generation, entries, to);
+    }
+
+    /**
+     * Builds the next page once the log is scrolled within a screen of its end. A list still waiting for its layout is
+     * measured after it, so a page that was just added can't count as the end and pull in the rest. The dismiss listener
+     * runs a message after the sheet goes, so a page asked for just before then checks the sheet is still up.
+     */
+    private void moreMessageLogIfNear() {
+        ScrollView scroll = messageLogScroll;
+        Runnable more = messageLogMore;
+        if (scroll == null || more == null || scroll.getChildCount() == 0) return;
+        View content = scroll.getChildAt(0);
+        int height = scroll.getHeight();
+        if (height == 0 || content.isLayoutRequested()) return;
+        if (content.getBottom() - (scroll.getScrollY() + height) < height) scroll.post(() -> { if (messageLogMore == more && scroll.isAttachedToWindow()) more.run(); });
     }
 
     private void removeSetAsideLog() {

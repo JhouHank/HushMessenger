@@ -5,6 +5,7 @@
 Development v0.23.3.
 
 - With **Spoof package version** in, Messenger's own checks of its version code still see the build it really is. Before, Messenger's component manager noticed the raised number didn't match the APK and flagged it in its log, and crash data carried the raised number. Only Messenger's reads of itself change. Google Play services, Facebook and every other app's version read as Android reports them. Refs #49.
+- A full message log opens without freezing. The log builds 20 messages at a time and adds the next ones as you scroll toward the end, so every saved message is still there, newest first. Before, a log near its 500-message limit held the screen still for about two seconds while it opened.
 - Quick setups can be hidden from the App tab with a long press on its section, and its help line now says so. The Quick setups on the home page button under Your choices brings it back. Backups and the Quick setups choices leave it alone.
 - The third-party patch catalog no longer offers v0.0.8 as a prerelease. Its stable import still serves v0.23.0 with verified metadata.
 - Added build guidance for native checks on an ARM-translated Android 12L emulator and for verifying the framework's low-RAM classification. Stock and patched comparisons keep separate app data and signing keys.
