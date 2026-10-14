@@ -2306,9 +2306,167 @@ public class CompatReport {
                     MESSENGER_ACCOUNT_TYPE.contentEquals(params.get(0)) && MESSAGE_TYPE.contentEquals(params.get(1)) &&
                     THREAD_SUMMARY_TYPE.contentEquals(params.get(2)) && m.getImplementation() != null) ctors.add(m);
             }
-            return ctors.size() == 1 ? ctors : List.of();
+            return ctors.size() == 1 && messageLogRoom(ctors.get(0)) && messageLogContract(classes, ctors.get(0)) ? ctors : List.of();
         }
         return List.of();
+    }
+
+    static final String SECRET_STRING = "Lcom/facebook/secure/secrettypes/SecretString;";
+    static final String MESSAGES_NOTIFICATION_MANAGER = "Lcom/facebook/messaging/notify/client/MessagesNotificationManager;";
+    static final String UNSEND_RETRACTION = "messenger_android_unsend_notificaiton_retraction";
+
+    /** Two free locals past the parameters, as MessageLog.kt's validateMessageLog needs for the hook. */
+    static boolean messageLogRoom(Method ctor) {
+        int words = 1;
+        for (var type : ctor.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
+        return !AccessFlags.STATIC.isSet(ctor.getAccessFlags()) && ctor.getImplementation().getRegisterCount() >= words + 2;
+    }
+
+    static String fieldId(FieldReference field) {
+        return field.getDefiningClass() + "->" + field.getName() + ":" + field.getType();
+    }
+
+    /** The instance fields of owner with this type that the method reads with iget-object, as MessageLog.kt's fieldReads. */
+    static Set<String> objectReads(Method method, String owner, String type) {
+        var reads = new LinkedHashSet<String>();
+        for (var i : instructions(method))
+            if (i.getOpcode() == Opcode.IGET_OBJECT && i instanceof ReferenceInstruction r && r.getReference() instanceof FieldReference f &&
+                owner.equals(f.getDefiningClass()) && type.equals(f.getType())) reads.add(fieldId(f));
+        return reads;
+    }
+
+    /** Whether cls declares the field where the notification class can read it: public, or non-private in its package. */
+    static boolean readableFromNotification(ClassDef cls, String id) {
+        for (var f : cls.getFields()) {
+            if (!(cls.getType() + "->" + f.getName() + ":" + f.getType()).equals(id)) continue;
+            String pkg = cls.getType().substring(0, cls.getType().lastIndexOf('/'));
+            return AccessFlags.PUBLIC.isSet(f.getAccessFlags()) || (!AccessFlags.PRIVATE.isSet(f.getAccessFlags()) &&
+                pkg.equals(NEW_MESSAGE_NOTIFICATION.substring(0, NEW_MESSAGE_NOTIFICATION.lastIndexOf('/'))));
+        }
+        return false;
+    }
+
+    /**
+     * The rest of MessageLog.kt's resolveMessageLogContract, which messageIdField and hiddenTextField start: one text
+     * field Message's SecretString getter reads, one String field SecretString's constructor fills from its argument,
+     * both readable from the notification, one ThreadKey field the constructor loads and one unsent check.
+     */
+    static boolean messageLogContract(List<ClassDef> classes, Method ctor) {
+        ClassDef message = null, secret = null;
+        for (var cls : classes) {
+            if (message == null && MESSAGE_TYPE.equals(cls.getType())) message = cls;
+            if (secret == null && SECRET_STRING.equals(cls.getType())) secret = cls;
+        }
+        if (message == null || secret == null) return false;
+        var bodies = new LinkedHashSet<String>();
+        for (var m : message.getMethods())
+            if (SECRET_STRING.equals(m.getReturnType()) && m.getImplementation() != null && stringsOf(m).contains("text"))
+                bodies.addAll(objectReads(m, MESSAGE_TYPE, SECRET_STRING));
+        var secretCtors = new ArrayList<Method>();
+        for (var m : secret.getMethods())
+            if ("<init>".equals(m.getName()) && m.getImplementation() != null &&
+                m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of("Ljava/lang/String;"))) secretCtors.add(m);
+        if (bodies.size() != 1 || secretCtors.size() != 1) return false;
+        int argument = secretCtors.get(0).getImplementation().getRegisterCount() - 1;
+        var texts = new LinkedHashSet<String>();
+        for (var i : instructions(secretCtors.get(0)))
+            if (i instanceof ReferenceInstruction r && r.getReference() instanceof FieldReference f && SECRET_STRING.equals(f.getDefiningClass()) &&
+                "Ljava/lang/String;".equals(f.getType()) && i instanceof TwoRegisterInstruction t && t.getRegisterA() == argument) texts.add(fieldId(f));
+        return texts.size() == 1 && readableFromNotification(message, bodies.iterator().next()) &&
+            readableFromNotification(secret, texts.iterator().next()) && objectReads(ctor, MESSAGE_TYPE, THREAD_KEY).size() == 1 &&
+            unsentChecks(classes).size() == 1;
+    }
+
+    /**
+     * MessageLog.kt's findUnsentChecks: the (Message)Z checks the notification manager calls where it logs an unsend
+     * retraction, kept when their public class holds them as public static checks of one long Message field.
+     */
+    static Set<String> unsentChecks(List<ClassDef> classes) {
+        ClassDef manager = null;
+        for (var cls : classes) if (MESSAGES_NOTIFICATION_MANAGER.equals(cls.getType())) { manager = cls; break; }
+        if (manager == null) return Set.of();
+        var called = new HashSet<String>();
+        for (var m : manager.getMethods()) {
+            if (m.getImplementation() == null || !stringsOf(m).contains(UNSEND_RETRACTION)) continue;
+            for (var i : instructions(m))
+                if ((i.getOpcode() == Opcode.INVOKE_STATIC || i.getOpcode() == Opcode.INVOKE_STATIC_RANGE) && i instanceof ReferenceInstruction r &&
+                    r.getReference() instanceof MethodReference mr && "Z".equals(mr.getReturnType()) &&
+                    mr.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(MESSAGE_TYPE))) called.add(mr.toString());
+        }
+        var owners = new HashSet<String>();
+        for (var id : called) owners.add(id.substring(0, id.indexOf("->")));
+        var checks = new LinkedHashSet<String>();
+        for (var cls : classes) {
+            if (!owners.contains(cls.getType()) || !AccessFlags.PUBLIC.isSet(cls.getAccessFlags())) continue;
+            for (var m : cls.getMethods()) if (called.contains(hookId(m)) && unsentCheck(m)) checks.add(hookId(m));
+        }
+        return checks;
+    }
+
+    static Long wide(Instruction i) {
+        return i instanceof WideLiteralInstruction w ? w.getWideLiteral() : null;
+    }
+
+    static TwoRegisterInstruction twoRegister(List<Instruction> code, int at, Opcode op) {
+        return code.get(at).getOpcode() == op && code.get(at) instanceof TwoRegisterInstruction t ? t : null;
+    }
+
+    /**
+     * OriginalVideo.kt's videoPassthroughSite: the one size check against the bitrate limit plus Messenger's configured
+     * margin, with the limit arithmetic, the metadata reads and the registers the hook needs all where 583 has them.
+     */
+    static boolean videoPassthroughSite(Method method) {
+        var code = instructions(method);
+        var sites = new ArrayList<Integer>();
+        for (int c = 11; c < code.size() - 1; c++)
+            if (code.get(c).getOpcode() == Opcode.CMP_LONG && code.get(c + 1).getOpcode() == Opcode.IF_LTZ &&
+                code.get(c - 6).getOpcode() == Opcode.CONST_WIDE_16 && Long.valueOf(8000L).equals(wide(code.get(c - 6))) &&
+                code.get(c - 3).getOpcode() == Opcode.MUL_INT_LIT16 && Long.valueOf(1000L).equals(wide(code.get(c - 3)))) sites.add(c);
+        if (sites.size() != 1) return false;
+        int c = sites.get(0);
+        var cmp = (ThreeRegisterInstruction) code.get(c);
+        int limit = cmp.getRegisterC(), size = cmp.getRegisterB(), result = cmp.getRegisterA();
+        var add = twoRegister(code, c - 1, Opcode.ADD_LONG_2ADDR);
+        var widenMargin = twoRegister(code, c - 2, Opcode.INT_TO_LONG);
+        var margin = twoRegister(code, c - 3, Opcode.MUL_INT_LIT16);
+        var div = twoRegister(code, c - 5, Opcode.DIV_LONG_2ADDR);
+        var mul = twoRegister(code, c - 7, Opcode.MUL_LONG_2ADDR);
+        var duration = twoRegister(code, c - 8, Opcode.IGET_WIDE);
+        var widen = twoRegister(code, c - 9, Opcode.INT_TO_LONG);
+        var bytes = twoRegister(code, c - 11, Opcode.IGET_WIDE);
+        if (add == null || widenMargin == null || margin == null || div == null || mul == null || duration == null || widen == null || bytes == null)
+            return false;
+        int temp = register(code.get(c - 6));
+        boolean marginInTemp = widenMargin.getRegisterA() == temp && widenMargin.getRegisterB() == temp &&
+            margin.getRegisterA() == temp && margin.getRegisterB() == temp;
+        if (add.getRegisterA() != limit || add.getRegisterB() != temp || !marginInTemp || div.getRegisterA() != limit ||
+            div.getRegisterB() != temp || mul.getRegisterA() != limit || mul.getRegisterB() != duration.getRegisterA() ||
+            widen.getRegisterA() != limit || widen.getRegisterB() != limit) return false;
+        var bytesField = (FieldReference) ((ReferenceInstruction) bytes).getReference();
+        var durationField = (FieldReference) ((ReferenceInstruction) duration).getReference();
+        if (bytes.getRegisterA() != size || !"J".equals(bytesField.getType()) || !"J".equals(durationField.getType()) ||
+            !bytesField.getDefiningClass().equals(durationField.getDefiningClass()) || bytesField.getName().equals(durationField.getName()) ||
+            bytes.getRegisterB() != duration.getRegisterB()) return false;
+        // Nothing between the size read and the compare may write the size pair.
+        for (int at = c - 10; at < c; at++) {
+            if (!(code.get(at) instanceof OneRegisterInstruction one)) continue;
+            int written = one.getRegisterA();
+            if (written == size || written == size + 1 || written + 1 == size) return false;
+        }
+        return register(code.get(c + 1)) == result && !mediaTargets(method).contains(c + 1) &&
+            result <= 15 && size + 1 <= 15 && result != size && result != size + 1;
+    }
+
+    /** Static, public, (Message)Z, and all it reads is one long field of the message, compared once. */
+    static boolean unsentCheck(Method m) {
+        if (!AccessFlags.STATIC.isSet(m.getAccessFlags()) || !AccessFlags.PUBLIC.isSet(m.getAccessFlags()) || !"Z".equals(m.getReturnType()) ||
+            !m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(MESSAGE_TYPE))) return false;
+        var code = instructions(m);
+        var touches = code.stream().filter(i -> i instanceof ReferenceInstruction r && r.getReference() instanceof FieldReference).toList();
+        if (touches.size() != 1 || touches.get(0).getOpcode() != Opcode.IGET_WIDE) return false;
+        var field = (FieldReference) ((ReferenceInstruction) touches.get(0)).getReference();
+        return MESSAGE_TYPE.equals(field.getDefiningClass()) && "J".equals(field.getType()) &&
+            code.stream().filter(i -> i.getOpcode() == Opcode.CMP_LONG).count() == 1;
     }
 
     /**
@@ -3707,7 +3865,7 @@ public class CompatReport {
 
                 // original_video: the video transcoder's private worker, which holds the passthrough size check
                 if ("Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;".equals(cls.getType()) && !isStatic &&
-                    ORIGINAL_VIDEO_HOOK.equals(hookId(method)) && strings.contains("mci_video_passthrough")) {
+                    ORIGINAL_VIDEO_HOOK.equals(hookId(method)) && strings.contains("mci_video_passthrough") && videoPassthroughSite(method)) {
                     found.get("original_video").add(method);
                 }
 
