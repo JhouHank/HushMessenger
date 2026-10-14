@@ -21,7 +21,7 @@ import kotlin.test.*
 /** Emoji drawer flag reads in each 583 build, across its nine drawer hooks. */
 private const val EMOJI_DRAWER_READS = 10
 
-/** [resumeTail] pads onResume after the guarded part: 22 instructions in 582, two more in older releases. */
+/** [resumeTail] pads onResume after the guarded part: 22 instructions in 583. An older release's two more are refused. */
 internal fun screenshotViewerFixture(id: String, quickSize: Int = 449, resumeTail: Int = 22): MutableMethod {
     val body: String
     val registers: Int

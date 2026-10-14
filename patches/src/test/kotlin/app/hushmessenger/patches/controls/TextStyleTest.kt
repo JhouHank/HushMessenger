@@ -27,7 +27,7 @@ internal const val SYNTHETIC_TEXT_FIELD_FOCUS = "$FIELD->onFocusChanged(ZILandro
 private const val TEXT_FIELD_CHANGED = "$FIELD->onTextChanged(Ljava/lang/CharSequence;III)V"
 private const val ANDROID_FOCUS = "Landroid/widget/TextView;->onFocusChanged(ZILandroid/graphics/Rect;)V"
 
-/** The focus change as 582 writes it: a trace mark, Android's own, then the input's focus listener. p0 is v3. */
+/** The focus change as Messenger writes it: a trace mark, Android's own, then the input's focus listener. p0 is v3. */
 private val FOCUS_BODY = """
     const v0, 0x1a2b
     invoke-static {v0}, LX/06O;->A06(I)I

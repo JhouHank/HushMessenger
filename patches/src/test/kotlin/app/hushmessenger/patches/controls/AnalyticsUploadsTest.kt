@@ -123,7 +123,7 @@ private val READ_LOGGER = listOf(
     "iget-object v0, v0, $LOGGER->A02:Lcom/facebook/xanalytics/XAnalyticsNative;",
 )
 
-/** Messenger 582's XAnalytics timer (Vjo / YjU): flush the native batch, then start its upload. */
+/** Messenger's XAnalytics timer: flush the native batch, then start its upload. */
 private fun timerBody(owner: String = TIMER, first: String = XANALYTICS_FLUSH, second: String = XANALYTICS_UPLOAD, extra: String = "") =
     (listOf("iget-object v0, p0, $owner->A00:LX/2zB;", "iget-object v1, v0, LX/2zB;->A00:$LOGGER_PROVIDER") +
         READ_LOGGER + "invoke-virtual {v0}, $first" + READ_LOGGER + "invoke-virtual {v0}, $second" + extra + "return-void")

@@ -236,7 +236,7 @@ class AnonymousStoriesTest {
             assertEquals("$MONTAGE_BUCKET_PREVIEW->$STORY_RING_HELPER($MONTAGE_BUCKET_PREVIEW)V", reference(init[init.size - 2]), code)
             assertEquals(Opcode.RETURN_VOID, init.last().opcode, code)
         }
-        // Every 582 build keeps the card in A06 and the flag in A0G.
+        // Every 583 build keeps the card in A06 and the flag in A0G.
         assertEquals(setOf(
             "$MONTAGE_BUCKET_PREVIEW->A06:$MONTAGE_CARD $MONTAGE_BUCKET_PREVIEW->A0G:Z $MONTAGE_BUCKET_PREVIEW->A02:I",
         ), ringFields)

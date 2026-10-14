@@ -170,7 +170,7 @@ private fun Method.bubbleGateHelper(gate: String): Boolean {
         c[4].bubbleRef() == gate && c[4].calls(0, 1) && c[5].bubbleRegister() == 0 && c[6].bubbleRegister() == 0
 }
 
-/** The shortcut builder names its ID itself, or (582) through a static (ThreadKey)String helper that does. */
+/** The shortcut builder names its ID itself, or (583) through a static (ThreadKey)String helper that does. */
 private fun List<Instruction>.namesThreadShortcut(byType: Map<String, ClassDef>) = any { it.bubbleRef() == "thread_shortcut_" } ||
     any { i -> i.opcode == Opcode.INVOKE_STATIC && ((i as? ReferenceInstruction)?.reference as? MethodReference)?.let { ref ->
         ref.parameterTypes.map(CharSequence::toString) == listOf("Lcom/facebook/messaging/model/threadkey/ThreadKey;") &&

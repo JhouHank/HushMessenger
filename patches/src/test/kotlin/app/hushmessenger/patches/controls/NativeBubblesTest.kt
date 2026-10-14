@@ -321,7 +321,7 @@ class NativeBubblesTest {
             from = "const/4 v1, 1", to = "const/4 v1, 0"), gate))
     }
 
-    @Test fun the582ShortcutIdMayComeFromAStaticThreadKeyHelperThatNamesIt() {
+    @Test fun the583ShortcutIdComesFromAStaticThreadKeyHelperThatNamesIt() {
         val gate = SYNTHETIC_PROFILE.hooks.getValue("bubble_mode").single()
         val inline = "const-string v0, \"thread_shortcut_\""
         val key = "Lfixture/Key;->id($thread)Ljava/lang/String;"

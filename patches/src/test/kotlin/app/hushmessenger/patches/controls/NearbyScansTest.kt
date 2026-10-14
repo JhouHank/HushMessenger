@@ -34,7 +34,7 @@ private const val WIFI_BSSID = "Landroid/net/wifi/WifiInfo;->getBSSID()Ljava/lan
 private const val BLUETOOTH_TASK = "LX/Yoi;"
 private val STATIC = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
 
-/** The scheduler as 582 writes it: under the controller's lock it builds the loop's task, names it and queues it. */
+/** The scheduler as Messenger writes it: under the controller's lock it builds the loop's task, names it and queues it. */
 private val SCHEDULER_BODY = """
     monitor-enter p2
     const-string v2, "$NEARBY_SCAN_MARK"
@@ -59,7 +59,7 @@ private val BLUETOOTH_BODY = """
     return-void
 """.trimIndent()
 
-/** The reader as 582 writes it: null unless Messenger may read the list, otherwise a copy of the system's scan results. */
+/** The reader as Messenger writes it: null unless Messenger may read the list, otherwise a copy of the system's scan results. */
 private val READER_BODY = """
     const/4 v2, 0x0
     if-eqz p1, :denied

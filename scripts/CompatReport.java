@@ -93,7 +93,7 @@ public class CompatReport {
     static final String EMOJI_DRAWER_ANCHOR = "Cannot render redesigned drawer with search icon ";
     // Controls whose hook count follows how Redex inlined one flag read, so it differs between releases
     static final Set<String> RELEASE_HOOK_COUNTS = Set.of("emoji_drawer");
-    // The inbox ad filter's exit registers in 582, in order
+    // The inbox ad filter's exit registers in 583, in order
     static final List<Integer> AD_FILTER_RESULTS = List.of(7, 2);
 
     // Material You theme finds its targets by shape when it patches (MaterialYouPatch.kt), so no profile records them
@@ -674,7 +674,7 @@ public class CompatReport {
             calls(c.get(4),0,1) && register(c.get(5)) == 0 && register(c.get(6)) == 0;
     }
 
-    /** The shortcut builder names its ID itself, or (582) through a static (ThreadKey)String helper that does. As in NativeBubbles.kt. */
+    /** The shortcut builder names its ID itself, or (583) through a static (ThreadKey)String helper that does. As in NativeBubbles.kt. */
     static boolean namesThreadShortcut(Map<String,ClassDef> byType, List<Instruction> c) {
         if (c.stream().anyMatch(i -> "thread_shortcut_".equals(ref(i)))) return true;
         for (var i : c) if (i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction r && r.getReference() instanceof MethodReference m &&
@@ -1316,7 +1316,7 @@ public class CompatReport {
 
     /**
      * Redex's string tables: static (I)String methods that switch on the key straight to a constant, by method and key.
-     * 582 moved some kill switch names into one, so a gate loads its anchor with `const/16 key` and a lookup. Mirrors PluginGates.kt.
+     * 583 keeps some kill switch names in one, so a gate loads its anchor with `const/16 key` and a lookup. Mirrors PluginGates.kt.
      */
     static Map<String, Map<Integer, String>> stringTables(List<ClassDef> classes) {
         var tables = new HashMap<String, Map<Integer, String>>();
@@ -2338,7 +2338,7 @@ public class CompatReport {
             MONTAGE_ACTIVITY.equals(t.getType());
     }
 
-    /** The static factory Messenger 582's chat screen gets its camera launcher from. Mirrors SystemCamera.kt. */
+    /** The static factory Messenger 583's chat screen gets its camera launcher from. Mirrors SystemCamera.kt. */
     static boolean isChatCameraFactory(Method m) {
         if (!AccessFlags.STATIC.isSet(m.getAccessFlags()) || m.getParameterTypes().isEmpty() ||
             !"Landroid/content/Context;".equals(m.getParameterTypes().get(0).toString())) return false;
@@ -2362,7 +2362,7 @@ public class CompatReport {
         return null;
     }
 
-    /** The check Messenger 582's chat runs on where a picked photo comes from. Mirrors SystemCamera.kt. */
+    /** The check Messenger 583's chat runs on where a picked photo comes from. Mirrors SystemCamera.kt. */
     static boolean isThirdPartyUriCheck(Method m) {
         if (AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"Ljava/lang/Boolean;".equals(m.getReturnType()) ||
             !List.of("Landroid/content/Context;", "Landroid/net/Uri;").equals(m.getParameterTypes().stream().map(Object::toString).toList())) return false;
@@ -2389,7 +2389,7 @@ public class CompatReport {
      * system_camera: the chat composer's camera listener, which builds MontageComposerActivity's intent and starts it
      * with request code 7377. Counted only while exactly one chat fragment also reads a photo picked in another app
      * (request code 1112), the path the switch hands the phone camera's photo to. While that reader also reads 7376, the
-     * code Messenger 582's chat screen starts its camera with, the chat camera's factory, its launcher's start and the
+     * code Messenger 583's chat screen starts its camera with, the chat camera's factory, its launcher's start and the
      * chat's checks on where a picked photo comes from and who owns its file count too.
      */
     static List<Method> systemCameraLaunches(List<ClassDef> classes) {

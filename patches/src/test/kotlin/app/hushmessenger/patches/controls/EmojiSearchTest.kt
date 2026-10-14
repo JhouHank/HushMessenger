@@ -67,7 +67,7 @@ private fun assertSearchHook(before: List<Instruction>, after: List<Instruction>
     assertEquals(mode, (after[call + 1] as OneRegisterInstruction).registerA, label)
     assertEquals(before[call], after[call + 2], label)
     val plainJump = after.indices.first { after[it].opcode == Opcode.GOTO && after.branchTarget(it) == call + 2 }
-    // 582's string pools pass 65535 entries, so the plain mode's name can load as const-string/jumbo.
+    // Messenger's string pools pass 65535 entries, so the plain mode's name can load as const-string/jumbo.
     assertTrue(after[plainJump - 1].opcode in setOf(Opcode.CONST_STRING, Opcode.CONST_STRING_JUMBO), label)
 }
 

@@ -139,7 +139,7 @@ class AppIconsTest {
                 assertEquals(before, after.drop(5), code)
             }
         }
-        // One icon manager per 582 naming.
+        // One icon manager per 583 naming.
         assertEquals(2, families.size)
     }
 }

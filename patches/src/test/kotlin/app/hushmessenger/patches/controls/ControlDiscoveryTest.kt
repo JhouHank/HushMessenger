@@ -319,7 +319,7 @@ class ControlDiscoveryTest {
         validateControls(found, setOf(TAB_PEOPLE, TAB_NOTIFICATIONS, "ai_tab"))
     }
 
-    // 582's Menu tab gives Meta's subscriptions (Facebook Plus, Meta Verified, Meta One) a section of their own next to
+    // Messenger's Menu tab gives Meta's subscriptions (Facebook Plus, Meta Verified, Meta One) a section of their own next to
     // Also from Meta. Both are Facebook shortcuts. The tab's own sections, built by the same class, aren't.
     @Test fun theMenuTabsMetaSectionsAreFacebookShortcutGates() {
         val section = { name: String, plugin: String ->

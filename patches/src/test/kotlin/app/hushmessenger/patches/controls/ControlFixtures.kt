@@ -386,7 +386,7 @@ internal fun messageWrapperFixture(
     idGetter: String = "B9d",
     unsentGetter: String = "Btd",
 ): MutableClass {
-    // 582 reads the text getter's row straight from the list; the other getters still go through the helper.
+    // 583 reads the text getter's row straight from the list; the other getters still go through the helper.
     val bwoMethod = fixtureMethod("$type->$textGetter(I)Ljava/lang/String;", """
         iget-object v0, p0, $type->A00:Ljava/util/List;
         invoke-interface {v0, p1}, Ljava/util/List;->get(I)Ljava/lang/Object;

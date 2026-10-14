@@ -24,7 +24,7 @@ internal const val SYNTHETIC_PINNED_CHAT_LIMIT = "LX/2na;->A00($FB_USER_SESSION)
 private const val CONFIG_READ = "LX/17Q;->A06(Ljava/lang/Object;J)I"
 private val STATIC = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
 
-/** The getter as 582 writes it: the session's config, the limit's id, one read and its answer handed back. */
+/** The getter as Messenger writes it: the session's config, the limit's id, one read and its answer handed back. */
 private val LIMIT_BODY = """
     invoke-static {p0}, LX/19a;->A0E(Ljava/lang/Object;)LX/5dD;
     move-result-object p0

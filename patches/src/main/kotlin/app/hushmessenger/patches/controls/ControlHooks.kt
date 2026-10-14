@@ -501,7 +501,7 @@ internal fun MutableMethod.validatePluginGate() {
     }
 }
 
-/** The registers 582 returns from its two exits, in order. */
+/** The registers 583 returns from its two exits, in order. */
 private val AD_FILTER_RESULTS = listOf(7, 2)
 
 /** Wrap both exits, including direct branches to a return. The returned list stays intact on the inactive path. */
@@ -1133,7 +1133,7 @@ internal fun MutableMethod.validateUnsentIndicator() {
     if (returnType != "Ljava/lang/String;") throw PatchException("Messenger controls: unsent_indicator hook must return String")
     if (parameterTypes != listOf("I")) throw PatchException("Messenger controls: unsent_indicator hook must take one int param")
     val code = implementation!!.instructions.toList()
-    // 582 takes the row from the wrapper's list, casts it and asks it for its text, ending in v0.
+    // 583 takes the row from the wrapper's list, casts it and asks it for its text, ending in v0.
     val shape = listOf(Opcode.IGET_OBJECT, Opcode.INVOKE_INTERFACE, Opcode.MOVE_RESULT_OBJECT, Opcode.CHECK_CAST,
         Opcode.INVOKE_INTERFACE, Opcode.MOVE_RESULT_OBJECT, Opcode.RETURN_OBJECT)
     if (code.size != shape.size) throw PatchException("Messenger controls: unsent_indicator hook has ${code.size} instructions, expected ${shape.size}")
