@@ -85,8 +85,8 @@ public class CompatReport {
         + "PeopleTabPYMKHandler$fetchPymkSuggestions$$inlined$CoroutineExceptionHandler$1;";
     static final String PEOPLE_JEWEL_KEY = "pymk_jewel_section_hidden";
     static final String STORY_CARD_DATE_KEY = "last_date_creation_card_shown";
-    // The Notifications tab's server flag ID. Meta renumbers it with each release; these are 582's and 583's.
-    static final Set<Long> PEOPLE_SERVER_FLAGS = Set.of(72344188615734930L, 72344188615735036L);
+    // The Notifications tab's server flag ID as 583 numbers it. Meta renumbers it with each release.
+    static final long PEOPLE_SERVER_FLAG = 72344188615735036L;
     // The redesigned emoji drawer's server flag. Meta renumbers it with each release; these are 582's and 583's.
     static final Set<Long> EMOJI_DRAWER_FLAGS = Set.of(36320652931710646L, 36320635751841408L);
     // The drawer renderer throws this when the redesign can't draw, which ties the flag to the emoji drawer
@@ -481,19 +481,19 @@ public class CompatReport {
         return read;
     }
 
-    /** The section check's false-default register by its register count, as in ControlHooks.kt's PEOPLE_SECTION_DEFAULTS. */
-    static final Map<Integer, Integer> PEOPLE_SECTION_DEFAULTS = Map.of(10, 5, 8, 3);
+    /** The section check's register count and its false-default register, as in ControlHooks.kt. */
+    static final int PEOPLE_SECTION_REGISTERS = 8, PEOPLE_SECTION_DEFAULT = 3;
 
     /** The Notifications tab's preference key and its server-override check, checked as validatePeopleSection does. */
     static List<String> peopleSection(List<Method> jewel, String getter) {
         if (jewel.size() != 1 || jewel.get(0).getImplementation() == null) return null;
         var code = instructions(jewel.get(0));
-        Integer no = PEOPLE_SECTION_DEFAULTS.get(jewel.get(0).getImplementation().getRegisterCount());
+        Integer no = jewel.get(0).getImplementation().getRegisterCount() == PEOPLE_SECTION_REGISTERS ? PEOPLE_SECTION_DEFAULT : null;
         // The server flag loads at 17.
         var flags = new ArrayList<Integer>();
         for (int i = 0; i < code.size(); i++) {
             if (code.get(i).getOpcode() == Opcode.CONST_WIDE && code.get(i) instanceof WideLiteralInstruction flag &&
-                PEOPLE_SERVER_FLAGS.contains(flag.getWideLiteral())) flags.add(i);
+                flag.getWideLiteral() == PEOPLE_SERVER_FLAG) flags.add(i);
         }
         if (no == null || flags.size() != 1 || flags.get(0) != 17) return null;
         int at = flags.get(0), last = code.size() - 1;

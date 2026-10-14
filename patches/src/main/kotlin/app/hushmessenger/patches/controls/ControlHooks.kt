@@ -708,18 +708,19 @@ internal fun ClassDef.isRowWrapper(): Boolean =
 internal fun ClassDef.hasMessageIdGetter(): Boolean = messageIdGetterName.isNotEmpty() &&
     methods.any { it.name == messageIdGetterName && it.returnType == "Ljava/lang/String;" && it.parameterTypes == listOf("I") }
 
-/** The Notifications tab's server flag ID. Meta renumbers it with each release; these are 582's and 583's. */
-private val PEOPLE_SERVER_FLAGS = setOf(72344188615734930L, 72344188615735036L)
+/** The Notifications tab's server flag ID as 583 numbers it. Meta renumbers it with each release. */
+private const val PEOPLE_SERVER_FLAG = 72344188615735036L
 
-/** The register holding the section check's false default, by its register count: 582 has ten, 583 eight. */
-internal val PEOPLE_SECTION_DEFAULTS = mapOf(10 to 5, 8 to 3)
+/** The section check's register count, and the register that holds its false default. */
+private const val PEOPLE_SECTION_REGISTERS = 8
+private const val PEOPLE_SECTION_DEFAULT = 3
 
 /**
- * Where the Notifications tab loads its server flag: the method's only constant with one of those values, at 17,
- * after the preference branch at 12.
+ * Where the Notifications tab loads its server flag: the method's only constant with that value, at 17, after the
+ * preference branch at 12.
  */
 private fun List<Instruction>.peopleFlagIndex(): Int =
-    indices.filter { i -> this[i].opcode == Opcode.CONST_WIDE && (this[i] as? WideLiteralInstruction)?.wideLiteral in PEOPLE_SERVER_FLAGS }
+    indices.filter { i -> this[i].opcode == Opcode.CONST_WIDE && (this[i] as? WideLiteralInstruction)?.wideLiteral == PEOPLE_SERVER_FLAG }
         .singleOrNull()?.takeIf { it == 17 } ?: -1
 
 /** The section check takes the suggestions logger, then its owner. */
@@ -728,8 +729,8 @@ private fun Method.isPeopleSectionShape() = parameterTypes.map(CharSequence::toS
 /**
  * The Notifications tab reads its stock "section hidden" preference into v0 and branches on it. A hidden
  * section is still shown when a server flag (v0, three instructions after its constant) is on; both branches
- * land on the final false return. The false value lives in v5 of 582's ten-register body (v3 of 583's eight), which
- * logs a skipped impression under a monitor after the server branch.
+ * land on the final false return. The false value lives in v3 of the eight-register body, which logs a skipped
+ * impression under a monitor after the server branch.
  */
 internal fun MutableMethod.validatePeopleSection() {
     val code = implementation!!.instructions.toList()
@@ -739,7 +740,7 @@ internal fun MutableMethod.validatePeopleSection() {
     val at = code.peopleFlagIndex()
     val flag = code.getOrNull(at)
     val last = code.lastIndex
-    val no = PEOPLE_SECTION_DEFAULTS[implementation!!.registerCount] ?: -1
+    val no = if (implementation!!.registerCount == PEOPLE_SECTION_REGISTERS) PEOPLE_SECTION_DEFAULT else -1
     if (!AccessFlags.STATIC.isSet(accessFlags) || returnType != "Z" || !isPeopleSectionShape() || no < 0 ||
         flag?.opcode != Opcode.CONST_WIDE || (flag as? OneRegisterInstruction)?.registerA != 0 ||
         code.getOrNull(at + 1)?.opcode != Opcode.INVOKE_STATIC ||

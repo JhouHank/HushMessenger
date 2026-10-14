@@ -216,19 +216,22 @@ class ControlsTest {
         assertEquals(code.lastIndex, code.branchTarget(serverBranch + 4))
     }
 
-    /** 583's reader has eight registers and keeps false in v3, and its server flag has its own number. */
-    @Test fun the583NotificationsReaderKeepsFalseInV3() {
-        val flag583 = "72344188615735036L"
-        val reader = peopleJewelMethod(serverFlag = flag583, default = "v3", registers = 8, logger = "v4")
+    /** The reader has eight registers and keeps false in v3; 582's ten-register reader with its own flag is refused. */
+    @Test fun theNotificationsReaderKeepsFalseInV3AndRefuses582s() {
+        val reader = peopleJewelMethod()
         reader.injectPeopleSection()
         val code = reader.implementation!!.instructions.toList()
         assertEquals("$SETTINGS->hidePeopleSection(Z)Z", (code[12] as ReferenceInstruction).reference.toString())
         assertEquals("$SETTINGS->keepPeopleSection(Z)Z", (code[22] as ReferenceInstruction).reference.toString())
-        // The false default has to be in the register its build keeps it in.
+        val flag582 = "72344188615734930L"
         for (changed in listOf(
-            peopleJewelMethod(serverFlag = flag583, default = "v5", registers = 8, logger = "v4"),
-            peopleJewelMethod(serverFlag = flag583, default = "v3", registers = 10, logger = "v4"),
-            peopleJewelMethod(serverFlag = flag583, default = "v3", registers = 9, logger = "v4"),
+            // The false default has to be in v3 of eight registers.
+            peopleJewelMethod(default = "v5"),
+            peopleJewelMethod(registers = 10),
+            peopleJewelMethod(registers = 9),
+            // 582's reader: its own flag, false in v5 of ten registers.
+            peopleJewelMethod(serverFlag = flag582, default = "v5", registers = 10, logger = "v3"),
+            peopleJewelMethod(serverFlag = flag582),
         )) {
             val before = changed.implementation!!.instructions.toList()
             assertFailsWith<PatchException> { changed.injectPeopleSection() }
