@@ -24,13 +24,13 @@ internal fun communityStub(id: String, body: String = "const/4 v0, 0x0\nreturn v
 
 /**
  * Wiring for 583's closure: the session capture in slot 2, an $onThreadInViewport capture before the trailing flag,
- * a session-gated block before the second read, that read into v1, and a 13-argument sink that takes the callback
- * after the list. A supported build's profile gets the IDs its record in scripts/profiles holds, not the compiled
- * profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line. The
+ * a session-gated block before the second read, that read into v1 at [secondRead], and a 13-argument sink that takes
+ * the callback after the list. A supported build's profile gets the IDs its record in scripts/profiles holds, not the
+ * compiled profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line. The
  * community check compares the key type with both channel types inline; [anyBody] replaces it, and [channelCheck]
  * builds the older form that asks a separate channel check first.
  */
-internal fun communityInboxFixture(anyBody: String? = null, channelCheck: Boolean = false): List<MutableClass> {
+internal fun communityInboxFixture(anyBody: String? = null, channelCheck: Boolean = false, secondRead: Int = 63): List<MutableClass> {
     val code = controlProfiles.entries.firstOrNull { it.value === activeProfile }?.key
     val record = code?.let { Files.readAllLines(Path.of("../scripts/profiles/$it.txt")) }
     val ids = (record?.single { it.startsWith("nativeCommunityInbox ") }?.substringAfter(' ') ?: SYNTHETIC_PROFILE.nativeCommunityInbox).split('|')
@@ -88,7 +88,7 @@ internal fun communityInboxFixture(anyBody: String? = null, channelCheck: Boolea
         6 to "invoke-virtual {v0}, Ljava/util/AbstractCollection;->isEmpty()Z",
         8 to "if-nez v0, :empty", 27 to "iget-object v1, v4, $closure->\$threadTypeFilter:$scope",
         32 to "const-string v0, \"searchBarSection\"",
-        63 to "iget-object v1, v4, $closure->\$inboxUnitItems:$IMMUTABLE_LIST",
+        secondRead to "iget-object v1, v4, $closure->\$inboxUnitItems:$IMMUTABLE_LIST",
         69 to "iget-object v0, v4, $closure->\$onThreadInViewport:Lkotlin/jvm/functions/Function1;",
         74 to "move-object/from16 v17, v1", 75 to "move-object/from16 v18, v0",
         76 to "invoke-static/range {v6 .. v18}, LX/Section;->build(LX/Session;LX/Scope;LX/Observer;LX/Binder;LX/Header;LX/Footer;LX/Loading;LX/Theme;LX/Publisher;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;)LX/Section;",

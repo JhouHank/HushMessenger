@@ -1936,8 +1936,8 @@ public class CompatReport {
         Method invoke=single(methods(closure).stream().filter(m->m.getName().equals("invoke") && m.getParameterTypes().equals(List.of("Ljava/lang/Object;"))).toList(),"section closure invoke");
         var code=instructions(invoke);
         var listReads=new ArrayList<Integer>(); for(int at=0;at<code.size();at++) if(reads(code.get(at),captured.toString())) listReads.add(at);
-        // 582's second read is at 64, 583's one earlier.
-        require(listReads.size()==2 && listReads.get(0)==5 && Set.of(63,64).contains(listReads.get(1)),"presentation read shape changed: "+listReads);
+        // The second read follows a session-gated block before the search bar, at 63.
+        require(listReads.size()==2 && listReads.get(0)==5 && listReads.get(1)==63,"presentation read shape changed: "+listReads);
         int secondRead=listReads.get(1);
         require(hasString(invoke,"searchBarSection") && code.get(secondRead) instanceof TwoRegisterInstruction read && read.getRegisterA()==1 && read.getRegisterB()==4,"header or local presentation read changed");
         // The list goes into v1, and the sink takes an $onThreadInViewport after the list, moved into place after the alias.

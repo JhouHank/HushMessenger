@@ -109,6 +109,21 @@ class CommunityInboxTest {
         assertNull(findCommunityInbox(live))
     }
 
+    @Test fun theSecondListReadIsTakenOnlyAt63() {
+        assertNotNull(findCommunityInbox(communityInboxFixture(secondRead = 63)))
+        // 582 read the list one instruction later. Every recorded build refuses that, and discovery fails before anything changes.
+        for (profile in listOf(SYNTHETIC_PROFILE) + controlProfiles.values.toSet()) {
+            activeProfile = profile
+            for (secondRead in listOf(62, 64)) {
+                val classes = communityInboxFixture(secondRead = secondRead)
+                val before = classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }
+                assertNull(findCommunityInbox(classes), "read at $secondRead")
+                assertFailsWith<PatchException> { validateControls(findControls(classes), setOf(COMMUNITY_INBOX)) }
+                assertEquals(before, classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) })
+            }
+        }
+    }
+
     @Test fun theCommunityCheckComparesTheKeyTypeWithBothChannelTypesInline() {
         val contract = assertNotNull(findCommunityInbox(communityInboxFixture()))
         // The identity names no separate channel check.

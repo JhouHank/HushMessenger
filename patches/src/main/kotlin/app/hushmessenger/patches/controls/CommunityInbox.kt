@@ -271,8 +271,8 @@ internal fun Method.communityReadSite(scope: String): Int {
     val c = communityCode()
     val listField = "$definingClass->\$inboxUnitItems:$IMMUTABLE_LIST"
     val reads = c.indices.filter { c[it].opcode == Opcode.IGET_OBJECT && c[it].communityRef().toString() == listField }
-    // The second read follows a session-gated block before the search bar: at 64 in 582, one earlier in 583.
-    communityRequire(reads.size == 2 && reads.first() == 5 && reads.last() in setOf(63, 64))
+    // The second read follows a session-gated block before the search bar, at 63.
+    communityRequire(reads.size == 2 && reads.first() == 5 && reads.last() == 63)
     val at = reads.last()
     // The list goes into v1, and the sink takes an $onThreadInViewport after the list, moved into place after the alias.
     val list = (c[at] as? TwoRegisterInstruction)?.takeIf { it.registerA == 1 && it.registerB == 4 }?.registerA ?: throw CommunityChanged()
