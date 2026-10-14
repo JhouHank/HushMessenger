@@ -313,9 +313,10 @@ class ExpandedControlsTest {
         val both = builder(folderRow("LX/HRf;", settingsKey) + folderRow("LX/HRf;", qrKey))
         assertEquals("LX/HRf;", both.menuFolderItemType())
         assertEquals(2, both.settingsRowCall())
-        // 582's main family builds each row's icon in place, straight into the constructor's icon argument (v3).
-        assertEquals("LX/HRf;", builder("new-instance v3, LX/KGb;\n" + folderRow("LX/HRf;", settingsKey)).menuFolderItemType())
         for (changed in listOf(
+            // 582's main family built each row's icon in place, straight into the constructor's icon argument (v3).
+            // 583 creates no row icons in the builder, so one made there is refused.
+            "new-instance v3, LX/KGb;\n" + folderRow("LX/HRf;", settingsKey),
             folderRow("LX/HRf;", settingsKey) + "new-instance v2, LX/HRg;\n",
             "new-instance v2, LX/KGb;\n" + folderRow("LX/HRf;", settingsKey),
             folderRow("LX/HRf;", settingsKey) + folderRow("LX/HRf;", settingsKey),

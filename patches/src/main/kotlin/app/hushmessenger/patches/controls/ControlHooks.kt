@@ -26,7 +26,6 @@ import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OffsetInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.SwitchPayload
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference as DexMethodReference
@@ -1003,30 +1002,17 @@ internal fun MutableMethod.injectOutgoingTyping() {
 
 /**
  * The Menu tab's folder row class, which the Settings row is built from. The builder may also make other folder rows
- * of that class (the QR code row), their folder keys and, in builds that make them in place, their icons, but nothing else.
+ * of that class (the QR code row) and their folder keys, but nothing else. 583 creates no row icons in the builder.
  */
 internal fun Method.menuFolderItemType(): String {
     val code = implementation!!.instructions.toList()
     val types = code.filter { it.opcode == Opcode.NEW_INSTANCE }
         .map { ((it as ReferenceInstruction).reference as TypeReference).type }.toSet()
     val row = ((code[settingsRowCall()] as ReferenceInstruction).reference as DexMethodReference).definingClass
-    val icons = inlineRowIcons(code, row)
-    if (row !in types || types.any { it != row && it !in icons && !(it.startsWith(DRAWER_MODEL) && it.endsWith("FolderKey;")) })
-        throw PatchException("Messenger controls: menu settings item builder creates ${types.size} types, expected its rows, folder keys and icons")
+    if (row !in types || types.any { it != row && !(it.startsWith(DRAWER_MODEL) && it.endsWith("FolderKey;")) })
+        throw PatchException("Messenger controls: menu settings item builder creates ${types.size} types, expected its rows and folder keys")
     return row
 }
-
-/** Types created by the last write before a row constructor call to the register holding the row's icon argument. */
-private fun inlineRowIcons(code: List<Instruction>, row: String): Set<String> = code.indices.mapNotNull { at ->
-    val call = (code[at] as? ReferenceInstruction)?.reference as? DexMethodReference
-    val range = code[at] as? RegisterRangeInstruction
-    if (code[at].opcode != Opcode.INVOKE_DIRECT_RANGE || range == null || call?.definingClass != row || call.name != "<init>" ||
-        range.registerCount < 4) return@mapNotNull null
-    // The receiver comes first, so the icon (the constructor's third parameter) is the fourth register.
-    val icon = range.startRegister + 3
-    val origin = (at - 1 downTo 0).firstOrNull { code[it].opcode.setsRegister() && (code[it] as? OneRegisterInstruction)?.registerA == icon }
-    origin?.takeIf { code[it].opcode == Opcode.NEW_INSTANCE }?.let { ((code[it] as ReferenceInstruction).reference as TypeReference).type }
-}.toSet()
 
 /** Messenger casts the tapped folder row just before its folder-selected trace section starts. */
 internal fun Method.menuFolderCastIndex(folderItemType: String): Int {
