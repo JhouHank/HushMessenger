@@ -2947,15 +2947,15 @@ public class CompatReport {
     }
 
     /**
-     * Where ReadReceipts.kt's REPLY_READ_SHAPES puts the pieces: size, composer copy, account copy, the thread's null
-     * default, the null path's copy and the dispatch. 583 drops one parameter check, four instructions shorter.
+     * Where ReadReceipts.kt's REPLY_READ_SHAPE puts the pieces: size, composer copy, account copy, the thread's null
+     * default, the null path's copy and the dispatch.
      */
-    static final int[][] REPLY_READ_SHAPES = {{402, 13, 25, 31, 73, 239}, {398, 10, 21, 27, 69, 235}};
+    static final int[] REPLY_READ_SHAPE = {398, 10, 21, 27, 69, 235};
 
     /**
      * reply_read injects at fixed indices, so ReadReceipts.kt's validateReplyRead pins the method's shape. The same
      * outline is checked here, so a changed body shows up as unresolved instead of passing until patch time: 36
-     * registers, one of the known sizes, the typed ThreadKey getter on p7's type two after the null default with its
+     * registers, 583's 398 instructions, the typed ThreadKey getter on p7's type two after the null default with its
      * result in v12, v12 taking v10 two before the dispatch, and the five-argument dispatch on p4's type that starts
      * with the FbUserSession and ends with two Strings. The dataflow proof stays in the patch.
      */
@@ -2964,9 +2964,8 @@ public class CompatReport {
         if (impl == null || impl.getRegisterCount() != 36) return false;
         var code = new ArrayList<Instruction>();
         impl.getInstructions().forEach(code::add);
-        int[] shape = null;
-        for (var known : REPLY_READ_SHAPES) if (known[0] == code.size()) shape = known;
-        if (shape == null) return false;
+        int[] shape = REPLY_READ_SHAPE;
+        if (shape[0] != code.size()) return false;
         int composer = shape[1], session = shape[2], n = shape[3], absent = shape[4], d = shape[5];
         var params = method.getParameterTypes();
         if (code.get(n + 2).getOpcode() != Opcode.INVOKE_INTERFACE_RANGE || !(code.get(n + 2) instanceof ReferenceInstruction g) ||
