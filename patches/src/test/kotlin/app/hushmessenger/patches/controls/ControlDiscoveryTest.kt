@@ -102,7 +102,8 @@ class ControlDiscoveryTest {
                     """.trimIndent()
                     else -> error("Missing synthetic resolver fixture for $key")
                 }
-                val staticGate = (key in pluginGates || key == "ai_search" || key == "growth_story_card" || key == APP_ICONS) && !id.substringAfter('(').startsWith(')')
+                val staticGate = (key in pluginGates || key == "ai_search" || key == "growth_story_card" || key == APP_ICONS || key == "keep_unsent") &&
+                    !id.substringAfter('(').startsWith(')')
                 fixtureMethod(id, body, registers = when (key) { "original_photo" -> 22; ORIGINAL_VIDEO -> 24;"chat_animation", "chat_legacy" -> 5; else -> 8 }, flags = AccessFlags.PUBLIC.value or
                     if (staticGate) AccessFlags.STATIC.value else 0)
             }

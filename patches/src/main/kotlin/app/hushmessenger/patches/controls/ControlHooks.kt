@@ -1108,23 +1108,22 @@ internal fun MutableMethod.injectMenuFolderClick(folderItemType: String) {
     """.trimIndent())
 }
 
-private val KEEP_UNSENT_PARAMETERS = listOf("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;")
+private val KEEP_UNSENT_PARAMETERS = listOf("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;", "Ljava/util/Map;")
 
-/** 582's revoke handler is an instance (Intent, session, String) method; 583's is static and also takes the extras Map. */
-private fun Method.isKeepUnsentShape() = parameterTypes.map(CharSequence::toString) ==
-    if (AccessFlags.STATIC.isSet(accessFlags)) KEEP_UNSENT_PARAMETERS + "Ljava/util/Map;" else KEEP_UNSENT_PARAMETERS
+/** The revoke handler is a static (Intent, session, String, Map) method. */
+private fun Method.isKeepUnsentShape() =
+    AccessFlags.STATIC.isSet(accessFlags) && parameterTypes.map(CharSequence::toString) == KEEP_UNSENT_PARAMETERS
 
 /**
- * Returns the parameter register number of the Intent: p1 of 582's instance handler, or p0 of 583's static one. The
- * hook reads it with a plain invoke, so it has to be in reach.
+ * Returns the parameter register number of the Intent, p0 of the static handler. The hook reads it with a plain
+ * invoke, so it has to be in reach.
  */
 internal fun MutableMethod.validateKeepUnsent(): Int {
     validateScratch()
     if (returnType != "V") throw PatchException("Messenger controls: keep_unsent hook must return void")
     if (!isKeepUnsentShape())
-        throw PatchException("Messenger controls: keep_unsent hook must be the (Intent, session, String) handler, or the static one that adds the extras Map")
-    val static = AccessFlags.STATIC.isSet(accessFlags)
-    val intent = if (static) 0 else 1
+        throw PatchException("Messenger controls: keep_unsent hook must be the static (Intent, session, String, Map) handler")
+    val intent = 0
     if (parameterRegister(intent) > 15)
         throw PatchException("Messenger controls: keep_unsent hook must have its Intent at v15 or below")
     return intent

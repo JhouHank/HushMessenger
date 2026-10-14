@@ -128,33 +128,31 @@ class ControlsTest {
         assertFailsWith<PatchException> { flag(static, flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value).validateDeltaUnsent() }
     }
 
-    @Test fun keptUnsentHookMustBeAnInstanceMethodWithItsIntentInReach() {
+    /** 582's instance (Intent, session, String) handler, with its Intent in p1, is refused. */
+    @Test fun a582InstanceRevokeHandlerIsRefused() {
         fun revoke(registers: Int, flags: Int = AccessFlags.PUBLIC.value, types: String = "${SESSION}Ljava/lang/String;") = fixtureMethod(
             "Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", "return-void", registers, flags)
-        revoke(5).validateKeepUnsent()
+        assertFailsWith<PatchException> { revoke(5).validateKeepUnsent() }
         assertFailsWith<PatchException> { revoke(5, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value).validateKeepUnsent() }
-        // p1 lands on v15 with 18 registers and on v16 with 19, where a plain invoke can't reach it.
-        revoke(18).validateKeepUnsent()
-        assertFailsWith<PatchException> { revoke(19).validateKeepUnsent() }
-        // Only 582's (Intent, session, String) handler, not another Intent method, and the Map belongs to 583's static one.
-        for (types in listOf("Ljava/lang/String;Ljava/lang/Object;", "Ljava/lang/String;$SESSION", "${SESSION}Ljava/lang/String;Ljava/util/Map;"))
+        assertFailsWith<PatchException> { revoke(11, types = "${SESSION}Ljava/lang/String;Ljava/util/Map;").validateKeepUnsent() }
+        for (types in listOf("Ljava/lang/String;Ljava/lang/Object;", "Ljava/lang/String;$SESSION"))
             assertFailsWith<PatchException>(types) { revoke(5, types = types).validateKeepUnsent() }
     }
 
-    @Test fun discoveryFindsEachBuildsRevokeHandlerAndNoOtherShape() {
+    @Test fun discoveryFindsOnlyTheStaticRevokeHandler() {
         val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
         val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"\nreturn-void"
         fun found(types: String, flags: Int) = findControls(listOf(fixtureClass("Lfixture/Revoke;", listOf(
             fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", revoke, 11, flags))))).getValue("keep_unsent").size
-        assertEquals(1, found("${SESSION}Ljava/lang/String;", AccessFlags.PUBLIC.value))
         assertEquals(1, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", static))
+        assertEquals(0, found("${SESSION}Ljava/lang/String;", AccessFlags.PUBLIC.value))
         assertEquals(0, found("${SESSION}Ljava/lang/String;", static))
         assertEquals(0, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", AccessFlags.PUBLIC.value))
         assertEquals(0, found("Ljava/lang/String;Ljava/lang/Object;", AccessFlags.PUBLIC.value))
     }
 
     /** 583 handles the revoke in a static (Intent, session, String, Map) method, so its Intent is p0. */
-    @Test fun the583StaticRevokeHandlerReadsItsIntentFromP0() {
+    @Test fun theStaticRevokeHandlerReadsItsIntentFromP0() {
         val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
         val map = "${SESSION}Ljava/lang/String;Ljava/util/Map;"
         fun handler(types: String, registers: Int = 11) =

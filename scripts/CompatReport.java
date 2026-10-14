@@ -2223,8 +2223,7 @@ public class CompatReport {
     static final String THREAD_SUMMARY_TYPE = "Lcom/facebook/messaging/model/threads/ThreadSummary;";
 
     static final String MESSENGER_BROWSER_LAUNCHER = "Lcom/facebook/messaging/browser/util/MessengerBrowserLauncher;";
-    static final List<String> REVOKE_HANDLER = List.of("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;");
-    static final List<String> STATIC_REVOKE_HANDLER = List.of("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;", "Ljava/util/Map;");
+    static final List<String> REVOKE_HANDLER = List.of("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;", "Ljava/util/Map;");
     static final String JSON_PUT = "Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;";
 
     /**
@@ -3644,8 +3643,8 @@ public class CompatReport {
                     if (secureFlag && addFlags) found.get("allow_screenshot").add(method);
                 }
 
-                // keep_unsent: 582's instance (Intent, session, String) handler, or 583's static one that adds the extras Map
-                if ("V".equals(method.getReturnType()) && paramTypes.equals(isStatic ? STATIC_REVOKE_HANDLER : REVOKE_HANDLER) &&
+                // keep_unsent: the static (Intent, session, String, Map) revoke handler
+                if ("V".equals(method.getReturnType()) && isStatic && paramTypes.equals(REVOKE_HANDLER) &&
                     strings.stream().anyMatch(s -> s.contains("ACTION_REVOKE_MESSAGE"))) {
                     found.get("keep_unsent").add(method);
                 }
