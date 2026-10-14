@@ -33,7 +33,7 @@ final class ProblemReport {
     private ProblemReport() { }
 
     /** The Messenger build the patch started from, as HostScreens.originalBuild carries it: name, code and mapping. */
-    private static final Pattern ORIGINAL = Pattern.compile("([0-9][0-9A-Za-z.]{0,31})\\|([1-9][0-9]{0,9})\\|([0-9A-Za-z]{1,16})");
+    static final Pattern ORIGINAL =Pattern.compile("([0-9][0-9A-Za-z.]{0,31})\\|([1-9][0-9]{0,9})\\|([0-9A-Za-z]{1,16})");
 
     /**
      * "583.0.0.29.95 (346611369, base mapping)": the build the patch started from, which Android's own version code
