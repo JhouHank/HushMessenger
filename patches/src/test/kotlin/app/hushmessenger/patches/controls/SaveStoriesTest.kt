@@ -123,7 +123,7 @@ class SaveStoriesTest {
                 context.use {
                     val owner = context.mutableClassDefBy("LX/JgG;")
                     assertTrue(owner.directMethods.isEmpty())
-                    discoveredControls = findControls(classes)
+                    discoveredControls = mirroredControls(classes)
                     saveStoriesPatch.execute(context)
                     assertEquals(1, owner.methods.count { it.name == STORY_SAVE_HELPER })
                     assertEquals(1, owner.directMethods.count { it.name == STORY_SAVE_HELPER })

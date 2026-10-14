@@ -91,7 +91,7 @@ class OriginalVideoTest {
     @Test fun theSizeCheckAsksTheSwitchAndKeepsEveryStockInstruction() {
         val site = 13
         val fixture = listOf(fixtureClass(MEDIA_TRANSCODER, listOf(fixtureMethod(VIDEO_TRANSCODE, VIDEO_TRANSCODE_BODY, registers = 24))))
-        val found = findControls(fixture)
+        val found = mirroredControls(fixture)
         validateControls(found, setOf(ORIGINAL_VIDEO))
         val method = found.getValue(ORIGINAL_VIDEO).single() as MutableMethod
         val before = method.code()
@@ -112,7 +112,7 @@ class OriginalVideoTest {
             assertFailsWith<PatchException> { method.videoPassthroughSite() }
         }
         // Discovery still finds 582's fixed-margin worker by its strings, and the patch refuses it before any edit.
-        val found = findControls(listOf(fixtureClass(MEDIA_TRANSCODER, listOf(fixtureMethod(VIDEO_TRANSCODE, FIXED_MARGIN_582_BODY, registers = 24)))))
+        val found = mirroredControls(listOf(fixtureClass(MEDIA_TRANSCODER, listOf(fixtureMethod(VIDEO_TRANSCODE, FIXED_MARGIN_582_BODY, registers = 24)))))
         val method = found.getValue(ORIGINAL_VIDEO).single() as MutableMethod
         val before = method.code()
         assertFailsWith<PatchException> { injectControl(ORIGINAL_VIDEO, mapOf(ORIGINAL_VIDEO to listOf(method))) }

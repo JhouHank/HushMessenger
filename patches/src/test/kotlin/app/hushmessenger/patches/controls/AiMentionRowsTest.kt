@@ -144,7 +144,7 @@ class AiMentionRowsTest {
 
     @Test fun eachRowCheckAnswersFalseWhileTheSwitchIsOn() {
         val checks = rowChecks()
-        val found = findControls(listOf(rowClass(checks = checks)))
+        val found = mirroredControls(listOf(rowClass(checks = checks)))
         assertEquals(setOf(SYNTHETIC_META_AI_ROW, SYNTHETIC_META_AI_CHATS_ROW, SYNTHETIC_META_AI_ENCRYPTED_ROW, SYNTHETIC_IMAGINE_ROW,
             SYNTHETIC_IMAGINE_YOURSELF_ROW), found.getValue(AI_MENTION_ROWS).map { it.hookId() }.toSet())
         validateControls(found, setOf(AI_MENTION_ROWS))

@@ -79,7 +79,7 @@ class TextStyleTest {
     private fun Element.children(tag: String) = (0 until childNodes.length)
         .mapNotNull { childNodes.item(it) as? Element }.filter { it.tagName == tag }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(TEXT_STYLE).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(TEXT_STYLE).map { it.hookId() }.toSet()
 
     @Test fun theMenuEntriesStartDisabledAndOpenTheStyleScreen() {
         val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(
@@ -122,7 +122,7 @@ class TextStyleTest {
             assertEquals(1, profile.hooks.getValue(TEXT_STYLE).size)
             assertTrue(profile.hooks.getValue(TEXT_STYLE).single().endsWith(";->onFocusChanged(ZILandroid/graphics/Rect;)V"))
         }
-        validateControls(findControls(textFieldFixture()), setOf(TEXT_STYLE))
+        validateControls(mirroredControls(textFieldFixture()), setOf(TEXT_STYLE))
     }
 
     @Test fun nothingUnlessThereIsExactlyOneOfEach() {
@@ -142,7 +142,7 @@ class TextStyleTest {
         )
         for ((case, classes) in cases) {
             assertTrue(found(classes).isEmpty(), case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(TEXT_STYLE)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(TEXT_STYLE)) }
         }
     }
 

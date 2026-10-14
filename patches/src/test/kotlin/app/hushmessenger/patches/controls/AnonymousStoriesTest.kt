@@ -217,7 +217,7 @@ class AnonymousStoriesTest {
             assertTrue(STORY_PREVIEW_INIT in hooks, code)
             val handlerType = hooks.single { it != STORY_PREVIEW_INIT }.substringBefore("->")
             val preview = byType.getValue(MONTAGE_BUCKET_PREVIEW)
-            val discovered = findControls(listOf(byType.getValue(handlerType), preview))
+            val discovered = mirroredControls(listOf(byType.getValue(handlerType), preview))
             validateControls(discovered, setOf("anonymous_stories"))
 
             val handler = MutableMethod(discovered.getValue("anonymous_stories").single { it.definingClass == handlerType })

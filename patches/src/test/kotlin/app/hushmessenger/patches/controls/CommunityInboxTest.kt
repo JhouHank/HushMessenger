@@ -118,7 +118,7 @@ class CommunityInboxTest {
                 val classes = communityInboxFixture(secondRead = secondRead)
                 val before = classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }
                 assertNull(findCommunityInbox(classes), "read at $secondRead")
-                assertFailsWith<PatchException> { validateControls(findControls(classes), setOf(COMMUNITY_INBOX)) }
+                assertFailsWith<PatchException> { validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX)) }
                 assertEquals(before, classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) })
             }
         }
@@ -157,7 +157,7 @@ class CommunityInboxTest {
             activeProfile = profile
             val classes = communityInboxFixture(channelCheck = true)
             assertNull(findCommunityInbox(classes))
-            assertFailsWith<PatchException> { validateControls(findControls(classes), setOf(COMMUNITY_INBOX)) }
+            assertFailsWith<PatchException> { validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX)) }
         }
     }
 
@@ -167,7 +167,7 @@ class CommunityInboxTest {
             val classes = communityInboxFixture()
             val contract = assertNotNull(findCommunityInbox(classes))
             assertEquals(profile.nativeCommunityInbox, contract.identity)
-            validateControls(findControls(classes), setOf(COMMUNITY_INBOX))
+            validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX))
             val render = contract.render as MutableMethod
             val untouched = classes.flatMap { it.methods }.filter { it !== render }.associate { it.hookId() to body(it).map(::structural) }
             injectCommunityInbox(contract, render, communityStub(JOINED_COMMUNITY_ROW), communityStub(MAIN_INBOX_SCOPE))
@@ -181,7 +181,7 @@ class CommunityInboxTest {
             val classes = communityInboxFixture()
             val contract = assertNotNull(findCommunityInbox(classes))
             assertEquals(profile.nativeCommunityInbox, contract.identity)
-            validateControls(findControls(classes), setOf(COMMUNITY_INBOX))
+            validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX))
             val render = contract.render as MutableMethod
             val before = body(render).map(::structural)
             val firstRead = body(render)[5]
@@ -247,7 +247,7 @@ class CommunityInboxTest {
             }
             val before = classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }
             assertNull(findCommunityInbox(classes), change)
-            assertFailsWith<PatchException>(change) { validateControls(findControls(classes), setOf(COMMUNITY_INBOX)) }
+            assertFailsWith<PatchException>(change) { validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX)) }
             assertEquals(before, classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }, change)
         }
     }
@@ -327,7 +327,7 @@ class CommunityInboxTest {
                 superclass = native.superclass!!, extraFields = fields, flags = if (change.endsWith("_class")) 0 else native.accessFlags)
             val before = classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }
             assertNull(findCommunityInbox(classes), change)
-            assertFailsWith<PatchException>(change) { validateControls(findControls(classes), setOf(COMMUNITY_INBOX)) }
+            assertFailsWith<PatchException>(change) { validateControls(mirroredControls(classes), setOf(COMMUNITY_INBOX)) }
             assertEquals(before, classes.flatMap { it.methods }.associate { it.hookId() to body(it).map(::structural) }, change)
         }
     }

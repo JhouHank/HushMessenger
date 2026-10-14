@@ -95,18 +95,18 @@ class MqttTelemetryTest {
         activeProfile = SYNTHETIC_PROFILE
     }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(MQTT_TELEMETRY).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(MQTT_TELEMETRY).map { it.hookId() }.toSet()
 
     @Test fun thePublishAndTheKeepaliveAreFoundInTheClientAndNotItsSubclass() {
         assertEquals(setOf(SYNTHETIC_MQTT_PUBLISH, SYNTHETIC_MQTT_KEEPALIVE), found(mqttClientFixture()))
-        validateControls(findControls(mqttClientFixture()), setOf(MQTT_TELEMETRY))
+        validateControls(mirroredControls(mqttClientFixture()), setOf(MQTT_TELEMETRY))
     }
 
     @Test fun everyProfileHooksTheSameTwoMethods() {
         for (profile in listOf(SYNTHETIC_PROFILE, BASE_PROFILE, PROFILE_346611351)) {
             assertEquals(setOf(SYNTHETIC_MQTT_PUBLISH, SYNTHETIC_MQTT_KEEPALIVE), profile.hooks.getValue(MQTT_TELEMETRY))
             activeProfile = profile
-            validateControls(findControls(mqttClientFixture()), setOf(MQTT_TELEMETRY))
+            validateControls(mirroredControls(mqttClientFixture()), setOf(MQTT_TELEMETRY))
         }
     }
 
@@ -129,7 +129,7 @@ class MqttTelemetryTest {
         )
         for ((case, classes) in cases) {
             assertTrue(found(classes).isEmpty(), case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(MQTT_TELEMETRY)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(MQTT_TELEMETRY)) }
         }
     }
 

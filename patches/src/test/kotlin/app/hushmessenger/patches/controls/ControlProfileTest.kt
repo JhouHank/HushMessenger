@@ -1,8 +1,10 @@
 package app.hushmessenger.patches.controls
 
+import app.hushmessenger.patches.CompatMirror
 import app.hushmessenger.patches.MessengerTarget
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import kotlin.test.AfterTest
@@ -79,6 +81,7 @@ class ControlProfileTest {
         switchIntoCopy: Boolean = false,
         catchIntoCopy: Boolean = false,
         addAllCopy: Boolean = false,
+        rangeCopy: Boolean = false,
     ) = fixtureMethod("$COMPOSER_FACTORY->A6X(LX/5vA;)V", """
             new-instance v12, Ljava/util/ArrayList;
             invoke-direct {v12}, Ljava/util/ArrayList;-><init>()V
@@ -88,9 +91,14 @@ class ControlProfileTest {
             const/4 v4, 0x0
             ${if (switchIntoCopy) "packed-switch v4, :cases" else "nop"}
             :copy
-            ${if (addAllCopy) "invoke-virtual {v2, v12}, $copy\ninvoke-static {v2}, $build" else "invoke-static {v2, v12}, $folded"}
+            ${when {
+                addAllCopy -> "invoke-virtual {v2, v12}, $copy\ninvoke-static {v2}, $build"
+                rangeCopy -> "move-object/from16 v3, v12\ninvoke-static/range {v2 .. v3}, $folded"
+                else -> "invoke-static {v2, v12}, $folded"
+            }}
             move-result-object v3
             ${if (extraCopy) "invoke-static {v2, v12}, $folded" else "nop"}
+            sget-object v0, $AVATAR_TAB_EVENT->A00:$AVATAR_TAB_EVENT
             return-void
             ${if (switchIntoCopy) ":cases\n.packed-switch 0x1\n:copy\n.end packed-switch" else ""}
         """.trimIndent(), registers = 16).apply {
@@ -126,5 +134,21 @@ class ControlProfileTest {
 
     @Test fun a582TabListCopiedThroughTheBuildersAddAllIsRefused() {
         assertFailsWith<PatchException> { inlineTabs(addAllCopy = true).injectKeyboardTabsInline() }
+    }
+
+    @Test fun compatReportTakesTheTabListOnlyWhereThePatchCanFilterIt() {
+        // The patch finds the method, then validates it just before its edit; CompatReport does both at discovery.
+        fun takenBy(method: com.android.tools.smali.dexlib2.iface.Method): Pair<Boolean, Boolean> {
+            val classes = listOf(fixtureClass(COMPOSER_FACTORY, listOf(method)))
+            val found = mirroredControls(classes)["avatar_tabs"].orEmpty()
+            val patch = found.size == 1 && runCatching { (found.single() as MutableMethod).validateKeyboardTabsInline() }.isSuccess
+            return patch to CompatMirror.controls(classes).containsKey("avatar_tabs")
+        }
+        assertEquals(true to true, takenBy(inlineTabs()))
+        for ((name, refused) in mapOf(
+            "two copies" to inlineTabs(extraCopy = true), "a branch into the copy" to inlineTabs(branchIntoCopy = true),
+            "a switch case into the copy" to inlineTabs(switchIntoCopy = true), "a catch into the copy" to inlineTabs(catchIntoCopy = true),
+            "582's addAll" to inlineTabs(addAllCopy = true), "the range form" to inlineTabs(rangeCopy = true),
+        )) assertEquals(false to false, takenBy(refused), name)
     }
 }

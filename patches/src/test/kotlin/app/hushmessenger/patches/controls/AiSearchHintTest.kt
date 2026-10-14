@@ -68,7 +68,7 @@ class AiSearchHintTest {
 
     @Test fun theMetaAiCheckGoesThroughTheExtensionBeforeTheHintIsPicked() {
         val method = searchBar()
-        val found = findControls(searchBarFixture())
+        val found = mirroredControls(searchBarFixture())
         assertEquals(listOf(SYNTHETIC_SEARCH_BAR), found.getValue(AI_SEARCH_HINT).map { it.hookId() })
         validateControls(found, setOf(AI_SEARCH_HINT))
         val before = method.code()

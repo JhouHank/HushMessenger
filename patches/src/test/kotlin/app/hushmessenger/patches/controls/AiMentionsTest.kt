@@ -179,7 +179,7 @@ class AiMentionsTest {
 
     @Test fun eachMetaAiSectionReadsItsStateThroughTheExtension() {
         val classes = aiMentionsFixture()
-        val found = findControls(classes)
+        val found = mirroredControls(classes)
         assertEquals(setOf(SYNTHETIC_MENTION_AI, SYNTHETIC_IMAGINE, SYNTHETIC_COMMUNITY_AI), found.getValue(AI_MENTIONS).map { it.hookId() }.toSet())
         validateControls(found, setOf(AI_MENTIONS, AI_COMMANDS))
         for (method in listOf(mentionAi(), imagine(), communityAi())) {

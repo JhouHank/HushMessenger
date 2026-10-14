@@ -121,11 +121,11 @@ class EmojiDrawerTest {
         activeProfile = SYNTHETIC_PROFILE
     }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(EMOJI_DRAWER).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(EMOJI_DRAWER).map { it.hookId() }.toSet()
 
     @Test fun theDrawerIsFoundWhereTheRendererReadsTheFlagItself() {
         assertEquals(setOf(DRAWER_RENDERER, DRAWER_EFFECT), found(emojiDrawerFixture()))
-        validateControls(findControls(emojiDrawerFixture()), setOf(EMOJI_DRAWER))
+        validateControls(mirroredControls(emojiDrawerFixture()), setOf(EMOJI_DRAWER))
     }
 
     @Test fun theFlagCountsOnlyWhenTheRendererThatThrowsTheAnchorReadsIt() {
@@ -140,7 +140,7 @@ class EmojiDrawerTest {
         )
         for ((case, classes) in cases) {
             assertTrue(found(classes).isEmpty(), case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(EMOJI_DRAWER)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(EMOJI_DRAWER)) }
         }
     }
 
@@ -149,7 +149,7 @@ class EmojiDrawerTest {
             val other = drawerEffect("LX/EfL;->invoke(Ljava/lang/Object;)Ljava/lang/Object;", flag)
             val classes = listOf(fixtureClass("LX/51i;", listOf(drawerRenderer("LX/51i;->render(LX/5XD;)V", flag))), fixtureClass("LX/EfL;", listOf(other)))
             assertTrue(found(classes).isEmpty(), "$flag")
-            assertFailsWith<PatchException>("$flag") { validateControls(findControls(classes), setOf(EMOJI_DRAWER)) }
+            assertFailsWith<PatchException>("$flag") { validateControls(mirroredControls(classes), setOf(EMOJI_DRAWER)) }
             assertFailsWith<PatchException>("$flag") { drawerRenderer(flag = flag).validateEmojiDrawer() }
         }
     }

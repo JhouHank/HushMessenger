@@ -133,11 +133,11 @@ class NearbyScansTest {
         activeProfile = SYNTHETIC_PROFILE
     }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(NEARBY_SCANS).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(NEARBY_SCANS).map { it.hookId() }.toSet()
 
     @Test fun theSchedulerAndTheReaderAreFoundWhenEveryScanAndReadSitsBehindThem() {
         assertEquals(setOf(SYNTHETIC_NEARBY_SCAN_SCHEDULER, SYNTHETIC_SCAN_RESULT_READER), found(nearbyScansFixture()))
-        validateControls(findControls(nearbyScansFixture()), setOf(NEARBY_SCANS))
+        validateControls(mirroredControls(nearbyScansFixture()), setOf(NEARBY_SCANS))
     }
 
     @Test fun everyProfileHooksTheSameSchedulerAndItsOwnMappingsReader() {
@@ -147,7 +147,7 @@ class NearbyScansTest {
             assertEquals(setOf(SYNTHETIC_NEARBY_SCAN_SCHEDULER, readerId), hooks)
             assertTrue(readerId.endsWith("->A03(Z)Ljava/util/ArrayList;"), readerId)
             activeProfile = profile
-            validateControls(findControls(nearbyScansFixture(readers = listOf(readerClass(reader(id = readerId))))), setOf(NEARBY_SCANS))
+            validateControls(mirroredControls(nearbyScansFixture(readers = listOf(readerClass(reader(id = readerId))))), setOf(NEARBY_SCANS))
         }
     }
 
@@ -182,7 +182,7 @@ class NearbyScansTest {
         )
         for ((case, classes) in cases) {
             assertTrue(found(classes).isEmpty(), case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(NEARBY_SCANS)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(NEARBY_SCANS)) }
         }
     }
 
@@ -241,11 +241,11 @@ class NearbyScansTest {
         }
     }
 
-    private fun wifiFound(classes: List<MutableClass>) = findControls(classes).getValue(WIFI_IDENTITY).map { it.hookId() }.toSet()
+    private fun wifiFound(classes: List<MutableClass>) = mirroredControls(classes).getValue(WIFI_IDENTITY).map { it.hookId() }.toSet()
 
     @Test fun everyReadOfTheConnectedNetworkOutsideWebRtcIsFound() {
         assertEquals(setOf(SYNTHETIC_WIFI_NAME_READER, SYNTHETIC_WIFI_BSSID_READER), wifiFound(nearbyScansFixture()))
-        validateControls(findControls(nearbyScansFixture()), setOf(NEARBY_SCANS, WIFI_IDENTITY))
+        validateControls(mirroredControls(nearbyScansFixture()), setOf(NEARBY_SCANS, WIFI_IDENTITY))
         // Calls pick their network through WebRTC's own monitor, so its read stays Messenger's.
         val webRtc = wifiReaderClass("Lorg/webrtc/NetworkMonitorAutoDetect\$WifiManagerDelegate;->getWifiSSID()Ljava/lang/String;", WIFI_NAME_BODY)
         assertEquals(setOf(SYNTHETIC_WIFI_NAME_READER, SYNTHETIC_WIFI_BSSID_READER), wifiFound(nearbyScansFixture() + webRtc))
@@ -261,11 +261,11 @@ class NearbyScansTest {
             "a reader the profile doesn't know" to nearbyScansFixture(wifi = wifiReaders() + wifiReaderClass("LX/Zzw;->A00()Ljava/lang/String;", WIFI_NAME_BODY)),
         )
         for ((case, classes) in cases) {
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(WIFI_IDENTITY)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(WIFI_IDENTITY)) }
         }
         assertTrue(wifiFound(nearbyScansFixture() + dropped).isEmpty())
         // The scans half doesn't depend on it.
-        validateControls(findControls(nearbyScansFixture() + dropped), setOf(NEARBY_SCANS))
+        validateControls(mirroredControls(nearbyScansFixture() + dropped), setOf(NEARBY_SCANS))
     }
 
     @Test fun eachReadHandsItsAnswerToTheExtensionWhereItsKept() {

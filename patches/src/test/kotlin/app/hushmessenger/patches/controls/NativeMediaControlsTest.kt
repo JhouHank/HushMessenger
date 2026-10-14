@@ -225,7 +225,7 @@ class NativeMediaControlsTest {
         val cell = aiStickerCellFixture("LX/CoQ;->render(LX/2Cg;)LX/1GU;", label = 0x7f14051c, sourceCount = 5,
             superclass = "LX/1N9;", size = 105)
         assertTrue(findAiStickerCells(cell).isEmpty())
-        assertFailsWith<PatchException> { validateControls(findControls(cell), setOf("ai_sticker_cell")) }
+        assertFailsWith<PatchException> { validateControls(mirroredControls(cell), setOf("ai_sticker_cell")) }
     }
 
     @Test fun paymentWindowsCleanupAndWrongProfileDialogNeverBecomeViewerHooks() {
@@ -236,7 +236,7 @@ class NativeMediaControlsTest {
         """.trimIndent())
         val cleanup = fixtureMethod("$QUICKSNAP_VIEWER->onDestroyView()V", "const/16 v0, 0x2000\ninvoke-virtual {v1, v0}, Landroid/view/Window;->clearFlags(I)V\nreturn-void")
         val before = listOf(payment, cleanup).map { it.implementation!!.instructions.toList() }
-        val found = findControls(listOf(fixtureClass(payment.definingClass, listOf(payment)), fixtureClass(cleanup.definingClass, listOf(cleanup))))
+        val found = mirroredControls(listOf(fixtureClass(payment.definingClass, listOf(payment)), fixtureClass(cleanup.definingClass, listOf(cleanup))))
         assertTrue(found.getValue("screenshot_viewers").isEmpty())
         assertEquals(before, listOf(payment, cleanup).map { it.implementation!!.instructions.toList() })
         activeProfile = PROFILE_346611351
@@ -312,7 +312,7 @@ class NativeMediaControlsTest {
                 "duplicate" -> fixture.add(cell)
             }
             assertTrue(findAiStickerCells(fixture).isEmpty(), change)
-            assertFailsWith<PatchException>(change) { validateControls(findControls(fixture), setOf("ai_sticker_cell")) }
+            assertFailsWith<PatchException>(change) { validateControls(mirroredControls(fixture), setOf("ai_sticker_cell")) }
         }
     }
 
@@ -331,7 +331,7 @@ class NativeMediaControlsTest {
             assertEquals(expectedHash, digest.digest().joinToString("") { "%02x".format(it) })
             val dex = DexFileFactory.loadDexContainer(apk.toFile(), Opcodes.forApi(35))
             val classes = dex.dexEntryNames.flatMap { dex.getEntry(it)!!.dexFile.classes }
-            val discovered = findControls(classes)
+            val discovered = mirroredControls(classes)
             validateControls(discovered, setOf("ai_sticker_cell", "screenshot_viewers", EMOJI_DRAWER, ANALYTICS_UPLOADS, MESSAGE_LOG))
             // The emoji drawer rides on the same discovery: every flag read takes the helper and nothing else moves.
             val drawerReads = discovered.getValue(EMOJI_DRAWER).sumOf { assertEmojiDrawerInjected(it, "$code ${it.hookId()}") }

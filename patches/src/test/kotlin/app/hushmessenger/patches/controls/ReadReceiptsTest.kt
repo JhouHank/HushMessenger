@@ -83,7 +83,7 @@ class ReadReceiptsTest {
     @AfterTest fun reset() { activeProfile = SYNTHETIC_PROFILE; readReceiptThreadFields = emptyMap() }
 
     @Test fun discoveryFindsTheTypedSendPathAndLeavesTheReadManagerAlone() {
-        val hooks = findControls(readReceiptsFixture())
+        val hooks = mirroredControls(readReceiptsFixture())
         assertEquals(listOf(SYNTHETIC_CHAT_SEEN), hooks.getValue(HIDE_READ_RECEIPTS).map { it.hookId() })
         assertEquals(listOf(SYNTHETIC_SEND_EVENT), hooks.getValue(REPLY_READ).map { it.hookId() })
         validateControls(hooks, setOf(HIDE_READ_RECEIPTS, REPLY_READ))
@@ -97,7 +97,7 @@ class ReadReceiptsTest {
 
     @Test fun seenReceivesTheTypedAccountAndHandlerThreadBeforeAnyStockWork() {
         val method = seen()
-        findControls(readReceiptsFixture(seenMethod = method))
+        mirroredControls(readReceiptsFixture(seenMethod = method))
         val before = method.code()
         method.injectChatSeen()
         val c = method.code()
@@ -158,7 +158,7 @@ class ReadReceiptsTest {
         for ((case, changes) in mutations) {
             val good = seen()
             val bad = send(changes)
-            val hooks = findControls(readReceiptsFixture(good, bad)).mapValues { (_, methods) -> methods.map { it as MutableMethod } }
+            val hooks = mirroredControls(readReceiptsFixture(good, bad)).mapValues { (_, methods) -> methods.map { it as MutableMethod } }
             val before = listOf(good.code(), bad.code())
             assertFailsWith<PatchException>(case) { injectControl(HIDE_READ_RECEIPTS, hooks) }
             assertStockCode(before[0], good.code(), emptySet(), case)
@@ -168,13 +168,13 @@ class ReadReceiptsTest {
 
     @Test fun missingImmutableThreadContractOrCrampedRegistersRefuseSeen() {
         val fixture = readReceiptsFixture()
-        findControls(fixture.filter { it.type != THREAD_KEY_TYPE })
+        mirroredControls(fixture.filter { it.type != THREAD_KEY_TYPE })
         assertFailsWith<PatchException> { seen().validateChatSeen() }
-        findControls(fixture)
+        mirroredControls(fixture)
         assertFailsWith<PatchException> { seen(SEEN_BODY.replace("v1", "v0"), 3).validateChatSeen() }
         val thread = fixture.single { it.type == THREAD_KEY_TYPE }
         val mutableKey = fixtureClass(THREAD_KEY_TYPE, thread.methods.toList(), extraFields = listOf(field(THREAD_KEY_TYPE, "key", "I", AccessFlags.PUBLIC.value)), flags = FINAL)
-        findControls(fixture.filter { it.type != THREAD_KEY_TYPE } + mutableKey)
+        mirroredControls(fixture.filter { it.type != THREAD_KEY_TYPE } + mutableKey)
         assertFailsWith<PatchException> { seen().validateChatSeen() }
     }
 

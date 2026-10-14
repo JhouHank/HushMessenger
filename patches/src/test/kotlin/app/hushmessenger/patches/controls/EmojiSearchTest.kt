@@ -75,12 +75,12 @@ class EmojiSearchTest {
     @AfterTest fun reset() { activeProfile = SYNTHETIC_PROFILE }
 
     private fun found(vararg methods: MutableMethod) =
-        findControls(methods.map { fixtureClass(it.definingClass, listOf(it)) }).getValue(EMOJI_SEARCH)
+        mirroredControls(methods.map { fixtureClass(it.definingClass, listOf(it)) }).getValue(EMOJI_SEARCH)
 
     @Test fun theTableLookupGoesThroughTheExtensionAndNothingStockMoves() {
         val method = watcher()
         assertEquals(listOf(method.hookId()), found(method).map { it.hookId() })
-        validateControls(findControls(listOf(fixtureClass(method.definingClass, listOf(method)))), setOf(EMOJI_SEARCH))
+        validateControls(mirroredControls(listOf(fixtureClass(method.definingClass, listOf(method)))), setOf(EMOJI_SEARCH))
         val before = method.code()
         val call = method.emojiSearchCall()
         injectControl(EMOJI_SEARCH, mapOf(EMOJI_SEARCH to listOf(method)))

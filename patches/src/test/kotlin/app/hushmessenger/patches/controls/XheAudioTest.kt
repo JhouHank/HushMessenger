@@ -71,7 +71,7 @@ class XheAudioTest {
 
     @Test fun theFinishedCopyGoesThroughTheExtensionBeforeMessengerReadsIt() {
         val method = shareCopy()
-        val found = findControls(shareCopyFixture())
+        val found = mirroredControls(shareCopyFixture())
         assertEquals(listOf(SYNTHETIC_SHARE_COPY), found.getValue(XHE_AUDIO).map { it.hookId() })
         validateControls(found, setOf(XHE_AUDIO))
         val before = method.code()

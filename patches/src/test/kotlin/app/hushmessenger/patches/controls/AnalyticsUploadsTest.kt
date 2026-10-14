@@ -161,11 +161,11 @@ class AnalyticsUploadsTest {
         activeProfile = SYNTHETIC_PROFILE
     }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(ANALYTICS_UPLOADS).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(ANALYTICS_UPLOADS).map { it.hookId() }.toSet()
 
     @Test fun everyUploadEntryPointIsFoundByItsManifestName() {
         assertEquals(activeProfile.hooks.getValue(ANALYTICS_UPLOADS), found(analyticsUploadFixture()))
-        validateControls(findControls(analyticsUploadFixture()), setOf(ANALYTICS_UPLOADS))
+        validateControls(mirroredControls(analyticsUploadFixture()), setOf(ANALYTICS_UPLOADS))
         assertEquals(11, found(analyticsUploadFixture()).size)
         // The inherited base and the timer are found under any obfuscated name.
         val renamed = analyticsUploadFixture(
@@ -231,7 +231,7 @@ class AnalyticsUploadsTest {
             val hooks = found(classes)
             assertEquals(10, hooks.size, case)
             assertTrue(inlined !in hooks && delegated !in hooks, case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(ANALYTICS_UPLOADS)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(ANALYTICS_UPLOADS)) }
         }
     }
 
@@ -281,7 +281,7 @@ class AnalyticsUploadsTest {
             val hooks = found(classes)
             assertEquals(9, hooks.size, case)
             assertTrue(hooks.none { it.startsWith(BASE) }, case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(ANALYTICS_UPLOADS)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(ANALYTICS_UPLOADS)) }
         }
         // A static method with an entry point's name isn't one.
         val static = analyticsUploadFixture().map {

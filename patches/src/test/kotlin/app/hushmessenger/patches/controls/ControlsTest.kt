@@ -142,7 +142,7 @@ class ControlsTest {
     @Test fun discoveryFindsOnlyTheStaticRevokeHandler() {
         val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
         val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"\nreturn-void"
-        fun found(types: String, flags: Int) = findControls(listOf(fixtureClass("Lfixture/Revoke;", listOf(
+        fun found(types: String, flags: Int) = mirroredControls(listOf(fixtureClass("Lfixture/Revoke;", listOf(
             fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", revoke, 11, flags))))).getValue("keep_unsent").size
         assertEquals(1, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", static))
         assertEquals(0, found("${SESSION}Ljava/lang/String;", AccessFlags.PUBLIC.value))
@@ -414,8 +414,8 @@ class ControlsTest {
             const/4 v0, 0x0
             return v0
         """.trimIndent())))
-        assertEquals(listOf(check), findControls(listOf(launcher)).getValue("browser").map { it.hookId() })
-        assertEquals(listOf(check), findControls(listOf(launcher, logger)).getValue("browser").map { it.hookId() })
-        assertTrue(findControls(listOf(logger)).getValue("browser").isEmpty())
+        assertEquals(listOf(check), mirroredControls(listOf(launcher)).getValue("browser").map { it.hookId() })
+        assertEquals(listOf(check), mirroredControls(listOf(launcher, logger)).getValue("browser").map { it.hookId() })
+        assertTrue(mirroredControls(listOf(logger)).getValue("browser").isEmpty())
     }
 }

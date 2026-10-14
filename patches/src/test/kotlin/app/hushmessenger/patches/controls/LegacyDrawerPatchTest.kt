@@ -164,11 +164,11 @@ class LegacyDrawerPatchTest {
     @Test fun legacyRefreshIsMandatoryAndLookalikesCannotReplaceItsRecordedId() {
         val fixture = legacyDrawerFixture(SYNTHETIC_PROFILE)
         activeProfile = SYNTHETIC_PROFILE
-        validateControls(findControls(fixture.classes), setOf("menu_settings"))
+        validateControls(mirroredControls(fixture.classes), setOf("menu_settings"))
         val owner = fixture.resolve("LX/9rv;")!!
         owner.methods.remove(fixture.method("LX/9rv;->A1i()V"))
         owner.methods.add(fixtureMethod("LX/9rv;->lookalike()V", "const-string v0, \"$DRAWER_REFRESH\"\nreturn-void"))
-        val found = findControls(fixture.classes)
+        val found = mirroredControls(fixture.classes)
         assertTrue(found.getValue("menu_settings").any { it.name == "lookalike" })
         assertFailsWith<PatchException> { validateControls(found, setOf("menu_settings")) }
     }

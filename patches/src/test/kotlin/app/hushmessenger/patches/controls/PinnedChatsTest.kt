@@ -47,11 +47,11 @@ class PinnedChatsTest {
         activeProfile = SYNTHETIC_PROFILE
     }
 
-    private fun found(classes: List<MutableClass>) = findControls(classes).getValue(PINNED_CHATS).map { it.hookId() }.toSet()
+    private fun found(classes: List<MutableClass>) = mirroredControls(classes).getValue(PINNED_CHATS).map { it.hookId() }.toSet()
 
     @Test fun theLimitsGetterIsFoundByItsConfigId() {
         assertEquals(setOf(SYNTHETIC_PINNED_CHAT_LIMIT), found(pinnedChatLimitFixture()))
-        validateControls(findControls(pinnedChatLimitFixture()), setOf(PINNED_CHATS))
+        validateControls(mirroredControls(pinnedChatLimitFixture()), setOf(PINNED_CHATS))
     }
 
     @Test fun everyProfileHooksItsOwnGetter() {
@@ -60,7 +60,7 @@ class PinnedChatsTest {
             val id = SYNTHETIC_PINNED_CHAT_LIMIT.replace("LX/2na;", owner)
             assertEquals(setOf(id), profile.hooks.getValue(PINNED_CHATS))
             activeProfile = profile
-            validateControls(findControls(pinnedChatLimitFixture(limit(id = id))), setOf(PINNED_CHATS))
+            validateControls(mirroredControls(pinnedChatLimitFixture(limit(id = id))), setOf(PINNED_CHATS))
         }
     }
 
@@ -79,7 +79,7 @@ class PinnedChatsTest {
         )
         for ((case, classes) in cases) {
             assertTrue(found(classes).isEmpty(), case)
-            assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(PINNED_CHATS)) }
+            assertFailsWith<PatchException>(case) { validateControls(mirroredControls(classes), setOf(PINNED_CHATS)) }
         }
     }
 
