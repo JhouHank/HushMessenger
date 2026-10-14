@@ -1541,8 +1541,7 @@ public class CompatReport {
     static final String QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;";
     static final String WINDOW = "Landroid/view/Window;";
     static final String SET_FLAGS = WINDOW + "->setFlags(II)V", ADD_FLAGS = WINDOW + "->addFlags(I)V";
-    static final int GENERATE_AI_LABEL = 0x7f14051c;
-    static final int GENERATE_AI_LABEL_583 = 0x7f140560;
+    static final int GENERATE_AI_LABEL = 0x7f140560;
     static final Set<String> EPHEMERAL_DIALOGS = Set.of("A1D", "A1F");
 
     static int mediaTarget(List<Instruction> code, int at) {
@@ -1629,17 +1628,15 @@ public class CompatReport {
     }
 
     /**
-     * Mirrors NativeMediaControls.kt: each build's cell, its label, how many renders offer that label and its render's
-     * size (24 registers in every build). 582 offers the label from five renders of 105; 583 from four, of 104 or 105.
+     * Mirrors NativeMediaControls.kt: each 583 naming's cell, its label, how many renders offer that label and its
+     * render's size (24 registers in both). Both offer the label from four renders, of 104 or 105.
      */
     record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size) {
         String render() { return type + "->render(" + scope + ")" + component; }
     }
     static List<Method> findAiStickerCells(List<ClassDef> classes) {
-        var shapes = List.of(new AiCell("LX/CoQ;", "LX/1N9;", "LX/2Cg;", "LX/1GU;", GENERATE_AI_LABEL, 5, 105),
-            new AiCell("LX/EyW;", "LX/1N8;", "LX/2Cf;", "LX/1GT;", GENERATE_AI_LABEL, 5, 105),
-            new AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, 4, 104),
-            new AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL_583, 4, 105));
+        var shapes = List.of(new AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL, 4, 104),
+            new AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL, 4, 105));
         var result = new ArrayList<Method>();
         for (var shape : shapes) {
             var matching = classes.stream().filter(c -> c.getType().equals(shape.type())).toList();

@@ -25,7 +25,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     ),
     "ai_menu" to setOf("LX/HFe;->A00()Z", "LX/HFe;->A01()Z", "LX/Jiu;->A00()Z", "LX/Jiu;->A01()Z"),
     "ai_fab" to setOf("LX/6k8;->render(LX/2MZ;)LX/1GG;"),
-    "ai_sticker_cell" to setOf("LX/CoQ;->render(LX/2Cg;)LX/1GU;"),
+    "ai_sticker_cell" to setOf("LX/F3k;->render(LX/2Cf;)LX/1Gu;"),
     "subtabs" to setOf("LX/2UL;->run()V"),
     "typing" to setOf("LX/Ahp;->run()V"),
     "typing_mailbox" to setOf("LX/8eb;->A0I(Ljava/lang/String;Z)LX/325;"),

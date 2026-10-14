@@ -95,10 +95,10 @@ internal fun aiStickerCellFixture(
     id: String = activeProfile.hooks.getValue("ai_sticker_cell").single(),
     label: Int = aiCells.single { it.render == id }.label,
     sourceCount: Int = aiCells.single { it.render == id }.sources,
+    superclass: String = aiCells.single { it.render == id }.superclass,
+    size: Int = aiCells.single { it.render == id }.size,
 ): List<MutableClass> {
     val type = id.substringBefore("->")
-    val superclass = aiCells.single { it.type == type }.superclass
-    val size = aiCells.single { it.type == type }.size
     val render = fixtureMethod(id, "const/4 v0, 0x0\n" + List(size - 2) { "nop" }.joinToString("\n") + "\nreturn-object v0", AI_CELL_REGISTERS)
     render.implementation!!.run {
         for (at in listOf(1, 3, 5, 7)) addCatch(newLabelForIndex(at), newLabelForIndex(at + 1), newLabelForIndex(size - 1))
@@ -205,14 +205,21 @@ class NativeMediaControlsTest {
             assertEquals(listOf(cell.render), findAiStickerCells(aiStickerCellFixture(cell.render)).map { it.hookId() })
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources - 1)).isEmpty())
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources + 1)).isEmpty())
-            // An older release's label for the same row, and the other build's.
+            // An older release's label for the same row, and 582's.
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f140511)).isEmpty())
-            val other = if (cell.label == GENERATE_AI_LABEL) GENERATE_AI_LABEL_583 else GENERATE_AI_LABEL
-            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = other)).isEmpty())
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f14051c)).isEmpty())
         }
-        // Messenger 583 offers its own label from four renders, and its cell render is one instruction shorter.
-        val cell583 = aiCells.single { it.type == "LX/F0Y;" }
-        assertEquals(Triple(GENERATE_AI_LABEL_583, 4, 104), Triple(cell583.label, cell583.sources, cell583.size))
+        // Both namings offer 583's label from four renders, and 346611351's cell render is one instruction shorter.
+        assertEquals(listOf(Triple(GENERATE_AI_LABEL, 4, 104), Triple(GENERATE_AI_LABEL, 4, 105)),
+            aiCells.map { Triple(it.label, it.sources, it.size) })
+    }
+
+    @Test fun a582CellIsNoLongerFound() {
+        // 582's CoQ under LX/1N9; offered its own label from five renders, and its render ran 105 instructions.
+        val cell = aiStickerCellFixture("LX/CoQ;->render(LX/2Cg;)LX/1GU;", label = 0x7f14051c, sourceCount = 5,
+            superclass = "LX/1N9;", size = 105)
+        assertTrue(findAiStickerCells(cell).isEmpty())
+        assertFailsWith<PatchException> { validateControls(findControls(cell), setOf("ai_sticker_cell")) }
     }
 
     @Test fun paymentWindowsCleanupAndWrongProfileDialogNeverBecomeViewerHooks() {
@@ -262,11 +269,10 @@ class NativeMediaControlsTest {
         }
     }
 
-    /** Both 583 namings' cells, each under its own name, to check the injection compares 583's own label. */
-    @Test fun the583CellComparesItsOwnLabel() {
-        val cells = aiCells.filter { it.label == GENERATE_AI_LABEL_583 }
-        assertEquals(2, cells.size)
-        for (cell in cells) {
+    /** Both 583 namings' cells, each under its own name, to check the injection compares 583's label. */
+    @Test fun eachCellCompares583sLabel() {
+        assertEquals(2, aiCells.size)
+        for (cell in aiCells) {
             val base = SYNTHETIC_PROFILE
             activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,
                 base.peopleKey, base.peopleFlagCheck, base.subtabsSupplier, base.browserPreferenceKey, base.browserPreferenceIndex,
@@ -277,7 +283,7 @@ class NativeMediaControlsTest {
             method.injectAiStickerCell()
             val after = method.implementation!!.instructions.toList()
             assertEquals(before, after.drop(10), cell.type)
-            assertEquals(GENERATE_AI_LABEL_583, (after[2] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(GENERATE_AI_LABEL, (after[2] as NarrowLiteralInstruction).narrowLiteral)
             assertEquals(10, after.branchTarget(3))
             assertEquals(10, after.branchTarget(7))
         }
