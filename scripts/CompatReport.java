@@ -194,7 +194,7 @@ public class CompatReport {
         PATCHES.put("Use system emoji", List.of("emoji_typeface"));
         PATCHES.put("Send photos at original quality", List.of("original_photo"));
         PATCHES.put("Send videos without re-encoding", List.of("original_video"));
-        PATCHES.put("Fix shared videos with xHE-AAC sound", List.of("xhe_audio"));
+        PATCHES.put("Fix shared videos with xHE-AAC sound", List.of("xhe_audio", "xhe_transcode"));
         PATCHES.put("Turn off the swipe up for disappearing messages", List.of("disappearing_swipe"));
         PATCHES.put("Use the phone's camera app", List.of("system_camera"));
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));
@@ -2465,6 +2465,48 @@ public class CompatReport {
      * OriginalVideo.kt's videoPassthroughSite: the one size check against the bitrate limit plus Messenger's configured
      * margin, with the limit arithmetic, the metadata reads and the registers the hook needs all where 583 has them.
      */
+    /**
+     * XheAudio.kt's source checks for xhe_transcode: the worker's source path (its first String parameter, the fourth
+     * register from the top) is read before anything overwrites it, and it or a plain copy of it reaches a static
+     * (String)Uri call, Messenger parsing the source it's about to read.
+     */
+    static boolean transcodeSourceParsed(Method method) {
+        var code = instructions(method);
+        int source = method.getImplementation().getRegisterCount() - 6 + 3;
+        var holders = new HashSet<Integer>(List.of(source));
+        boolean read = false;
+        for (Instruction insn : code) {
+            List<Integer> named = new ArrayList<>();
+            if (insn instanceof FiveRegisterInstruction f) {
+                int[] all = {f.getRegisterC(), f.getRegisterD(), f.getRegisterE(), f.getRegisterF(), f.getRegisterG()};
+                for (int i = 0; i < f.getRegisterCount(); i++) named.add(all[i]);
+            } else if (insn instanceof RegisterRangeInstruction r) {
+                for (int i = 0; i < r.getRegisterCount(); i++) named.add(r.getStartRegister() + i);
+            }
+            Opcode op = insn.getOpcode();
+            Integer written = op.setsRegister() && !op.name.endsWith("/2addr") && insn instanceof OneRegisterInstruction o
+                ? o.getRegisterA() : null;
+            if (insn instanceof ReferenceInstruction ref && ref.getReference() instanceof MethodReference m &&
+                (op == Opcode.INVOKE_STATIC || op == Opcode.INVOKE_STATIC_RANGE) && "Landroid/net/Uri;".equals(m.getReturnType()) &&
+                m.getParameterTypes().size() == 1 && "Ljava/lang/String;".contentEquals(m.getParameterTypes().get(0)) &&
+                named.size() == 1 && holders.contains(named.get(0))) return true;
+            if ((op == Opcode.MOVE_OBJECT || op == Opcode.MOVE_OBJECT_FROM16 || op == Opcode.MOVE_OBJECT_16) &&
+                holders.contains(((TwoRegisterInstruction) insn).getRegisterB())) {
+                holders.add(((TwoRegisterInstruction) insn).getRegisterA());
+                read = true;
+                continue;
+            }
+            if (!read && written != null && (written == source || (op.setsWideRegister() && written + 1 == source))) return false;
+            if (named.contains(source)) read = true;
+            if (written != null) {
+                holders.remove(written);
+                if (op.setsWideRegister()) holders.remove(written + 1);
+            }
+            if (holders.isEmpty()) return false;
+        }
+        return false;
+    }
+
     static boolean videoPassthroughSite(Method method) {
         var code = instructions(method);
         var sites = new ArrayList<Integer>();
@@ -3917,6 +3959,12 @@ public class CompatReport {
                 if ("Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;".equals(cls.getType()) && !isStatic &&
                     ORIGINAL_VIDEO_HOOK.equals(hookId(method)) && strings.contains("mci_video_passthrough") && videoPassthroughSite(method)) {
                     found.get("original_video").add(method);
+                }
+
+                // xhe_transcode: the same worker, counted only when its first String still reaches Messenger's source Uri parse
+                if ("Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;".equals(cls.getType()) && !isStatic &&
+                    ORIGINAL_VIDEO_HOOK.equals(hookId(method)) && strings.contains("mci_video_passthrough") && transcodeSourceParsed(method)) {
+                    found.get("xhe_transcode").add(method);
                 }
 
                 // emoji_typeface: Messenger's emoji getter, counted only when its downloaded font holder proves out (#34)

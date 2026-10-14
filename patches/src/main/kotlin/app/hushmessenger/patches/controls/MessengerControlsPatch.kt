@@ -155,6 +155,7 @@ internal fun MutableMethod.validateHook(hook: String) {
         AI_SEARCH_HINT -> validateAiSearchHint()
         AI_MENTION_ROWS -> validateAiMentionRows()
         XHE_AUDIO -> validateXheAudio()
+        XHE_TRANSCODE -> validateXheTranscode()
         DISAPPEARING_SWIPE -> validateDisappearingSwipe()
         HIDE_READ_RECEIPTS -> validateChatSeen()
         REPLY_READ -> validateReplyRead()
@@ -221,6 +222,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             AI_SEARCH_HINT -> method.injectAiSearchHint()
             AI_MENTION_ROWS -> method.injectAiMentionRows()
             XHE_AUDIO -> method.injectXheAudio()
+            XHE_TRANSCODE -> method.injectXheTranscode()
             DISAPPEARING_SWIPE -> method.injectDisappearingSwipe()
             ANALYTICS_UPLOADS -> method.injectAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
@@ -402,7 +404,7 @@ val originalVideoPatch = controlPatch("original_video", "Send videos without re-
     "Sends a video as the original file instead of a recompressed copy, when Messenger allows it. Videos over 25 MB, edited videos and some formats are still compressed.", "Conversations")
 @Suppress("unused")
 val xheAudioPatch = controlPatch("xhe_audio", "Fix shared videos with xHE-AAC sound",
-    "Messenger can't send a video whose only sound is xHE-AAC, which Facebook and Instagram now use. When you share one into Messenger from another app, its sound is converted to regular AAC first, so it sends. The picture isn't touched.", "Conversations")
+    "Messenger can't send a video whose only sound is xHE-AAC, which Facebook and Instagram now use. Whether you share one into Messenger from another app or pick it in a chat, its sound is converted to regular AAC first, so it sends. The picture isn't touched.", "Conversations", XHE_AUDIO, XHE_TRANSCODE)
 @Suppress("unused")
 val disappearingSwipePatch = controlPatch("disappearing_swipe", "Turn off the swipe up for disappearing messages",
     "Swiping up at the bottom of a chat no longer turns on disappearing messages, so a scroll can't set the timer by accident. You can still change it in the chat's settings.", "Conversations")

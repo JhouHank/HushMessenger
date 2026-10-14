@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fix shared videos with xHE-AAC sound** now also works on a video you pick inside a chat, not only one you share into Messenger from another app. Its xHE-AAC sound is converted to regular AAC in a copy in Messenger's cache, so the video sends instead of failing with "Unable to send". Your original file isn't changed, and old copies get cleaned up as new ones are made.
 - **Slide chats in and out** measures Messenger's short freezes against your screen's own refresh rate now, instead of assuming 60 Hz. On a 90 or 120 Hz screen a freeze of a few frames gets skipped over rather than counted as part of the slide.
 
 ## 0.24.0 (2026-10-14)

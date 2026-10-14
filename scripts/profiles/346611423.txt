@@ -175,6 +175,7 @@ hook wifi_identity LX/AhN;->A03()Ljava/lang/String;
 hook wifi_identity LX/AhN;->A04(Ljava/util/Map;)V
 hook wifi_identity LX/MWw;->A01(LX/MWw;)Ljava/lang/String;
 hook xhe_audio LX/KYZ;->call()Ljava/lang/Object;
+hook xhe_transcode Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->A05(Lcom/facebook/msys/mci/TranscodeVideoCompletionCallback;Lcom/facebook/msys/mci/VideoEdits;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
 pluginSentinel LX/1fl;->A03:Ljava/lang/Object;
 preferenceGetter Lcom/facebook/prefs/shared/FbSharedPreferences;->AjV(LX/2vT;Z)Z
 peopleKey LX/PO9;->A01:LX/2vU;

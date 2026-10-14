@@ -263,7 +263,10 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 instructions.any { (it as? NarrowLiteralInstruction)?.narrowLiteral == FLAG_SECURE } &&
                 refs.any { it.toString() == "Landroid/view/Window;->addFlags(I)V" }) add("allow_screenshot")
             if (cls.type == MEDIA_TRANSCODER && method.hookId().let { it == TRANSCODE_IMAGE || it == TRANSCODE_IMAGE_ASYNC }) add("original_photo")
-            if (method.isVideoTranscode(strings)) add(ORIGINAL_VIDEO)
+            if (method.isVideoTranscode(strings)) {
+                add(ORIGINAL_VIDEO)
+                if (method.parsesTranscodeSource()) add(XHE_TRANSCODE)
+            }
             if (method.returnType == "V" && method.isKeepUnsentShape() && strings.any { "ACTION_REVOKE_MESSAGE" in it }) add("keep_unsent")
             // Both unsent hooks call the wrapper's own message id getter, so the wrapper that holds them has to have one.
             if (messageTextGetterName.isNotEmpty() && method.name == messageTextGetterName &&
