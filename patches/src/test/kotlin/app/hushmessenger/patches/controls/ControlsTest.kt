@@ -353,7 +353,7 @@ class ControlsTest {
     }
 
     /** The launcher's preference check, read at 60 as in every supported build, with false in [default]. */
-    private fun browserCheck(registers: Int = 9, default: Int = 3, branch: String = "if-eqz", flags: Int = AccessFlags.PUBLIC.value) =
+    private fun browserCheck(registers: Int = 8, default: Int = 2, branch: String = "if-nez", flags: Int = AccessFlags.PUBLIC.value) =
         MutableMethod(ImmutableMethod(
             MESSENGER_BROWSER_LAUNCHER, "A0L",
             listOf("Landroid/net/Uri;", SESSION).map { ImmutableMethodParameter(it, null, null) },
@@ -377,22 +377,22 @@ class ControlsTest {
         assertEquals(before, browser.implementation!!.instructions.toList())
     }
 
-    /** 582 keeps false in v3 of nine registers and skips ahead when the answer is off; 583 has eight, v2, and returns when it's on. */
-    @Test fun eachBuildsBrowserCheckTakesTheAnswerBeforeItsOwnBranch() {
-        for ((registers, default, branch) in listOf(Triple(9, 3, Opcode.IF_EQZ), Triple(8, 2, Opcode.IF_NEZ))) {
-            val check = browserCheck(registers, default, if (branch == Opcode.IF_EQZ) "if-eqz" else "if-nez")
-            assertEquals(63, check.validateBrowserPreference())
-            check.injectBrowserPreference()
-            val code = check.implementation!!.instructions.toList()
-            assertEquals("$SETTINGS->preferExternalBrowser(ZLandroid/net/Uri;)Z", (code[63] as ReferenceInstruction).reference.toString())
-            assertEquals(listOf(0, check.parameterRegister(1)), (code[63] as FiveRegisterInstruction).let { listOf(it.registerC, it.registerD) })
-            assertEquals(Opcode.MOVE_RESULT, code[64].opcode)
-            assertEquals(0, (code[64] as OneRegisterInstruction).registerA)
-            assertEquals(branch, code[65].opcode)
-        }
-        // A default or branch from the other build's shape is refused before anything changes.
+    /** The check keeps false in v2 of eight registers and returns when the answer is on. */
+    @Test fun theBrowserCheckTakesTheAnswerBeforeItsBranch() {
+        val check = browserCheck()
+        assertEquals(63, check.validateBrowserPreference())
+        check.injectBrowserPreference()
+        val code = check.implementation!!.instructions.toList()
+        assertEquals("$SETTINGS->preferExternalBrowser(ZLandroid/net/Uri;)Z", (code[63] as ReferenceInstruction).reference.toString())
+        assertEquals(listOf(0, check.parameterRegister(1)), (code[63] as FiveRegisterInstruction).let { listOf(it.registerC, it.registerD) })
+        assertEquals(Opcode.MOVE_RESULT, code[64].opcode)
+        assertEquals(0, (code[64] as OneRegisterInstruction).registerA)
+        assertEquals(Opcode.IF_NEZ, code[65].opcode)
+        // 582's shape (false in v3 of nine registers, skipping ahead when the answer is off) and any mix of the two are
+        // refused before anything changes.
         for ((registers, default, branch) in listOf(
-            Triple(9, 3, "if-nez"), Triple(8, 2, "if-eqz"), Triple(8, 3, "if-nez"), Triple(9, 2, "if-eqz"), Triple(10, 3, "if-eqz"),
+            Triple(9, 3, "if-eqz"), Triple(9, 3, "if-nez"), Triple(8, 2, "if-eqz"), Triple(8, 3, "if-nez"), Triple(9, 2, "if-nez"),
+            Triple(10, 3, "if-eqz"),
         )) {
             val changed = browserCheck(registers, default, branch)
             val before = changed.implementation!!.instructions.toList()

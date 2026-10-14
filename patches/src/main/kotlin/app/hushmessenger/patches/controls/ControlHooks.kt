@@ -625,27 +625,27 @@ internal fun MutableMethod.injectSubtabs() {
 }
 
 /**
- * How each tested build reads the external-browser preference, keyed by the check's register count: the register that
- * holds the false default, and the branch taken on the result. 582 skips ahead when it's off; 583 returns when it's on.
+ * How 583 reads the external-browser preference: an eight-register check that keeps the false default in v2 and
+ * returns when the answer is on.
  */
-internal val BROWSER_PREFERENCE_SHAPES = mapOf(9 to (3 to Opcode.IF_EQZ), 8 to (2 to Opcode.IF_NEZ))
+private const val BROWSER_PREFERENCE_REGISTERS = 8
+private const val BROWSER_PREFERENCE_DEFAULT = 2
 
 internal fun MutableMethod.validateBrowserPreference(): Int {
     val instructions = implementation!!.instructions
     val key = activeProfile.browserPreferenceIndex
     val getter = instructions.getOrNull(key + 1) as? FiveRegisterInstruction
-    val (default, branch) = BROWSER_PREFERENCE_SHAPES[implementation!!.registerCount] ?: (-1 to null)
-    if (AccessFlags.STATIC.isSet(accessFlags) ||
+    if (AccessFlags.STATIC.isSet(accessFlags) || implementation!!.registerCount != BROWSER_PREFERENCE_REGISTERS ||
         parameterTypes != listOf("Landroid/net/Uri;", "Lcom/facebook/auth/usersession/FbUserSession;") ||
         returnType != "Z" || instructions.getOrNull(key)?.opcode != Opcode.SGET_OBJECT ||
         (instructions[key] as? OneRegisterInstruction)?.registerA != 0 ||
         instructions.getOrNull(key + 1)?.opcode != Opcode.INVOKE_INTERFACE ||
-        getter?.registerCount != 3 || getter.registerC != 1 || getter.registerD != 0 || getter.registerE != default ||
+        getter?.registerCount != 3 || getter.registerC != 1 || getter.registerD != 0 || getter.registerE != BROWSER_PREFERENCE_DEFAULT ||
         (instructions.getOrNull(key) as? ReferenceInstruction)?.reference.toString() != activeProfile.browserPreferenceKey ||
         (instructions.getOrNull(key + 1) as? ReferenceInstruction)?.reference.toString() != activeProfile.preferenceGetter ||
         instructions.getOrNull(key + 2)?.opcode != Opcode.MOVE_RESULT ||
         (instructions[key + 2] as? OneRegisterInstruction)?.registerA != 0 ||
-        branch == null || instructions.getOrNull(key + 3)?.opcode != branch ||
+        instructions.getOrNull(key + 3)?.opcode != Opcode.IF_NEZ ||
         (instructions[key + 3] as? OneRegisterInstruction)?.registerA != 0) {
         throw PatchException("Messenger controls: external-browser preference no longer matches the tested build")
     }
@@ -654,7 +654,7 @@ internal fun MutableMethod.validateBrowserPreference(): Int {
 
 internal fun MutableMethod.injectBrowserPreference() {
     val branch = validateBrowserPreference()
-    // p1 is the Uri. Both builds branch on v0 being true as "open it outside", so the stock branch takes the answer.
+    // p1 is the Uri. The check returns on v0 being true as "open it outside", so the stock branch takes the answer.
     addInstructions(branch, "invoke-static {v0, p1}, $SETTINGS->preferExternalBrowser(ZLandroid/net/Uri;)Z\nmove-result v0")
 }
 

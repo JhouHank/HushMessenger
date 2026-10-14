@@ -455,26 +455,23 @@ public class CompatReport {
 
     record PreferenceRead(int index, String key, String getter) {}
 
-    /** Register count to (false-default register, branch on the result), as in ControlHooks.kt's BROWSER_PREFERENCE_SHAPES. */
-    static final Map<Integer, Map.Entry<Integer, Opcode>> BROWSER_PREFERENCE_SHAPES =
-        Map.of(9, Map.entry(3, Opcode.IF_EQZ), 8, Map.entry(2, Opcode.IF_NEZ));
+    /** The check's register count and false-default register; it returns when the answer is on. As in ControlHooks.kt. */
+    static final int BROWSER_PREFERENCE_REGISTERS = 8, BROWSER_PREFERENCE_DEFAULT = 2;
 
     /** The one boolean preference read the external-browser check branches on. */
     static PreferenceRead browserPreferenceRead(List<Method> browser) {
-        if (browser.size() != 1) return null;
-        var shape = BROWSER_PREFERENCE_SHAPES.get(browser.get(0).getImplementation().getRegisterCount());
-        if (shape == null) return null;
+        if (browser.size() != 1 || browser.get(0).getImplementation().getRegisterCount() != BROWSER_PREFERENCE_REGISTERS) return null;
         var code = instructions(browser.get(0));
         PreferenceRead read = null;
         for (int k = 0; k + 3 < code.size(); k++) {
             if (code.get(k).getOpcode() != Opcode.SGET_OBJECT || register(code.get(k)) != 0 ||
                 !(code.get(k + 1) instanceof FiveRegisterInstruction call) || call.getOpcode() != Opcode.INVOKE_INTERFACE ||
                 call.getRegisterCount() != 3 || call.getRegisterC() != 1 || call.getRegisterD() != 0 ||
-                call.getRegisterE() != shape.getKey() ||
+                call.getRegisterE() != BROWSER_PREFERENCE_DEFAULT ||
                 !(((ReferenceInstruction) call).getReference() instanceof MethodReference getter) ||
                 !PREFERENCES.equals(getter.getDefiningClass()) || !"Z".equals(getter.getReturnType()) ||
                 code.get(k + 2).getOpcode() != Opcode.MOVE_RESULT || register(code.get(k + 2)) != 0 ||
-                code.get(k + 3).getOpcode() != shape.getValue() || register(code.get(k + 3)) != 0) continue;
+                code.get(k + 3).getOpcode() != Opcode.IF_NEZ || register(code.get(k + 3)) != 0) continue;
             if (read != null) return null;
             read = new PreferenceRead(k, ref(code.get(k)), getter.toString());
         }
