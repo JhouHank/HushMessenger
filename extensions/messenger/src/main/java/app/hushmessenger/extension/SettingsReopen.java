@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -92,23 +94,72 @@ final class SettingsReopen {
         app.registerActivityLifecycleCallbacks(new FirstScreen(app));
     }
 
+    /**
+     * Messenger's launcher screen. It picks where Messenger opens (the chat list, a sign-in, the chat restore prompt),
+     * starts that screen and finishes, so settings opened from it end up behind the screen it hands over to.
+     */
+    static final String START_SCREEN = "com.facebook.orca.auth.StartScreenActivity";
+    /** How long the start screen may stay in front before settings open over it anyway, as on a sign-in it shows itself. */
+    static final long HANDOVER_MS = 1_500;
+
     static final class FirstScreen implements Application.ActivityLifecycleCallbacks {
         private final Application app;
+        private final Handler main = new Handler(Looper.getMainLooper());
+        /** The page taken from the marker, held while Messenger's start screen picks where to go. */
+        private String page;
+        /** Messenger's start screen while it's in front with the page waiting. */
+        private Activity startScreen;
+        private final Runnable stayedInFront = () -> { if (startScreen != null) open(startScreen); };
 
         FirstScreen(Application app) { this.app = app; }
 
         @Override public void onActivityResumed(Activity activity) {
-            app.unregisterActivityLifecycleCallbacks(this);
             try {
-                // Settings live in the main process, the one Messenger's own screens open in.
-                if (!activity.getPackageName().equals(Application.getProcessName())) return;
-                // Settings' own store, opened directly: reading a marker shouldn't start settings and CrashGuard early.
-                SharedPreferences prefs = Settings.preferences != null ? Settings.preferences
-                    : activity.getApplicationContext().getSharedPreferences("hushmessenger", Context.MODE_PRIVATE);
-                String page = takeFresh(prefs, SystemClock.elapsedRealtime());
+                if (page == null) {
+                    // Settings live in the main process, the one Messenger's own screens open in.
+                    if (!activity.getPackageName().equals(Application.getProcessName())) { done(); return; }
+                    // Settings' own store, opened directly: reading a marker shouldn't start settings and CrashGuard early.
+                    SharedPreferences prefs = Settings.preferences != null ? Settings.preferences
+                        : activity.getApplicationContext().getSharedPreferences("hushmessenger", Context.MODE_PRIVATE);
+                    page = takeFresh(prefs, SystemClock.elapsedRealtime());
+                    if (page == null) { done(); return; }
+                }
                 // A settings screen that is already up is where the restart meant to go.
-                if (page == null || activity instanceof SettingsActivity || activity instanceof RestartActivity) return;
-                Intent settings = HostScreens.intentFor(activity, HostScreens.SETTINGS).putExtra(EXTRA, page);
+                if (activity instanceof SettingsActivity || activity instanceof RestartActivity) { done(); return; }
+                if (START_SCREEN.equals(activity.getClass().getName())) {
+                    // The screen it hands over to opens them. If it stays in front instead, they open over it.
+                    startScreen = activity;
+                    main.removeCallbacks(stayedInFront);
+                    main.postDelayed(stayedInFront, HANDOVER_MS);
+                    return;
+                }
+                open(activity);
+            } catch (RuntimeException | LinkageError error) {
+                done();
+                Log.w("HushMessenger", "Couldn't reopen settings after the restart", error);
+            }
+        }
+
+        @Override public void onActivityPaused(Activity activity) {
+            // Handing over: the next screen to come up takes the page.
+            if (activity == startScreen) {
+                startScreen = null;
+                main.removeCallbacks(stayedInFront);
+            }
+        }
+
+        private void done() {
+            app.unregisterActivityLifecycleCallbacks(this);
+            main.removeCallbacks(stayedInFront);
+            page = null;
+            startScreen = null;
+        }
+
+        private void open(Activity activity) {
+            String opening = page;
+            done();
+            try {
+                Intent settings = HostScreens.intentFor(activity, HostScreens.SETTINGS).putExtra(EXTRA, opening);
                 // Android keeps the settings task across the restart, with the screen the restart was asked from still
                 // in it. Opened from the app drawer, that screen's intent names the launcher alias, so this one would be
                 // stacked on top and Back would show the older copy. Emptying the task first leaves one settings screen.
@@ -128,7 +179,6 @@ final class SettingsReopen {
 
         @Override public void onActivityCreated(Activity activity, Bundle state) { }
         @Override public void onActivityStarted(Activity activity) { }
-        @Override public void onActivityPaused(Activity activity) { }
         @Override public void onActivityStopped(Activity activity) { }
         @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
         @Override public void onActivityDestroyed(Activity activity) { }
