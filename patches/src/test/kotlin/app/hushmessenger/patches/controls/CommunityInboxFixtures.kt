@@ -26,11 +26,11 @@ internal fun communityStub(id: String, body: String = "const/4 v0, 0x0\nreturn v
  * Wiring for 582's closure: the session capture in slot 2, an $onThreadInViewport capture before the trailing flag,
  * a session-gated block before the second read, that read into v1, and a 13-argument sink that takes the callback
  * after the list. A supported build's profile gets the IDs its record in scripts/profiles holds, not the compiled
- * profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line. [shape583]
- * reads the list one instruction earlier and folds the channel check into the community check, as 583 does; [anyBody]
+ * profile being checked. The synthetic mapping has no build behind it, so it uses its own profile's line. 583's shape
+ * (every recorded build, or the synthetic one with [fold583]) reads the list one instruction earlier and folds the channel check into the community check, as 583 does; [anyBody]
  * replaces that inline check.
  */
-internal fun communityInboxFixture(shape583: Boolean = false, anyBody: String? = null): List<MutableClass> {
+internal fun communityInboxFixture(fold583: Boolean = false, anyBody: String? = null): List<MutableClass> {
     val code = controlProfiles.entries.firstOrNull { it.value === activeProfile }?.key
     val record = code?.let { Files.readAllLines(Path.of("../scripts/profiles/$it.txt")) }
     val ids = (record?.single { it.startsWith("nativeCommunityInbox ") }?.substringAfter(' ') ?: SYNTHETIC_PROFILE.nativeCommunityInbox).split('|')
@@ -38,6 +38,8 @@ internal fun communityInboxFixture(shape583: Boolean = false, anyBody: String? =
     val joinedId = ids[5]; val nullableId = ids[6]; val anyId = ids[7]
     // 583's identity has no separate channel check, so everything after the community check sits one earlier.
     check(ids.size == 17 || ids.size == 18) { "nativeCommunityInbox has ${ids.size} parts" }
+    // A recorded 583 identity always gets 583's shape. The synthetic one is 582's unless [fold583] asks for 583's.
+    val shape583 = fold583 || ids.size == 17
     val channelId = if (ids.size == 18) ids[8] else "$TK->isCommunityChannel()Z"
     val rest = ids.drop(ids.size - 9)
     val requests = rest[0]; val prefix = rest[1]; val path = rest.subList(2, 7); val folderGetter = rest[7]; val inbox = rest[8]

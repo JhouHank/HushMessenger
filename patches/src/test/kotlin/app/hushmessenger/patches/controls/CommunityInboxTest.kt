@@ -110,7 +110,7 @@ class CommunityInboxTest {
     }
 
     @Test fun messenger583FoldsTheChannelCheckInAndReadsTheListOneEarlier() {
-        val contract = assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true)))
+        val contract = assertNotNull(findCommunityInbox(communityInboxFixture(fold583 = true)))
         // The identity names no separate channel check.
         val stock = SYNTHETIC_PROFILE.nativeCommunityInbox.split('|')
         assertEquals((stock.take(8) + stock.drop(9)).joinToString("|"), contract.identity)
@@ -130,19 +130,19 @@ class CommunityInboxTest {
             const/4 v0, 0x1
             return v0
         """.trimIndent()
-        assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement"))))
-        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("announcement", "channel"))))
-        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "channel"))))
-        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", register = 2))))
+        assertNotNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("channel", "announcement"))))
+        assertNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("announcement", "channel"))))
+        assertNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("channel", "channel"))))
+        assertNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("channel", "announcement", register = 2))))
         // The type has to come from the key's own field, not another class's or a field the key doesn't have.
-        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", field = "LX/OtherKey;->kind:LX/KeyKind;"))))
-        assertNull(findCommunityInbox(communityInboxFixture(shape583 = true, anyBody = inline("channel", "announcement", field = kind.replace("->kind", "->other")))))
+        assertNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("channel", "announcement", field = "LX/OtherKey;->kind:LX/KeyKind;"))))
+        assertNull(findCommunityInbox(communityInboxFixture(fold583 = true, anyBody = inline("channel", "announcement", field = kind.replace("->kind", "->other")))))
         // A 583 record's identity has 17 parts, and the fixture built from one gives the same identity back.
         val field = ControlProfile::class.java.getDeclaredField("nativeCommunityInbox").apply { isAccessible = true }
         val original = SYNTHETIC_PROFILE.nativeCommunityInbox
         try {
             field.set(SYNTHETIC_PROFILE, contract.identity)
-            assertEquals(contract.identity, assertNotNull(findCommunityInbox(communityInboxFixture(shape583 = true))).identity)
+            assertEquals(contract.identity, assertNotNull(findCommunityInbox(communityInboxFixture(fold583 = true))).identity)
         } finally { field.set(SYNTHETIC_PROFILE, original) }
     }
 
@@ -431,11 +431,13 @@ class CommunityInboxTest {
     private fun exerciseTypedHelpers(all: List<Method>, contract: CommunityInboxContract) {
         val methods = all.associateBy { it.hookId() }
         val ids = contract.identity.split('|')
-        val channel = body(methods.getValue(ids[8]))
         val any = body(methods.getValue(ids[7]))
+        // 582 asks a separate channel check (ids[8]) first; 583 compares the key type with both channel types inline.
+        val separate = ids.size == 18
+        val channel = if (separate) body(methods.getValue(ids[8])) else any
         val kindField = reference(channel[0]) as FieldReference
         val channelField = reference(channel[1]).toString()
-        val announcementField = reference(any[4]).toString()
+        val announcementField = reference(any[if (separate) 4 else 3]).toString()
         val scopeType = contract.requests.substringBefore("->")
         val request = NativeValue(scopeType, mapOf("kind" to "requests"))
         val ordinaryScope = NativeValue(scopeType, mapOf("kind" to "all"))
