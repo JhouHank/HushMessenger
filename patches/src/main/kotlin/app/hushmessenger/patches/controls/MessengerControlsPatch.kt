@@ -32,8 +32,10 @@ internal fun Document.addSettingsEntry() {
     }
     application.child("provider", "name" to "app.hushmessenger.extension.SettingsProvider",
         "authorities" to MessengerTarget.PACKAGE + SETTINGS_AUTHORITY_SUFFIX, "exported" to "false")
+    // Settings get their own task, so Recents left a second card for them beside Messenger's (#54). Android still shows
+    // the card while settings are in front, and drops it once anything else is.
     application.child("activity", "name" to "app.hushmessenger.extension.SettingsActivity",
-        "label" to "HushMessenger settings", "exported" to "true",
+        "label" to "HushMessenger settings", "exported" to "true", "excludeFromRecents" to "true",
         "icon" to "@android:drawable/ic_menu_preferences", "taskAffinity" to "app.hushmessenger.settings")
     // The app drawer entry is an alias, so settings can hide it while the shortcuts and Menu tab row keep working.
     val launcher = application.child("activity-alias", "name" to "app.hushmessenger.extension.SettingsLauncher",

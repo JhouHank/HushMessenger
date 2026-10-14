@@ -63,6 +63,7 @@ Development v0.23.3.
 - Settings now use rose accents with graphite panels on black. Search and category filters stay together, and the App page gives Restart a filled button. The uninstall warning sits in its own panel. Backup actions have a separate Your choices section.
 - Restart Messenger now shows that choices are being saved before the app reopens. Message log and auto reply screens follow the same style, including the light theme.
 - **Restart Messenger** no longer leaves a black screen behind. On a fast phone the restart could reopen Messenger before its own restarting screen had appeared, and Android then didn't bring Messenger back until you tapped its icon. The restart waits for that screen to show first now.
+- HushMessenger settings no longer leave a card of their own in Recents next to Messenger's. You'll still see them there while they're open on screen. Once you go Home or switch apps, the card drops out ([#54](https://github.com/SysAdminDoc/HushMessenger/issues/54)).
 - The restart screen keeps its text clear of camera cutouts and system bars.
 - If your phone refuses to open a link from settings (Source and licenses, Support or View release), settings stay open and say so instead of closing.
 

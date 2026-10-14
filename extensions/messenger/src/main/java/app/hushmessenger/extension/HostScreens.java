@@ -263,8 +263,9 @@ public final class HostScreens {
             (settings ? SettingsActivity.class : RestartActivity.class).getName());
         if (hosted(context)) {
             intent = new Intent().setClassName(context.getPackageName(), SCREEN_HOST).putExtra(EXTRA, screen);
-            // The host shares Messenger's task affinity; a document task keeps settings apart like the real one.
-            if (settings) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+            // The host shares Messenger's task affinity; a document task keeps settings apart like the real one, and the
+            // flag keeps that task out of Recents as the real activity's manifest entry does.
+            if (settings) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
         }
         // Settings always get their own task, as the real activity's task affinity gives them.
         if (settings || !(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

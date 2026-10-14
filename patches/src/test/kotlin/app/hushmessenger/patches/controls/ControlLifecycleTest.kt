@@ -129,6 +129,10 @@ class ControlLifecycleTest {
         assertEquals(1, count("activity", "app.hushmessenger.extension.SettingsActivity"), selection.name)
         assertEquals(1, count("activity", "app.hushmessenger.extension.RestartActivity"), selection.name)
         assertEquals(1, count("activity-alias", "app.hushmessenger.extension.SettingsLauncher"), selection.name)
+        // Settings run in their own task, which Recents would otherwise list as a second card beside Messenger's.
+        val settings = document.getElementsByTagName("activity").let { nodes -> (0 until nodes.length).map { nodes.item(it) as Element } }
+            .single { it.getAttribute("android:name") == "app.hushmessenger.extension.SettingsActivity" }
+        assertEquals("true", settings.getAttribute("android:excludeFromRecents"), selection.name)
     }
 
     private fun assertPatchedClasses(classes: List<ClassDef>, native: List<ClassDef>, extensionTypes: Set<String>, selection: Selection) {
