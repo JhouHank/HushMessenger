@@ -219,6 +219,49 @@ public class RestartActivityTest {
         assertTrue(ShadowToast.getTextOfLatestToast().contains("wasn't restarted"));
     }
 
+    /**
+     * A relaunch sent while this screen was still coming in left Messenger's start screen with no process on the S25
+     * (2 of 3 restarts showed a black screen), so a saved restart waits until Android has shown the screen, or for a
+     * while if it never says so. A failed save reports at once.
+     */
+    @Test public void aSavedRestartWaitsUntilTheScreenIsShown() {
+        Intent start = new Intent(Intent.ACTION_MAIN);
+        var slow = Robolectric.buildActivity(Probe.class).get();
+        slow.launch = start;
+        slow.saved(true);
+        assertFalse("Still coming in", slow.exited);
+        assertNull(Shadows.shadowOf(slow).getNextStartedActivity());
+        slow.onEnterAnimationComplete();
+        assertTrue(slow.exited);
+        assertSame(start, Shadows.shadowOf(slow).getNextStartedActivity());
+        var shownFirst = Robolectric.buildActivity(Probe.class).get();
+        shownFirst.launch = start;
+        shownFirst.onEnterAnimationComplete();
+        assertFalse("Still saving", shownFirst.exited);
+        shownFirst.saved(true);
+        assertTrue(shownFirst.exited);
+        assertSame(start, Shadows.shadowOf(shownFirst).getNextStartedActivity());
+        var neverTold = Robolectric.buildActivity(Probe.class).get();
+        neverTold.launch = start;
+        neverTold.saved(true);
+        var looper = Shadows.shadowOf(android.os.Looper.getMainLooper());
+        looper.idleFor(java.time.Duration.ofMillis(RestartActivity.SHOWN_WAIT_MS - 1));
+        assertFalse(neverTold.exited);
+        looper.idleFor(java.time.Duration.ofMillis(1));
+        assertTrue(neverTold.exited);
+        neverTold.onEnterAnimationComplete();
+        assertNotNull(Shadows.shadowOf(neverTold).getNextStartedActivity());
+        assertNull("Told twice, it still relaunches once", Shadows.shadowOf(neverTold).getNextStartedActivity());
+        var failed = Robolectric.buildActivity(Probe.class).get();
+        failed.launch = start;
+        failed.saved(false);
+        assertFalse(failed.exited);
+        assertNull(Shadows.shadowOf(failed).getNextStartedActivity());
+        assertTrue(ShadowToast.getTextOfLatestToast().contains("wasn't restarted"));
+        looper.idleFor(java.time.Duration.ofMillis(RestartActivity.SHOWN_WAIT_MS));
+        assertFalse("A failed save never relaunches later", failed.exited);
+    }
+
     @Test public void exitOnlyFollowsSuccessfulLauncherDispatch() {
         var screen = Robolectric.buildActivity(Probe.class).get();
         Intent intent = new Intent(Intent.ACTION_MAIN);

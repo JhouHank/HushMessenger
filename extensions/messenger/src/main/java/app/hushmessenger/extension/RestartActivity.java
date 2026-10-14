@@ -12,6 +12,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.DisplayCutout;
 import android.view.Gravity;
@@ -37,7 +39,7 @@ public class RestartActivity extends Activity {
         getWindow().setNavigationBarColor(ui.background);
         getWindow().getDecorView().setSystemUiVisibility(light ? android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : 0);
         setContentView(content(ui));
-        Intent launch = launcherIntent(this);
+        launch = launcherIntent(this);
         if (launch == null) {
             fail("restart_unavailable");
             return;
@@ -46,8 +48,44 @@ public class RestartActivity extends Activity {
         String page = getIntent().getStringExtra(SettingsReopen.EXTRA);
         new Thread(() -> {
             boolean saved = saveBeforeRestart(Settings.preferences, page);
-            runOnUiThread(() -> completeRestart(launch, saved));
+            runOnUiThread(() -> saved(saved));
         }, "HushMessenger-save-restart").start();
+    }
+
+    /** How long a saved restart waits for Android to say this screen is in before it relaunches anyway. */
+    static final long SHOWN_WAIT_MS = 1_500;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    Intent launch;
+    private boolean savedOk, shown, relaunched;
+    private final Runnable shownAnyway = () -> { shown = true; relaunchWhenReady(); };
+
+    /** The save finished. A failed one reports at once, a good one relaunches when this screen is in. */
+    void saved(boolean ok) {
+        if (!ok) {
+            completeRestart(launch, false);
+            return;
+        }
+        savedOk = true;
+        if (!shown) main.postDelayed(shownAnyway, SHOWN_WAIT_MS);
+        relaunchWhenReady();
+    }
+
+    /**
+     * The relaunch waits for this. Sent while this screen was still coming in, the process exited before Android had
+     * shown it, and Android, which brings back the screen in front only when a shown one dies, left Messenger's start
+     * screen without a process: a black screen on the S25 in 2 of 3 restarts.
+     */
+    @Override public void onEnterAnimationComplete() {
+        super.onEnterAnimationComplete();
+        shown = true;
+        relaunchWhenReady();
+    }
+
+    private void relaunchWhenReady() {
+        if (!shown || !savedOk || relaunched) return;
+        relaunched = true;
+        main.removeCallbacks(shownAnyway);
+        completeRestart(launch, true);
     }
 
     /** A scrollable status pane also fits large text and a short split-screen window. */
