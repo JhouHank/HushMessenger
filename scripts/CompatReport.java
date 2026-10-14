@@ -345,11 +345,13 @@ public class CompatReport {
 
     /**
      * How many times a method copies a list into an ImmutableList.Builder through 583's one static
-     * (ImmutableList.Builder, Iterable) -> ImmutableList call. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
+     * (ImmutableList.Builder, Iterable) -> ImmutableList call, made with invoke-static and not its range form, as the patch
+     * injects. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
      */
-    static long keyboardTabCopies(Collection<Object> refs) {
+    static long keyboardTabCopies(Method method) {
         String builder = "Lcom/google/common/collect/ImmutableList$Builder;", iterable = "Ljava/lang/Iterable;";
-        return refs.stream().filter(r -> r instanceof MethodReference m && IMMUTABLE_LIST.equals(m.getReturnType()) &&
+        return instructions(method).stream().filter(i -> i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction r &&
+            r.getReference() instanceof MethodReference m && IMMUTABLE_LIST.equals(m.getReturnType()) &&
             m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable))).count();
     }
 
@@ -3782,7 +3784,7 @@ public class CompatReport {
 
                 // avatar_tabs: the sticker keyboard's tab list, filled inline in a void composer factory method
                 // that copies it into a builder once.
-                if ("V".equals(method.getReturnType()) && keyboardTabCopies(refs) == 1 &&
+                if ("V".equals(method.getReturnType()) && keyboardTabCopies(method) == 1 &&
                     "Lcom/facebook/messaging/msys/thread/composer/configuration/xapp/BaseXappComposerConfigurationFactory;".equals(cls.getType()) &&
                     refs.stream().anyMatch(r -> r.toString().startsWith(
                         "Lcom/facebook/xapp/messaging/composer/avatar/composertab/event/ActivateAvatarSticker;->")) &&
