@@ -109,6 +109,9 @@ public final class SettingsActivity extends Activity {
     /** #22's control and whether it could be turned on when it was built. */
     private LinearLayout menuRowControl;
     private boolean menuRowAvailable;
+    /** The Quick setups heading and panel, hidden by a long press on either, and the line that says which way the choice is. */
+    private TextView quickHeading, quickHomeStatus;
+    private LinearLayout quickPanel;
     /** The App tab's line on how to get back here, which names the Menu row only while it shows. */
     private TextView accessHelp;
     private String accessHelpId;
@@ -359,6 +362,28 @@ public final class SettingsActivity extends Activity {
         } else cancelDocumentJob(null);
         cancelUpdateCheck();
         super.onDestroy();
+    }
+
+    /** Kept in the settings file like the other choices, but not a control: backups and Quick setups never carry it. */
+    static final String HIDE_QUICK_SETUPS = "hide_quick_setups";
+
+    private static boolean quickSetupsHidden() { return Settings.preferences.getBoolean(HIDE_QUICK_SETUPS, false); }
+
+    /** Shows or hides the Quick setups section to match the saved choice, and words the restore button's line. */
+    private void showQuickSetups() {
+        int shown = quickSetupsHidden() ? View.GONE : View.VISIBLE;
+        if (quickHeading != null) quickHeading.setVisibility(shown);
+        if (quickPanel != null) quickPanel.setVisibility(shown);
+        if (quickHomeStatus != null) quickHomeStatus.setText(text.get(quickSetupsHidden() ? "quick_setups_home_hidden" : "quick_setups_home_shown"));
+    }
+
+    private void holdToHide(View view) {
+        view.setOnLongClickListener(held -> {
+            Settings.preferences.edit().putBoolean(HIDE_QUICK_SETUPS, true).apply();
+            showQuickSetups();
+            feedback(text.get("quick_setups_hidden", text.format("app")), Toast.LENGTH_LONG);
+            return true;
+        });
     }
 
     private LinearLayout menuRowControl() {
@@ -1373,8 +1398,9 @@ public final class SettingsActivity extends Activity {
         }
         ui.add(content, access, 8);
         if (!installedControls.isEmpty()) {
-            ui.add(content, ui.heading(text.get("quick_setups")), 22);
-            LinearLayout quick = ui.panel();
+            quickHeading = ui.heading(text.get("quick_setups"));
+            ui.add(content, quickHeading, 22);
+            LinearLayout quick = quickPanel = ui.panel();
             quick.setTag("quick_setups");
             ui.add(quick, ui.text(text.get("quick_setups_help"), 13, ui.muted, false), 0);
             for (String name : QuickSetups.CHOICES) {
@@ -1386,6 +1412,11 @@ public final class SettingsActivity extends Activity {
                 ui.add(quick, ui.text(text.get("quick_" + name + "_help"), 13, ui.muted, false), 8);
             }
             ui.add(content, quick, 12);
+            // A long press anywhere on the section hides it, buttons and help lines included.
+            holdToHide(quickHeading);
+            holdToHide(quick);
+            for (int i = 0; i < quick.getChildCount(); i++) holdToHide(quick.getChildAt(i));
+            showQuickSetups();
         }
         ui.add(content, ui.heading(text.get("appearance")), 22);
         LinearLayout appearance = ui.panel();
@@ -1468,6 +1499,21 @@ public final class SettingsActivity extends Activity {
             documentJob != null && documentJob.request == READ_CHOICES ? "choices_file_canceled_read" : "choices_file_canceled"));
         ui.add(choices, cancelChoicesFile, 8);
         ui.add(choices, ui.text(text.get("choices_file_help"), 13, ui.muted, false), 8);
+        // Where the Quick setups section comes back after a long press hid it.
+        if (quickPanel != null) {
+            ui.rule(choices, 12);
+            Button quickHome = ui.button(text.get("quick_setups_home"));
+            quickHome.setTag("quick_setups_home");
+            quickHome.setOnClickListener(view -> {
+                Settings.preferences.edit().putBoolean(HIDE_QUICK_SETUPS, !quickSetupsHidden()).apply();
+                showQuickSetups();
+            });
+            ui.add(choices, quickHome, 8);
+            quickHomeStatus = ui.text("", 13, ui.muted, false);
+            quickHomeStatus.setTag("quick_setups_home_status");
+            ui.add(choices, quickHomeStatus, 8);
+            showQuickSetups();
+        }
         ui.add(content, choices, 12);
         LinearLayout updates = ui.panel();
         ui.add(updates, controlRow("check_updates", text.format("check_updates"), text.format("check_updates_help"), false), 0);
@@ -1538,7 +1584,8 @@ public final class SettingsActivity extends Activity {
         }
         List<String> on = new ArrayList<>();
         for (String[] spec : installedControls) if (Settings.preferences.getBoolean(spec[0], false)) on.add(spec[1]);
-        return new ProblemReport.Facts(BuildConfig.VERSION_NAME, messenger, code, Build.MANUFACTURER, Build.MODEL,
+        return new ProblemReport.Facts(BuildConfig.VERSION_NAME, messenger, code,
+            ProblemReport.patchedFrom(HostScreens.originalBuild(), Settings.preview), Build.MANUFACTURER, Build.MODEL,
             Build.VERSION.RELEASE, Build.VERSION.SDK_INT, Settings.preferences.getBoolean("paused", false), CrashGuard.isSafeMode(), on);
     }
 
@@ -1572,6 +1619,7 @@ public final class SettingsActivity extends Activity {
                 .append("\nSettings provider: ").append(HostScreens.settingsProviderFound(this) ? "found" : "missing")
                 .append("\nHost version: ").append(host.versionName == null ? "unknown" : host.versionName)
                 .append("\nHost version code: ").append(host.getLongVersionCode())
+                .append("\nPatched from: ").append(ProblemReport.patchedFrom(HostScreens.originalBuild(), Settings.preview))
                 .append("\nAndroid API: ").append(Build.VERSION.SDK_INT)
                 .append("\nPaused: ").append(paused)
                 .append("\nSafe mode: ").append(safeMode).append('\n');
