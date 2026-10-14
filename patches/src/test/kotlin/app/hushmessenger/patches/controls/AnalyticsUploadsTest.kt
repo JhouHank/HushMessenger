@@ -85,7 +85,10 @@ private fun taskBase(type: String = TASK_BASE, superclass: String = SERVICE, var
 /** The inlined route as the synthetic mapping has it: the task base and its Runnable. */
 private fun inlinedTaskFixture() = listOf(taskBase(), taskRunner())
 
-/** GooglePlayUploadService's own task override where a build kept it, as 346013423 ships it (twelve registers). */
+/**
+ * GooglePlayUploadService's own task override, as 580's 346013423 shipped it (twelve registers). Two 582 builds kept
+ * one too. No 583 build has one.
+ */
 private fun delegatedTask(task: String = "LX/UTH;", mark: String = BOUND_UPLOAD_MARK) = fixtureMethod("$PLAY->A04($task)I", """
     const/4 v3, 0x2
     const-string v2, "$mark"
@@ -95,7 +98,7 @@ private fun delegatedTask(task: String = "LX/UTH;", mark: String = BOUND_UPLOAD_
 private fun abstractTask(owner: String, task: String) = MutableMethod(ImmutableMethod(owner, "A04",
     listOf(ImmutableMethodParameter(task, null, null)), "I", ABSTRACT, null, null, null))
 
-/** The delegating route as 346013423 ships it: the base declares the task method, the uploader overrides it, run() calls it. */
+/** The delegating route as 346013423 shipped it: the base declares the task method, the uploader overrides it, run() calls it. */
 private fun delegatedTaskFixture(base: String = "LX/QBX;", task: String = "LX/UTH;", runner: String = "LX/ScF;") = listOf(
     taskBase(base, SERVICE, abstractTask(base, task)),
     taskRunner(runner, base, fixtureMethod("$runner->run()V", """
@@ -164,14 +167,13 @@ class AnalyticsUploadsTest {
         assertEquals(activeProfile.hooks.getValue(ANALYTICS_UPLOADS), found(analyticsUploadFixture()))
         validateControls(findControls(analyticsUploadFixture()), setOf(ANALYTICS_UPLOADS))
         assertEquals(11, found(analyticsUploadFixture()).size)
-        // A build can keep the uploader's own task override instead of inlining it, as two 582 builds did.
+        // The inherited base and the timer are found under any obfuscated name.
         val renamed = analyticsUploadFixture(
             uploadClass("LX/0bU;", START_COMMAND, START_JOB, superclass = JOBS, flags = AccessFlags.PUBLIC.value or AccessFlags.ABSTRACT.value),
-            fixtureClass(ANALYTICS2_UPLOAD_SERVICE, superclass = "LX/0bU;"),
-            fixtureClass(PLAY, listOf(entry(PLAY, START_COMMAND), delegatedTask("LX/RVX;")), superclass = "LX/QBX;"),
-            delegatedTaskFixture(task = "LX/RVX;"), timers = listOf(timerClass("LX/YjU;")))
-        assertTrue("$PLAY->A04(LX/RVX;)I" in found(renamed))
+            fixtureClass(ANALYTICS2_UPLOAD_SERVICE, superclass = "LX/0bU;"), timers = listOf(timerClass("LX/YjU;")))
+        assertTrue("LX/0bU;->$START_JOB" in found(renamed))
         assertTrue("LX/YjU;->run()V" in found(renamed))
+        assertEquals(11, found(renamed).size)
     }
 
     @Test fun theXAnalyticsTimerIsTakenOnlyInItsOwnShape() {
@@ -210,6 +212,8 @@ class AnalyticsUploadsTest {
         val delegated = "$PLAY->A04(LX/UTH;)I"
         val delegatingPlay = fixtureClass(PLAY, listOf(entry(PLAY, START_COMMAND), delegatedTask()), superclass = "LX/QBX;")
         val cases = mapOf(
+            // 582's route: the uploader's own task override, which a delegating run() calls.
+            "582's task override" to analyticsUploadFixture(play = delegatingPlay, tasks = delegatedTaskFixture()),
             "a Runnable without the uploader's message" to analyticsUploadFixture(tasks = listOf(taskBase(),
                 taskRunner(run = inlinedTask(mark = "Job with old build ID")))),
             "a Runnable that never checks for compat tasks" to analyticsUploadFixture(tasks = listOf(taskBase(),
@@ -222,11 +226,6 @@ class AnalyticsUploadsTest {
             "a Runnable whose first read isn't the service" to analyticsUploadFixture(tasks = listOf(taskBase(),
                 taskRunner(run = inlinedTask(base = "Ljava/lang/Object;")))),
             "no task base" to analyticsUploadFixture(tasks = listOf(taskRunner())),
-            "an override the base never declared" to analyticsUploadFixture(play = delegatingPlay,
-                tasks = listOf(taskBase("LX/QBX;"), delegatedTaskFixture()[1])),
-            "an override without the uploader's message" to analyticsUploadFixture(play = fixtureClass(PLAY,
-                listOf(entry(PLAY, START_COMMAND), delegatedTask(mark = "Misunderstood job extras: %s")), superclass = "LX/QBX;"),
-                tasks = delegatedTaskFixture()),
         )
         for ((case, classes) in cases) {
             val hooks = found(classes)
@@ -234,9 +233,6 @@ class AnalyticsUploadsTest {
             assertTrue(inlined !in hooks && delegated !in hooks, case)
             assertFailsWith<PatchException>(case) { validateControls(findControls(classes), setOf(ANALYTICS_UPLOADS)) }
         }
-        // The delegating Runnable itself never counts: its run() only calls the task method.
-        assertEquals(setOf(delegated), found(analyticsUploadFixture(play = delegatingPlay, tasks = delegatedTaskFixture())) -
-            found(analyticsUploadFixture(tasks = emptyList())))
     }
 
     @Test fun anInlinedTaskReportsSuccessOnceAndLeavesCompatTasksStock() {
@@ -263,18 +259,11 @@ class AnalyticsUploadsTest {
         assertEquals(before, code.drop(9))
     }
 
-    @Test fun aDelegatedTaskReturnsSuccessFromTheUploaderOverride() {
+    @Test fun a582TaskOverrideIsRefusedBeforeAnyEdit() {
         val method = delegatedTask()
         val before = method.code()
-        injectControl(ANALYTICS_UPLOADS, mapOf(ANALYTICS_UPLOADS to listOf(method)))
-        val code = method.code()
-        assertEquals("$SETTINGS->stopAnalyticsUploads()Z", reference(0, code))
-        assertEquals(Opcode.MOVE_RESULT, code[1].opcode)
-        assertEquals(Opcode.IF_EQZ, code[2].opcode)
-        assertEquals(5, code.branchTarget(2))
-        assertEquals(0, (code[3] as NarrowLiteralInstruction).narrowLiteral)
-        assertEquals(Opcode.RETURN, code[4].opcode)
-        assertEquals(before, code.drop(5))
+        assertFailsWith<PatchException> { injectControl(ANALYTICS_UPLOADS, mapOf(ANALYTICS_UPLOADS to listOf(method))) }
+        assertEquals(before, method.code())
     }
 
     @Test fun theInheritedBaseCountsOnlyWhileNothingElseCanReachIt() {
@@ -351,7 +340,7 @@ class AnalyticsUploadsTest {
             "another method" to fixtureMethod("$ALARM->onBind(Landroid/content/Intent;)Landroid/os/IBinder;", "const/4 v0, 0x0\nreturn-object v0"),
             "a Runnable that isn't the uploader's task" to inlinedTask(mark = "Job with old build ID"),
             "a task with two reporters" to inlinedTask(secondReporter = true),
-            "an uploader method without the task message" to delegatedTask(mark = "GooglePlayUploadService"),
+            "582's task override" to delegatedTask(),
             "a Runnable that uploads before it flushes" to timerRun(body = timerBody(first = XANALYTICS_UPLOAD, second = XANALYTICS_FLUSH)),
         )
         for ((case, bad) in cases) {

@@ -2571,15 +2571,8 @@ public class CompatReport {
         ClassDef baseClass = null;
         for (var cls : classes) if (base.equals(cls.getType())) baseClass = cls;
         if (baseClass == null || !"Landroid/app/Service;".equals(baseClass.getSuperclass())) return List.of();
-        var abstractTasks = new HashSet<String>();
-        for (var m : baseClass.getMethods())
-            if (AccessFlags.ABSTRACT.isSet(m.getAccessFlags()) && "I".equals(m.getReturnType()) && m.getParameterTypes().size() == 1)
-                abstractTasks.add(entryPoint(m));
+        // Every 583 build inlines the upload into the Runnable; the uploader keeps no task override of its own.
         var found = new ArrayList<Method>();
-        for (var m : play.getMethods())
-            if (abstractTasks.contains(entryPoint(m)) && "I".equals(m.getReturnType()) && m.getParameterTypes().size() == 1 &&
-                !AccessFlags.STATIC.isSet(m.getAccessFlags()) && !AccessFlags.ABSTRACT.isSet(m.getAccessFlags()) && holdsBoundUploadMark(m))
-                found.add(m);
         for (var cls : classes) {
             if (!cls.getInterfaces().contains("Ljava/lang/Runnable;")) continue;
             boolean holdsService = false;
