@@ -107,6 +107,8 @@ final class SettingsReopen {
         private final Handler main = new Handler(Looper.getMainLooper());
         /** The page taken from the marker, held while Messenger's start screen picks where to go. */
         private String page;
+        /** When the page was taken. A start screen can hand over outside this process (a sign-in, Home) and leave it held. */
+        private long takenAt;
         /** Messenger's start screen while it's in front with the page waiting. */
         private Activity startScreen;
         private final Runnable stayedInFront = () -> { if (startScreen != null) open(startScreen); };
@@ -121,8 +123,13 @@ final class SettingsReopen {
                     // Settings' own store, opened directly: reading a marker shouldn't start settings and CrashGuard early.
                     SharedPreferences prefs = Settings.preferences != null ? Settings.preferences
                         : activity.getApplicationContext().getSharedPreferences("hushmessenger", Context.MODE_PRIVATE);
-                    page = takeFresh(prefs, SystemClock.elapsedRealtime());
+                    takenAt = SystemClock.elapsedRealtime();
+                    page = takeFresh(prefs, takenAt);
                     if (page == null) { done(); return; }
+                } else if (SystemClock.elapsedRealtime() - takenAt >= MAX_AGE_MS) {
+                    // Held that long, the handover never reached a screen here: this is an ordinary launch, not the restart's.
+                    done();
+                    return;
                 }
                 // A settings screen that is already up is where the restart meant to go.
                 if (activity instanceof SettingsActivity || activity instanceof RestartActivity) { done(); return; }
