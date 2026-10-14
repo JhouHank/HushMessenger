@@ -92,12 +92,7 @@ class ControlDiscoveryTest {
                         id.endsWith("->A1i()V") -> "const-string v0, \"$DRAWER_REFRESH\"\nreturn-void"
                         else -> "const-string v0, \"Unknown ViewHolder\"\nreturn-void"
                     }
-                    "browser" -> """
-                        const-string v0, "iab_skipped_reason"
-                        const-string v0, "user_prefers_external"
-                        const/4 v0, 0x0
-                        return v0
-                    """.trimIndent()
+                    "browser" -> "const/4 v0, 0x0\nreturn v0"
                     "ads" -> """
                         const-string v0, "messaging.inbox.itemlistprocessor.ItemListProcessorInterfaceSpec"
                         const-string v0, "processItems"

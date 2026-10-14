@@ -3362,7 +3362,6 @@ public class CompatReport {
         for (var cls : classes) for (var method : cls.getMethods())
             if (!screenshotViewerSites(method).isEmpty()) found.get("screenshot_viewers").add(method);
         var jewelCandidates = new ArrayList<Map.Entry<Method, Set<String>>>();
-        var browserChecks = new ArrayList<Method>();
 
         boolean hasAdItem = false, hasImmutableCopy = false;
         for (var cls : classes) {
@@ -3612,13 +3611,10 @@ public class CompatReport {
                         i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag &&
                         BUBBLE_ROLLOUTS.contains(flag.getWideLiteral()))) found.get("bubble_mode").add(method);
 
-                // browser
-                if ("Z".equals(method.getReturnType()) && strings.contains("iab_skipped_reason") && strings.contains("user_prefers_external")) {
-                    found.get("browser").add(method);
-                }
+                // browser: the launcher's own (Uri, session) instance check, which logs no skip reason
                 if ("Z".equals(method.getReturnType()) && MESSENGER_BROWSER_LAUNCHER.equals(cls.getType()) && !isStatic &&
                     paramTypes.equals(List.of("Landroid/net/Uri;", BUBBLE_SESSION))) {
-                    browserChecks.add(method);
+                    found.get("browser").add(method);
                 }
 
                 // people_jewel, kept once discovery knows the preference getter. It takes the suggestions logger, then its owner.
@@ -3903,8 +3899,6 @@ public class CompatReport {
                 }
             }
         }
-        // 583 dropped the skip-reason logging, so only a build without it falls back to the launcher's (Uri, session) check.
-        if (found.get("browser").isEmpty()) found.get("browser").addAll(browserChecks);
         // The Notifications tab reads its preference through the getter the external-browser check uses.
         var read = browserPreferenceRead(found.get("browser"));
         for (var candidate : jewelCandidates) {

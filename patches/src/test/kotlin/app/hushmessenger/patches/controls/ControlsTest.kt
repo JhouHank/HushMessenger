@@ -401,7 +401,7 @@ class ControlsTest {
         }
     }
 
-    @Test fun theLauncherCheckIsTheBrowserHookOnlyWhenNoMethodLogsTheSkipReason() {
+    @Test fun theLauncherCheckIsTheBrowserHookAnd582sSkipReasonLoggerIsNot() {
         val check = "$MESSENGER_BROWSER_LAUNCHER->A0L(Landroid/net/Uri;$SESSION)Z"
         val launcher = fixtureClass(MESSENGER_BROWSER_LAUNCHER, listOf(
             fixtureMethod(check, "const/4 v0, 0x0\nreturn v0"),
@@ -409,14 +409,15 @@ class ControlsTest {
             fixtureMethod("$MESSENGER_BROWSER_LAUNCHER->A0M(Landroid/net/Uri;$SESSION)Z", "const/4 v0, 0x0\nreturn v0",
                 flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value),
         ))
-        val logged = "LX/1Iab;->A00(Landroid/net/Uri;)Z"
-        val logger = fixtureClass("LX/1Iab;", listOf(fixtureMethod(logged, """
+        // 582 logged the skip reason in a method of its own, and that method was the hook. No 583 build logs it.
+        val logger = fixtureClass("LX/1Iab;", listOf(fixtureMethod("LX/1Iab;->A00(Landroid/net/Uri;)Z", """
             const-string v0, "iab_skipped_reason"
             const-string v0, "user_prefers_external"
             const/4 v0, 0x0
             return v0
         """.trimIndent())))
         assertEquals(listOf(check), findControls(listOf(launcher)).getValue("browser").map { it.hookId() })
-        assertEquals(listOf(logged), findControls(listOf(launcher, logger)).getValue("browser").map { it.hookId() })
+        assertEquals(listOf(check), findControls(listOf(launcher, logger)).getValue("browser").map { it.hookId() })
+        assertTrue(findControls(listOf(logger)).getValue("browser").isEmpty())
     }
 }

@@ -185,7 +185,6 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     var changedViewer = false
     val drawerReaders = mutableListOf<Method>()
     val drawerAnchors = mutableListOf<Method>()
-    val browserChecks = mutableListOf<Method>()
     for (cls in classes) {
         val original = cls.fields.firstOrNull { it.name == "__redex_internal_original_name" }
             ?.initialValue.let { (it as? StringEncodedValue)?.value }
@@ -237,9 +236,9 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 method.parameterTypes == listOf(BUBBLE_SESSION) && instructions.any {
                     it.opcode == Opcode.CONST_WIDE && (it as? WideLiteralInstruction)?.wideLiteral?.let { flag -> flag in BUBBLE_ROLLOUTS } == true
                 }) add("bubble_mode")
-            if (method.returnType == "Z" && strings.containsAll(setOf("iab_skipped_reason", "user_prefers_external"))) add("browser")
+            // The external-browser check is the launcher's own (Uri, session) instance check; it logs no skip reason.
             if (method.returnType == "Z" && cls.type == MESSENGER_BROWSER_LAUNCHER && !AccessFlags.STATIC.isSet(method.accessFlags) &&
-                method.parameterTypes == listOf("Landroid/net/Uri;", BUBBLE_SESSION)) browserChecks.add(method)
+                method.parameterTypes == listOf("Landroid/net/Uri;", BUBBLE_SESSION)) add("browser")
             if (method.returnType == "Z" && AccessFlags.STATIC.isSet(method.accessFlags) && method.isPeopleSectionShape() &&
                 refs.any { it.toString() in peopleJewelKeys } && refs.any { it.toString() == activeProfile.preferenceGetter }) add("people_jewel")
             if (AccessFlags.STATIC.isSet(method.accessFlags) && method.returnType == "V" && method.parameterTypes == listOf(cls.type) &&
@@ -359,8 +358,6 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
             ?.let { found.getValue("ai_search_chip").add(it) }
     }
     if (changedViewer) found.getValue("screenshot_viewers").clear() else screenshotViewerRefusal = null
-    // 583 dropped the skip-reason logging, so only a build without it falls back to the launcher's (Uri, session) check.
-    if (found.getValue("browser").isEmpty()) found.getValue("browser").addAll(browserChecks)
     found.getValue(EMOJI_DRAWER).addAll(connectEmojiDrawer(drawerReaders, drawerAnchors))
     found.getValue(EMOJI_SEARCH).addAll(findEmojiSearch(classes))
     found.getValue(AI_MENTIONS).addAll(findAiMentions(classes))
