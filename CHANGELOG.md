@@ -14,6 +14,7 @@
 
 - Morphe Manager lists every change of the release your Messenger was patched with, not only a short summary. For that one release Manager shows the patch source's description instead of the changelog, and the description was a single paragraph while older releases listed their changes. It now carries the release's changelog groups after the summary. You'll see it from the next release on.
 - On a phone set to Arabic, Hebrew, Persian or another right-to-left language, HushMessenger settings read left to right now, like the English they're written in. The page used to be mirrored, and periods and numbers landed on the wrong side of their sentences.
+- Searching in HushMessenger settings moves the search box up to the top of the page while the keyboard is open, so the matching switches show right under it. Before, the box stayed where it was and every match sat behind the keyboard until you closed it.
 
 ## 0.24.0 (2026-10-14)
 

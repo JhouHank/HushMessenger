@@ -547,6 +547,34 @@ public class SettingsReliabilityTest {
         }
     }
 
+    @Test @Config(sdk = {28, 36}) public void phoneKeyboardLeavesTheFirstMatchVisibleUnderSearch() {
+        // A phone-sized window that Samsung's keyboard resizes to a little over half its height.
+        RuntimeEnvironment.setQualifiers("w360dp-h740dp-mdpi");
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = layout(screen.get(), 360, 740);
+            EditText search = root.findViewWithTag("find_control");
+            ScrollView controls = scroll(root.findViewWithTag("controls_page"));
+            assertEquals(0, controls.getScrollY());
+            search.setText("People You May");
+            assertTrue(search.requestFocus());
+            layout(screen.get(), 360, 426);
+            for (int frame = 0; frame < 40; frame++) {
+                Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16));
+                controls.computeScroll();
+            }
+            Rect visible = new Rect();
+            assertTrue(search.getGlobalVisibleRect(visible));
+            assertEquals("Whole search visible above the keyboard", search.getHeight(), visible.height());
+            Rect page = new Rect();
+            assertTrue(controls.getGlobalVisibleRect(page));
+            assertTrue("Search moves up to make room: " + visible + " in " + page, visible.top - page.top < page.height() / 3);
+            View match = root.findViewWithTag("people");
+            assertTrue("The match shows under the search instead of behind the keyboard", match.getGlobalVisibleRect(visible));
+            assertEquals("Whole match visible", match.getHeight(), visible.height());
+            assertTrue(search.hasFocus());
+        }
+    }
+
     @Test @Config(sdk = {29, 36}) public void cutoutInsetsKeepTheScreenClearOnEitherSide() {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             View content = ((ViewGroup) screen.get().findViewById(android.R.id.content)).getChildAt(0);

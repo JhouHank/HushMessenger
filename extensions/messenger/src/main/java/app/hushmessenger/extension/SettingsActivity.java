@@ -258,8 +258,11 @@ public final class SettingsActivity extends Activity {
                 super.onLayout(changed, left, top, right, bottom);
                 if (!revealSearch) return;
                 revealSearch = false;
-                if (search.hasFocus() && search.isShown())
-                    search.requestRectangleOnScreen(new Rect(0, 0, search.getWidth(), search.getHeight()), false);
+                if (!search.hasFocus() || !search.isShown()) return;
+                // From the search row down a whole page, so its filters and first matches show above the keyboard too.
+                View row = (View) search.getParent();
+                int viewport = controlsScroll.getHeight() - controlsScroll.getPaddingTop() - controlsScroll.getPaddingBottom();
+                row.requestRectangleOnScreen(new Rect(0, 0, row.getWidth(), Math.max(row.getHeight(), viewport)), false);
             }
         };
         root.setOrientation(LinearLayout.VERTICAL);
