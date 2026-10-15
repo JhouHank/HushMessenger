@@ -381,6 +381,9 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(AUTO_REPLY).addAll(findMessageLogHook(classes))
     messageLogContract = resolveMessageLogContract(classes)
     readReceiptThreadFields = resolveReadReceiptThreadFields(classes)
+    val (markReadBar, markReadClick) = findMarkReadButton(classes)
+    found.getValue(MARK_READ_BAR).addAll(markReadBar)
+    found.getValue(MARK_READ_CLICK).addAll(markReadClick)
     found.getValue(SYSTEM_CAMERA).addAll(findSystemCamera(classes))
     for ((hook, methods) in findCustomFont(classes)) found.getValue(hook).addAll(methods)
     return found

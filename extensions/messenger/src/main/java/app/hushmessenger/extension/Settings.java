@@ -568,6 +568,21 @@ public final class Settings {
         return enabled("hide_read_receipts");
     }
 
+    /**
+     * The read receipt hook's entry, with Messenger's read handler and the message it's marking. A Seen held back is kept
+     * for the Mark as read button, and the button's own tap goes through.
+     */
+    public static boolean hideChatSeen(Object session, Object thread, Object handler, String messageId) {
+        if (MarkReadButton.replaying()) return false;
+        if (!hideChatSeen(session, thread)) return false;
+        try {
+            MarkReadButton.hold(session, thread, handler, messageId);
+        } catch (RuntimeException error) {
+            hookFailed(MarkReadButton.KEY, "Can't keep the chat's Seen for Mark as read", error);
+        }
+        return true;
+    }
+
     /** Record the account and thread only after the native composer dispatch returns. */
     public static void noteMessageSent(Object session, Object thread) {
         if (session != null && thread != null && wouldUse("hide_read_receipts")) {

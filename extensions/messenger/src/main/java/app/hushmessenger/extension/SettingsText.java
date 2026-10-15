@@ -366,6 +366,9 @@ final class SettingsText {
         ENGLISH.put("font_adjust_help", "If your font looks too small or sits too high or low in a message bubble, size it or move it here. Each move is 2%% of the text size. Restart Messenger to see a change.");
         ENGLISH.put("font_adjust_saved", "%1$s. Restart Messenger to see it.");
         ENGLISH.put("font_adjust_failed", "Couldn't save that change, so your font stays as it was. Try again.");
+        ENGLISH.put("mark_read", "Mark as read");
+        ENGLISH.put("mark_read_done", "Marked as read");
+        ENGLISH.put("mark_read_nothing", "Nothing new to mark as read");
     }
 
     static String english(String id) {

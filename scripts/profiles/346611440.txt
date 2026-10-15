@@ -121,6 +121,8 @@ hook inbox_promotions LX/265;->A0K()Z
 hook keep_unsent LX/VE7;->A00(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/util/Map;)V
 hook mark_read_action LX/HXw;->A0V()Z
 hook mark_read_action LX/JsO;->A0F()Z
+hook mark_read_bar LX/7Np;->Da9(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/71j;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V
+hook mark_read_click LX/CIj;->onClick(Landroid/view/View;)V
 hook menu_settings LX/9vp;->A1h()V
 hook menu_settings LX/HUy;->B04(LX/0MG;)Ljava/util/ArrayList;
 hook menu_settings LX/HZu;->onClick(Landroid/view/View;)V
