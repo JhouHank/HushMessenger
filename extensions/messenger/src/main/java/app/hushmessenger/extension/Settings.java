@@ -160,6 +160,12 @@ public final class Settings {
 
     public static boolean hideStories() { return enabled("stories"); }
     public static boolean hideFacebook() { return enabled("facebook"); }
+
+    /** Under Hide Facebook shortcuts: leaves the Profile button on a chat's details page while the rest stays hidden. */
+    static final String KEEP_FACEBOOK_PROFILE = "facebook_keep_profile";
+
+    /** Asked by the gates that create only the chat details Profile button. */
+    public static boolean hideFacebookProfile() { return hideFacebook() && !preferences.getBoolean(KEEP_FACEBOOK_PROFILE, false); }
     public static boolean hideMetaAi() { return enabled("meta_ai"); }
 
     /**

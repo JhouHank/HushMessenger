@@ -119,10 +119,12 @@ internal val BASE_PROFILE = ControlProfile(
         "event_prompts" to setOf("LX/HVB;->A08()Z", "LX/HVB;->A09()Z"),
         "facebook" to setOf(
             "LX/2Q7;->A0D()Z", "LX/3FS;->A00()Z", "LX/3Gb;->A02()Z", "LX/3qW;->A00()Z", "LX/ET9;->A06()Z",
-            "LX/HUx;->A02()Z", "LX/HUx;->A05()Z", "LX/He0;->A06()Z", "LX/JsP;->A00()Z", "LX/JsX;->A02()Z",
-            "LX/JsY;->A01()Z", "LX/Jsa;->A02()Z", "LX/Jsc;->A02()Z", "LX/Jsh;->A03()Z", "LX/Jsi;->A03()Z",
-            "LX/Jsk;->A01()Z", "LX/Jsl;->A01()Z", "LX/Jsn;->A06()Z", "LX/Jso;->A06()Z", "LX/Jsp;->A06()Z",
-            "LX/VOv;->A04()Z", "LX/VP7;->A07()Z",
+            "LX/HUx;->A02()Z", "LX/HUx;->A05()Z", "LX/VOv;->A04()Z", "LX/VP7;->A07()Z",
+        ),
+        "facebook_profile" to setOf(
+            "LX/He0;->A06()Z", "LX/JsP;->A00()Z", "LX/JsX;->A02()Z", "LX/JsY;->A01()Z", "LX/Jsa;->A02()Z",
+            "LX/Jsc;->A02()Z", "LX/Jsh;->A03()Z", "LX/Jsi;->A03()Z", "LX/Jsk;->A01()Z", "LX/Jsl;->A01()Z",
+            "LX/Jsn;->A06()Z", "LX/Jso;->A06()Z", "LX/Jsp;->A06()Z",
         ),
         "font_by_name" to setOf("LX/Nj8;->A00(Landroid/content/Context;Ljava/lang/String;I)Landroid/graphics/Typeface;"),
         "font_input" to setOf(
@@ -309,10 +311,12 @@ internal val PROFILE_346611351 = ControlProfile(
         "event_prompts" to setOf("LX/HRb;->A08()Z", "LX/HRb;->A09()Z"),
         "facebook" to setOf(
             "LX/2Q7;->A0D()Z", "LX/3FF;->A00()Z", "LX/3GJ;->A02()Z", "LX/3oU;->A00()Z", "LX/EPj;->A06()Z",
-            "LX/HRP;->A02()Z", "LX/HRP;->A05()Z", "LX/HaR;->A06()Z", "LX/JpK;->A00()Z", "LX/JpS;->A02()Z",
-            "LX/JpT;->A01()Z", "LX/JpV;->A02()Z", "LX/JpX;->A02()Z", "LX/Jpc;->A03()Z", "LX/Jpd;->A03()Z",
-            "LX/Jpf;->A01()Z", "LX/Jpg;->A01()Z", "LX/Jpi;->A06()Z", "LX/Jpj;->A06()Z", "LX/Jpk;->A06()Z",
-            "LX/Pdx;->A04()Z", "LX/Pe4;->A06()Z",
+            "LX/HRP;->A02()Z", "LX/HRP;->A05()Z", "LX/Pdx;->A04()Z", "LX/Pe4;->A06()Z",
+        ),
+        "facebook_profile" to setOf(
+            "LX/HaR;->A06()Z", "LX/JpK;->A00()Z", "LX/JpS;->A02()Z", "LX/JpT;->A01()Z", "LX/JpV;->A02()Z",
+            "LX/JpX;->A02()Z", "LX/Jpc;->A03()Z", "LX/Jpd;->A03()Z", "LX/Jpf;->A01()Z", "LX/Jpg;->A01()Z",
+            "LX/Jpi;->A06()Z", "LX/Jpj;->A06()Z", "LX/Jpk;->A06()Z",
         ),
         "font_by_name" to setOf("LX/KUj;->A00(Landroid/content/Context;Ljava/lang/String;I)Landroid/graphics/Typeface;"),
         "font_input" to setOf(

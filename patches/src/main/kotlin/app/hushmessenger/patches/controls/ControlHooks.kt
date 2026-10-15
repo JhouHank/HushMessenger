@@ -87,10 +87,14 @@ internal const val TRANSCODE_IMAGE_ASYNC = "$MEDIA_TRANSCODER->transcodeImageAsy
 private const val ORIGINAL_PHOTO = "Lapp/hushmessenger/extension/OriginalPhoto;"
 private const val FLAG_SECURE = 0x2000
 
+internal const val FACEBOOK_PROFILE = "facebook_profile"
+internal const val FACEBOOK_PROFILE_BUTTON =
+    "Lcom/facebook/messaging/profile/plugins/core/threadsettingsactionbutton/facebookprofile/ThreadSettingsFacebookProfileActionButton;"
+
 private val facebookPlugins = setOf(
     "Lcom/facebook/messaging/inbox/tab/plugins/core/tabtoolbarbutton/facebookbutton/facebooktoolbarbutton/FacebookButtonTabButtonImplementation;",
     "Lcom/facebook/messaging/marketplace/plugins/folder/navbarmenuitem/NavBarMenuItemImplementation;",
-    "Lcom/facebook/messaging/profile/plugins/core/threadsettingsactionbutton/facebookprofile/ThreadSettingsFacebookProfileActionButton;",
+    FACEBOOK_PROFILE_BUTTON,
     "Lcom/facebook/messaging/navigation/plugins/drawerfoldersections/fbshortcutsfoldersection/FacebookShortcutsFolderSection;",
     "Lcom/facebook/messaging/navigation/plugins/drawerfoldersections/subscriptionsfoldersection/SubscriptionsFolderSection;",
     "Lcom/facebook/messaging/communitymessaging/plugins/channelinvite/sharetofacebookbutton/ShareToFacebookButtonImplementation;",
@@ -215,10 +219,14 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 strings.containsAll(setOf("messaging.inbox.itemlistprocessor.ItemListProcessorInterfaceSpec", "processItems", "new_friend_bump_threads"))) add("ads")
             if (gate && "com.facebook.messaging.friendsinboxunit.plugins.inboxunit.FriendsInboxUnitKillSwitch" in strings) add("stories")
             if (cls.type in appIconManagers && method.isAppIconGate()) add(APP_ICONS)
-            if (gate && instructions.any {
-                it.opcode == Opcode.NEW_INSTANCE &&
-                    ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type in facebookPlugins
-            }) add("facebook")
+            if (gate) {
+                val shortcuts = instructions.filter { it.opcode == Opcode.NEW_INSTANCE }
+                    .mapNotNull { ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type }
+                    .filter { it in facebookPlugins }.toSet()
+                // A gate that builds only the chat details Profile button gets its own key, so Keep the Profile button can spare it.
+                if (shortcuts == setOf(FACEBOOK_PROFILE_BUTTON)) add(FACEBOOK_PROFILE)
+                else if (shortcuts.isNotEmpty()) add("facebook")
+            }
             if (gate && strings.any {
                 it == "com.facebook.messaging.navigation.plugins.aicreationfolder.folderitem.AiCreationFolderItem" ||
                     it == "com.facebook.messaging.navigation.plugins.aihomefolder.folderitem.AiHomeFolderItem"

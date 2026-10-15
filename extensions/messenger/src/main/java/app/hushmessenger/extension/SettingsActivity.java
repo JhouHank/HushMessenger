@@ -58,7 +58,8 @@ public final class SettingsActivity extends Activity {
     private final Map<Switch, CharSequence> switchDescriptions = new java.util.HashMap<>();
     private long documentGeneration;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (preferences, key) -> {
-        if (key == null || "paused".equals(key) || Settings.BUBBLE_CHAT_HEADS.equals(key) || Settings.installed.contains(key))
+        if (key == null || "paused".equals(key) || Settings.BUBBLE_CHAT_HEADS.equals(key) || Settings.KEEP_FACEBOOK_PROFILE.equals(key)
+            || Settings.installed.contains(key))
             documentGeneration++;
         refreshChoices();
         if (key == null || "check_updates".equals(key)) syncUpdateChoice(true);
@@ -688,11 +689,13 @@ public final class SettingsActivity extends Activity {
                 groups.add(group);
             }
             LinearLayout row = controlRow(spec[0], text.control(spec, 1), text.control(spec, 2), true);
-            if ("bubbles".equals(spec[0]) || OwnFont.KEY.equals(spec[0]) || MessageLog.KEY.equals(spec[0]) || AutoReply.KEY.equals(spec[0])) {
+            if ("bubbles".equals(spec[0]) || "facebook".equals(spec[0]) || OwnFont.KEY.equals(spec[0]) || MessageLog.KEY.equals(spec[0]) || AutoReply.KEY.equals(spec[0])) {
                 // Below the row, where TalkBack reaches them: the row's label column hides its descendants.
                 LinearLayout wrapper = ui.column();
                 ui.add(wrapper, row, 0);
                 if ("bubbles".equals(spec[0])) addBubbleModes(wrapper);
+                else if ("facebook".equals(spec[0])) ui.add(wrapper, controlRow(Settings.KEEP_FACEBOOK_PROFILE,
+                    text.format("facebook_keep_profile"), text.format("facebook_keep_profile_help"), false), 8);
                 else if (OwnFont.KEY.equals(spec[0])) addFontFile(wrapper);
                 else if (AutoReply.KEY.equals(spec[0])) addAutoReplyActions(wrapper);
                 else addMessageLogActions(wrapper);
@@ -2403,12 +2406,13 @@ public final class SettingsActivity extends Activity {
         java.util.Set<String> known = new java.util.HashSet<>();
         for (String[] spec : CONTROLS) known.add(spec[0]);
         known.add(Settings.BUBBLE_CHAT_HEADS);
+        known.add(Settings.KEEP_FACEBOOK_PROFILE);
         Map<String, Boolean> supported = new java.util.LinkedHashMap<>();
         int unknown = 0, unavailable = 0;
         for (Map.Entry<String, Boolean> choice : choices.entrySet()) {
             String key = choice.getKey();
-            if ("paused".equals(key) || (known.contains(key) && Settings.installed.contains(
-                Settings.BUBBLE_CHAT_HEADS.equals(key) ? "bubbles" : key))) supported.put(key, choice.getValue());
+            if ("paused".equals(key) || (known.contains(key) && Settings.installed.contains(Settings.BUBBLE_CHAT_HEADS.equals(key) ? "bubbles"
+                : Settings.KEEP_FACEBOOK_PROFILE.equals(key) ? "facebook" : key))) supported.put(key, choice.getValue());
             else if (known.contains(key)) unavailable++;
             else unknown++;
         }
@@ -2870,8 +2874,10 @@ public final class SettingsActivity extends Activity {
             String[] spec = installedControls.get(i);
             String bucket = "inbox".equals(spec[3]) ? "inbox" :
                 ("conversations".equals(spec[3]) || "stickers".equals(spec[3])) ? "chats" : "more";
+            // A switch inside a control's block is found by its own words too.
+            String inside = "facebook".equals(spec[0]) ? text.get("facebook_keep_profile") + " " + text.get("facebook_keep_profile_help") : "";
             boolean match = ("all".equals(category) || category.equals(bucket)) && SettingsSearch.matches(terms, spec[1], spec[2],
-                SettingsText.english(spec[3]), text.display(text.control(spec, 1)), text.display(text.control(spec, 2)), text.get(spec[3]));
+                SettingsText.english(spec[3]), text.display(text.control(spec, 1)), text.display(text.control(spec, 2)), text.get(spec[3]), inside);
             controlRows.get(i).setVisibility(match ? View.VISIBLE : View.GONE);
             if (match) visible++;
         }

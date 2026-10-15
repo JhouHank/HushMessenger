@@ -52,6 +52,7 @@ class ControlDiscoveryTest {
                         const/4 v0, 0x1
                         return v0
                     """.trimIndent()
+                    FACEBOOK_PROFILE -> "new-instance v0, $FACEBOOK_PROFILE_BUTTON\nconst/4 v0, 0x1\nreturn v0"
                     "ai_menu" -> """
                         const-string v0, "com.facebook.messaging.navigation.plugins.aihomefolder.folderitem.AiHomeFolderItem"
                         const/4 v0, 0x1
@@ -336,6 +337,22 @@ class ControlDiscoveryTest {
         ))
         val found = mirroredControls(listOf(drawer))
         assertEquals(setOf("LX/WRg;->A02()Z", "LX/WRg;->A05()Z"), found.getValue("facebook").map { it.hookId() }.toSet())
+    }
+
+    // Keep the Profile button (#51) spares only the gates that build nothing but the chat details Profile button.
+    // A gate that also builds another Facebook shortcut stays with Hide Facebook shortcuts.
+    @Test fun theProfileButtonGateIsItsOwnHookAndAMixedGateIsNot() {
+        val gate = { name: String, body: String -> fixtureMethod("LX/Pf1;->$name()Z", "$body\nconst/4 v0, 0x1\nreturn v0") }
+        val share = "Lcom/facebook/messaging/communitymessaging/plugins/channelinvite/sharetofacebookbutton/ShareToFacebookButtonImplementation;"
+        val details = fixtureClass("LX/Pf1;", listOf(
+            gate("A01", "new-instance v0, $FACEBOOK_PROFILE_BUTTON"),
+            gate("A02", "new-instance v0, $FACEBOOK_PROFILE_BUTTON\nnew-instance v0, $FACEBOOK_PROFILE_BUTTON"),
+            gate("A03", "new-instance v0, $FACEBOOK_PROFILE_BUTTON\nnew-instance v0, $share"),
+            gate("A04", "new-instance v0, Lcom/facebook/messaging/profile/plugins/core/threadsettingsactionbutton/mute/ThreadSettingsMuteActionButton;"),
+        ))
+        val found = mirroredControls(listOf(details))
+        assertEquals(setOf("LX/Pf1;->A01()Z", "LX/Pf1;->A02()Z"), found.getValue(FACEBOOK_PROFILE).map { it.hookId() }.toSet())
+        assertEquals(listOf("LX/Pf1;->A03()Z"), found.getValue("facebook").map { it.hookId() })
     }
 
     // Both chat menu builders gate Mark as read by its plugin name. Mark as unread has the same shape and its own name.

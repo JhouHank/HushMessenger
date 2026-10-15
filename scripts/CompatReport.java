@@ -103,10 +103,12 @@ public class CompatReport {
     static final Set<String> COLOR_CALLS = Set.of(
         "Landroid/graphics/Color;->parseColor(Ljava/lang/String;)I", "Landroid/content/Context;->getColor(I)I");
 
+    static final String FACEBOOK_PROFILE_BUTTON =
+        "Lcom/facebook/messaging/profile/plugins/core/threadsettingsactionbutton/facebookprofile/ThreadSettingsFacebookProfileActionButton;";
     static final Set<String> FACEBOOK_PLUGINS = Set.of(
         "Lcom/facebook/messaging/inbox/tab/plugins/core/tabtoolbarbutton/facebookbutton/facebooktoolbarbutton/FacebookButtonTabButtonImplementation;",
         "Lcom/facebook/messaging/marketplace/plugins/folder/navbarmenuitem/NavBarMenuItemImplementation;",
-        "Lcom/facebook/messaging/profile/plugins/core/threadsettingsactionbutton/facebookprofile/ThreadSettingsFacebookProfileActionButton;",
+        FACEBOOK_PROFILE_BUTTON,
         "Lcom/facebook/messaging/navigation/plugins/drawerfoldersections/fbshortcutsfoldersection/FacebookShortcutsFolderSection;",
         "Lcom/facebook/messaging/navigation/plugins/drawerfoldersections/subscriptionsfoldersection/SubscriptionsFolderSection;",
         "Lcom/facebook/messaging/communitymessaging/plugins/channelinvite/sharetofacebookbutton/ShareToFacebookButtonImplementation;",
@@ -173,7 +175,7 @@ public class CompatReport {
         PATCHES.put("Hide inbox tabs", List.of("subtabs"));
         PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
         PATCHES.put("Pin more chats", List.of("pinned_chats"));
-        PATCHES.put("Hide Facebook shortcuts", List.of("facebook"));
+        PATCHES.put("Hide Facebook shortcuts", List.of("facebook", "facebook_profile"));
         PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
@@ -4280,18 +4282,17 @@ public class CompatReport {
                     found.get("app_icons").add(method);
                 }
 
-                // facebook
+                // facebook, and facebook_profile for a gate that builds only the chat details Profile button
                 if (gate) {
+                    Set<String> shortcuts = new HashSet<>();
                     for (var i : instructions) {
-                        if (i.getOpcode() == Opcode.NEW_INSTANCE && i instanceof ReferenceInstruction ri) {
-                            if (ri.getReference() instanceof TypeReference tr) {
-                                if (FACEBOOK_PLUGINS.contains(tr.getType())) {
-                                    found.get("facebook").add(method);
-                                    break;
-                                }
-                            }
+                        if (i.getOpcode() == Opcode.NEW_INSTANCE && i instanceof ReferenceInstruction ri &&
+                            ri.getReference() instanceof TypeReference tr && FACEBOOK_PLUGINS.contains(tr.getType())) {
+                            shortcuts.add(tr.getType());
                         }
                     }
+                    if (shortcuts.equals(Set.of(FACEBOOK_PROFILE_BUTTON))) found.get("facebook_profile").add(method);
+                    else if (!shortcuts.isEmpty()) found.get("facebook").add(method);
                 }
 
                 // ai_menu
@@ -4649,7 +4650,7 @@ public class CompatReport {
      */
     static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
         "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
-        "disappearing_swipe", "facebook", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
+        "disappearing_swipe", "facebook", "facebook_profile", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
         "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "stories", "system_camera", "typing",
         "unsent_indicator");
 

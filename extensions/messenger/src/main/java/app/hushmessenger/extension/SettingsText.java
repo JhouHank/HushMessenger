@@ -159,6 +159,8 @@ final class SettingsText {
         ENGLISH.put("bubble_notifications", "Messenger notification settings");
         ENGLISH.put("bubble_conversations", "Android conversation settings");
         ENGLISH.put("bubble_settings_missing", "This phone has no matching settings screen. Open Messenger's app info, then Notifications.");
+        ENGLISH.put("facebook_keep_profile", "Keep the Profile button");
+        ENGLISH.put("facebook_keep_profile_help", "Leaves the Profile button on a chat's details page, so you can still open the person's Facebook profile. The other Facebook shortcuts stay hidden.");
         ENGLISH.put("experimental", "Experimental");
         ENGLISH.put("choice_on", "%s on");
         ENGLISH.put("choice_off", "%s off");
