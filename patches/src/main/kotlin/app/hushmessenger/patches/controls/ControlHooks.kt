@@ -1675,6 +1675,9 @@ internal fun MutableMethod.injectLegacyChatAnimation() {
 /** Search and notifications open a chat in this activity instead of over the inbox; the extension matches its name. */
 internal const val CHAT_ACTIVITY = "Lcom/facebook/messaging/msys/thread/fragment/MsysThreadViewActivity;"
 
+/** Page and business chats open in Messenger's older chat activity; the extension matches its name too. */
+internal const val BUSINESS_CHAT_ACTIVITY = "Lcom/facebook/orca/threadview/ThreadViewActivity;"
+
 private const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
 
 private fun chatSlide(from: String, to: String, duration: Int) = """

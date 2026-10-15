@@ -601,8 +601,9 @@ val chatAnimationPatch = bytecodePatch(
         val inbox = original("chat_inbox").definingClass
         // Everything is checked before the first edit, so a changed build fails with the APK untouched.
         for (type in listOf(chat, inbox)) validateInheritsFragmentAnimation(type) { classDefByOrNull(it) }
-        // The extension slides chats opened from search and notifications by this activity's name.
-        if (classDefByOrNull(CHAT_ACTIVITY) == null) throw PatchException(
+        // The extension slides chats opened from search and notifications, and page and business chats, by these
+        // activities' names.
+        if (listOf(CHAT_ACTIVITY, BUSINESS_CHAT_ACTIVITY).any { classDefByOrNull(it) == null }) throw PatchException(
             "Slide chats in and out: Messenger's chat activity differs from the tested builds. Start with an unmodified supported APK.",
         )
         val base = mutable("chat_animation").apply { validateFragmentAnimation() }
