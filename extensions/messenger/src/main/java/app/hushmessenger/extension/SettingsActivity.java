@@ -1235,7 +1235,9 @@ public final class SettingsActivity extends Activity {
         LinearLayout labels = ui.column();
         labels.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         LinearLayout titleLine = ui.row();
-        if (overlay) titleLine.setPaddingRelative(0, 0, ui.dp(60), 0);
+        LinearLayout.LayoutParams titleSpace = new LinearLayout.LayoutParams(-1, -2);
+        // A margin, since relative padding set before the row is attached stays on the right in a mirrored layout.
+        if (overlay) titleSpace.setMarginEnd(ui.dp(60));
         if (ui.largeText) titleLine.setOrientation(LinearLayout.VERTICAL);
         titleLine.addView(ui.text(text.display(title), appRow ? 14 : 16, ui.text, false), new LinearLayout.LayoutParams(-2, -2));
         if (EXPERIMENTAL.contains(key)) {
@@ -1246,7 +1248,7 @@ public final class SettingsActivity extends Activity {
             params.setMarginStart(ui.dp(ui.largeText ? 0 : 8));
             titleLine.addView(badge, params);
         }
-        ui.add(labels, titleLine, 0);
+        labels.addView(titleLine, titleSpace);
         if (!description.isEmpty()) ui.add(labels, ui.text(text.display(description), appRow ? 13 : 14, ui.muted, false), appRow ? 4 : 6);
         // A switch records a use only when Messenger reaches its screen or event, so an off switch shows nothing.
         // A failure newer than the last use means the switch isn't doing its job, so that shows instead.

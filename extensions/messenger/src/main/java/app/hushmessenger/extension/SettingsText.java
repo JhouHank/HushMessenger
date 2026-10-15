@@ -5,6 +5,7 @@ import android.content.Context;
 import android.os.Build;
 import android.os.LocaleList;
 import android.text.TextUtils;
+import android.view.View;
 import java.util.IllegalFormatException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -37,7 +38,15 @@ final class SettingsText {
 
     boolean isPseudo() { return expanded || rtl; }
 
-    int layoutDirection() { return TextUtils.getLayoutDirectionFromLocale(locale); }
+    /**
+     * Right to left only when the words shown are: the mirrored pseudo-locale, or a translation into a right-to-left
+     * language. English on an Arabic or Hebrew phone stays left to right, since English sentences forced right to left
+     * put their periods and counts on the wrong side.
+     */
+    int layoutDirection() {
+        return rtl || !translated.isEmpty() && TextUtils.getLayoutDirectionFromLocale(locale) == View.LAYOUT_DIRECTION_RTL
+            ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR;
+    }
 
     String get(String id, Object... arguments) { return display(format(id, arguments)); }
 

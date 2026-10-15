@@ -119,6 +119,14 @@ public class SettingsReliabilityTest {
     @Test @Config(sdk = {28, 36})
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     public void normalSizeAppDescriptionsStayClearOfTheSwitchTrack() {
+        // English stays left to right, so the mirrored rows need an Arabic table.
+        SettingsTranslations.LOCALES.put("ar", java.util.Map.of("tab_controls", "Controls in Arabic"));
+        try {
+            normalSizeAppDescriptionsStayClearOfTheSwitchTrackIn();
+        } finally { SettingsTranslations.LOCALES.remove("ar"); }
+    }
+
+    private void normalSizeAppDescriptionsStayClearOfTheSwitchTrackIn() {
         for (String locale : new String[] {"en-rUS-ldltr", "ar-rEG-ldrtl"}) {
             RuntimeEnvironment.setQualifiers(locale + "-w390dp-h844dp-mdpi");
             RuntimeEnvironment.setFontScale(1f);
@@ -565,6 +573,8 @@ public class SettingsReliabilityTest {
     @Test public void rtlKeepsTheGapBetweenTheSwitchAndItsLabel() {
         RuntimeEnvironment.setQualifiers("ar-rEG-ldrtl-w400dp-h800dp-mdpi");
         RuntimeEnvironment.getApplication().getApplicationInfo().flags |= ApplicationInfo.FLAG_SUPPORTS_RTL;
+        // English stays left to right, so the mirrored rows need an Arabic table.
+        SettingsTranslations.LOCALES.put("ar", java.util.Map.of("tab_controls", "Controls in Arabic"));
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             View root = screen.get().getWindow().getDecorView();
             root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -579,7 +589,9 @@ public class SettingsReliabilityTest {
             titleLine.getChildAt(0).getDrawingRect(titleBounds);
             row.offsetDescendantRectToMyCoords(titleLine.getChildAt(0), titleBounds);
             assertTrue("The visible title stays clear of the switch", titleBounds.left - control.getRight() >= 12);
-        }
+            // The space kept for the switch sits on its side, so the title starts at the mirrored edge like its description.
+            assertEquals("The title starts at the right edge", labels.getRight() - labels.getPaddingRight(), titleBounds.right);
+        } finally { SettingsTranslations.LOCALES.remove("ar"); }
     }
 
     @Test @Config(sdk = {28, 36}) public void accessiblePageActionsExposeTheActivePaneAndCheckedState() {
