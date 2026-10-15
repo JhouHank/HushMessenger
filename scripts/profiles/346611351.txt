@@ -122,6 +122,7 @@ hook keep_unsent LX/VAg;->A00(Landroid/content/Intent;Lcom/facebook/auth/userses
 hook mark_read_action LX/HUP;->A0V()Z
 hook mark_read_action LX/JpJ;->A0F()Z
 hook mark_read_bar LX/7Kl;->DZy(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/6yf;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V
+hook mark_read_bar LX/91z;->A02(Landroid/content/Context;LX/0XS;Lcom/facebook/auth/usersession/FbUserSession;LX/0LY;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/52D;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/6eV;Lcom/google/common/collect/ImmutableList$Builder;Lcom/google/common/collect/ImmutableList;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIZZZZZZ)Ljava/lang/Object;
 hook mark_read_click LX/CEV;->onClick(Landroid/view/View;)V
 hook menu_settings LX/9sA;->A1h()V
 hook menu_settings LX/HRQ;->B04(LX/0MG;)Ljava/util/ArrayList;

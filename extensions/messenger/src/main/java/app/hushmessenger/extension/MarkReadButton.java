@@ -7,6 +7,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +71,8 @@ public final class MarkReadButton {
     }
 
     /**
-     * Messenger's chat top bar calls this right before it shows its buttons, padded with nulls, of which it shows the
-     * first three. The button goes where the chat details button sits, taking its place when the bar is full, since
+     * Messenger's older chat top bar calls this right before it shows its buttons, padded with nulls, of which it shows
+     * the first three. The button goes where the chat details button sits, taking its place when the bar is full, since
      * tapping the chat's name opens the same page. Without a details button it's added only when there's room, so no
      * call button is ever pushed out or moved.
      */
@@ -83,9 +84,26 @@ public final class MarkReadButton {
         }
     }
 
-    /** Puts a built button into the bar's list by the rule {@link #add} describes. Null and a full bar change nothing. */
-    static void place(List<Object> buttons, Object button) throws IllegalAccessException {
-        if (button == null) return;
+    /**
+     * Messenger's newer chat top bar hands over its finished, unchangeable button list here and shows the list this
+     * returns. The button goes in by the same rule as {@link #add}, in a copy; the list comes back as it was otherwise.
+     */
+    public static List<Object> addTo(List<Object> buttons, Object session, Object thread, Object mig) {
+        try {
+            if (buttons == null || !shown()) return buttons;
+            Object button = button(session, thread, mig);
+            if (button == null) return buttons;
+            List<Object> copy = new ArrayList<>(buttons);
+            return place(copy, button) ? copy : buttons;
+        } catch (Throwable error) {
+            Settings.hookFailed(KEY, "Can't add the Mark as read button", error);
+            return buttons;
+        }
+    }
+
+    /** Puts a built button into the bar's list by the rule {@link #add} describes. False when it changed nothing. */
+    static boolean place(List<Object> buttons, Object button) throws IllegalAccessException {
+        if (button == null) return false;
         int count = 0, details = -1;
         for (int i = 0; i < buttons.size(); i++) {
             Object held = buttons.get(i);
@@ -96,33 +114,32 @@ public final class MarkReadButton {
         if (details >= 0 && count >= MOST_BUTTONS) buttons.set(details, button);
         else if (details >= 0) buttons.add(details, button);
         else if (count < MOST_BUTTONS) buttons.add(button);
+        else return false;
+        return true;
     }
 
-    /** Messenger's chat details plugin, which the details button's tap listener holds. */
-    static final String DETAILS_PLUGIN =
-        "com.facebook.messaging.threadsettings.plugins.threadviewentrypoint.implementation.ThreadSettingsButtonImplementation";
+    /** The test tag Messenger gives the chat details button in both top bars. The patch checks the build sets it. */
+    static final String DETAILS_TAG = "settings_button";
 
-    /** Whether a top bar button is the chat details one: its listener, one field in, holds the details plugin. */
-    static boolean isDetails(Object button) throws IllegalAccessException { return holdsDetails(button, 2); }
-
-    private static boolean holdsDetails(Object value, int depth) throws IllegalAccessException {
-        for (Class<?> type = value.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+    /** Whether a top bar button is the chat details one, by the test tag the button keeps. */
+    static boolean isDetails(Object button) throws IllegalAccessException {
+        for (Class<?> type = button.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
             for (Field field : type.getDeclaredFields()) {
-                if (Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive()) continue;
+                if (Modifier.isStatic(field.getModifiers()) || field.getType() != String.class) continue;
                 field.setAccessible(true);
-                Object held = field.get(value);
-                if (held == null || held instanceof CharSequence) continue;
-                if (DETAILS_PLUGIN.equals(held.getClass().getName())) return true;
-                if (depth > 1 && holdsDetails(held, depth - 1)) return true;
+                if (DETAILS_TAG.equals(field.get(button))) return true;
             }
         }
         return false;
     }
 
-    /** Builds the button from this Messenger's own top bar classes, or null. The patch writes its body. */
+    /** Reads the older bar's chat, account and colors from its plugin socket and builds the button, or null. The patch writes its body. */
     static Object build(Object socket) { return null; }
 
-    /** What the button's listener holds, or null when the chat isn't known yet. Called by the patched build(). */
+    /** Builds the button from this Messenger's own top bar classes, or null. The patch writes its body. */
+    static Object button(Object session, Object thread, Object mig) { return null; }
+
+    /** What the button's listener holds, or null when the chat isn't known yet. Called by the patched button(). */
     public static Object tag(Object session, Object thread) {
         return session == null || thread == null ? null : new Tag(session, thread);
     }
@@ -157,7 +174,8 @@ public final class MarkReadButton {
         HeldSeen seen;
         synchronized (held) { seen = held.get(thread); }
         Object handler = seen == null ? null : seen.handler.get();
-        if (handler == null || seen.session.get() != session) return false;
+        // The bar and the read hook read the session from different places, so an equal one counts as the same account.
+        if (handler == null || !session.equals(seen.session.get())) return false;
         Method send = readJob(handler.getClass(), session);
         if (send == null) return false;
         replaying.set(Boolean.TRUE);

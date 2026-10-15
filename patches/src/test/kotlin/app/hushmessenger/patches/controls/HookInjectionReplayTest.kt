@@ -46,8 +46,11 @@ class HookInjectionReplayTest {
                     } else {
                         injectControl(key, methods)
                     }
-                    // The Mark as read button also builds the extension's button from this build's recipe.
-                    if (key == MARK_READ_BUTTON) markReadBuilder(markReadStub(), markReadRecipe!!)
+                    // The Mark as read button also builds the extension's two builders from this build's recipe.
+                    if (key == MARK_READ_BUTTON) {
+                        markReadSocketBuilder(markReadStub(), markReadRecipe!!)
+                        markReadBuilder(markReadButtonStub(), markReadRecipe!!)
+                    }
                 } catch (error: Exception) {
                     refused += "$code $key: ${error.javaClass.simpleName} ${error.message}"
                 }

@@ -3703,7 +3703,9 @@ public class CompatReport {
      * mark_read_bar and mark_read_click: the chat top bar's builder (the one method naming the QR scanner plugin and
      * reading it from the socket) and its shared listener's onClick, taken only when every value the generated button
      * copies from the QR block resolves, the classes and helpers it names are public, the list walk seam and the
-     * three-button limit hold, and the listener's onClick has two locals. Mirrors MarkReadButton.kt.
+     * three-button limit hold, and the listener's onClick has two locals. The newer top bar's factory, the one other
+     * caller of the details button's builder, joins mark_read_bar when its return seam holds. Returns bar, click,
+     * factory. Mirrors MarkReadButton.kt.
      */
     static List<Method> markReadButton(List<ClassDef> classes) {
         var byType = new HashMap<String, ClassDef>();
@@ -3854,7 +3856,101 @@ public class CompatReport {
             if (found == null || !AccessFlags.PUBLIC.isSet(found.getAccessFlags()) || !AccessFlags.STATIC.isSet(found.getAccessFlags())) return List.of();
         }
         if (markReadSite(bar, list, pluginRead.getRegisterB(), socketType) < 0 || !topBarCapMatches(bar)) return List.of();
-        return List.of(bar, click);
+        // The details button's builder: the bar's one call that takes the chat colors last and returns a button.
+        var detailsRefs = new LinkedHashSet<String>();
+        for (var insn : c)
+            if (insn.getOpcode() == Opcode.INVOKE_VIRTUAL && insn instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference m &&
+                spec.equals(m.getReturnType()) && !m.getParameterTypes().isEmpty() &&
+                MIG_SCHEME.equals(m.getParameterTypes().get(m.getParameterTypes().size() - 1).toString())) detailsRefs.add(m.toString());
+        if (detailsRefs.size() != 1) return List.of();
+        String detailsRef = detailsRefs.iterator().next();
+        var detailsOwner = byType.get(detailsRef.substring(0, detailsRef.indexOf("->")));
+        Method details = null;
+        if (detailsOwner != null) for (var m : detailsOwner.getMethods()) if (hookId(m).equals(detailsRef)) details = m;
+        if (details == null || !tagsDetails(details, tagField)) return List.of();
+        // The newer bar is the one other method that makes the details button.
+        Method factory = null;
+        String barId = hookId(bar);
+        for (var cls : classes) for (var m : cls.getMethods()) {
+            if (hookId(m).equals(barId)) continue;
+            boolean calls = false;
+            for (var i : instructions(m)) if (detailsRef.equals(ref(i))) { calls = true; break; }
+            if (!calls) continue;
+            if (factory != null) return List.of();
+            factory = m;
+        }
+        if (factory == null || !markReadFactorySite(factory)) return List.of();
+        var immutable = byType.get(IMMUTABLE_LIST);
+        boolean copies = false;
+        if (immutable != null) for (var m : immutable.getMethods())
+            if (LIST_COPY.equals(hookId(m)) && AccessFlags.STATIC.isSet(m.getAccessFlags()) && AccessFlags.PUBLIC.isSet(m.getAccessFlags())) copies = true;
+        if (!copies) return List.of();
+        return List.of(bar, click, factory);
+    }
+
+    static final String LIST_BUILD = "Lcom/google/common/collect/ImmutableList$Builder;->build()Lcom/google/common/collect/ImmutableList;";
+    static final String LIST_COPY = "Lcom/google/common/collect/ImmutableList;->copyOf(Ljava/util/Collection;)Lcom/google/common/collect/ImmutableList;";
+    /** MarkReadButton.DETAILS_TAG. */
+    static final String DETAILS_TAG = "settings_button";
+    static final Set<String> FACTORY_RETURNS = Set.of("Ljava/lang/Object;", "Ljava/lang/Iterable;", "Ljava/util/Collection;", "Ljava/util/List;", IMMUTABLE_LIST);
+
+    /** The details builder stores DETAILS_TAG in the button builder's tag field. */
+    static boolean tagsDetails(Method details, String tagField) {
+        var dc = instructions(details);
+        for (int k = 0; k < dc.size(); k++) {
+            if (dc.get(k).getOpcode() != Opcode.IPUT_OBJECT || !tagField.equals(ref(dc.get(k)))) continue;
+            int value = ((TwoRegisterInstruction) dc.get(k)).getRegisterA();
+            for (int j = k - 1; j >= 0; j--) if (writesRegister(dc.get(j), value)) {
+                if (DETAILS_TAG.equals(dc.get(j) instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference s ? s.getString() : null)) return true;
+                break;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The newer bar's factory: static, one return of the list an ImmutableList builder just built, nothing between them
+     * writing the list, branching or landed on, the account, chat and colors each one parameter never reassigned, and
+     * three low locals free. Mirrors markReadFactorySite in MarkReadButton.kt.
+     */
+    static boolean markReadFactorySite(Method factory) {
+        if (!AccessFlags.STATIC.isSet(factory.getAccessFlags()) || !FACTORY_RETURNS.contains(factory.getReturnType()) || factory.getImplementation() == null) return false;
+        var code = instructions(factory);
+        int site = -1;
+        for (int i = 0; i < code.size(); i++) if (code.get(i).getOpcode() == Opcode.RETURN_OBJECT) {
+            if (site >= 0) return false;
+            site = i;
+        }
+        if (site < 0) return false;
+        int list = ((OneRegisterInstruction) code.get(site)).getRegisterA();
+        int build = -1;
+        for (int i = site - 1; i >= 0 && build < 0; i--) if (LIST_BUILD.equals(ref(code.get(i)))) build = i;
+        if (build < 0 || code.get(build + 1).getOpcode() != Opcode.MOVE_RESULT_OBJECT || ((OneRegisterInstruction) code.get(build + 1)).getRegisterA() != list) return false;
+        for (int i = build + 2; i < site; i++) if (writesRegister(code.get(i), list) || code.get(i) instanceof OffsetInstruction) return false;
+        var edges = edges(factory);
+        if (edges == null) return false;
+        for (var e : edges) if (e[1] > build && e[1] <= site) return false;
+        var types = params(factory);
+        int words = 0;
+        for (var t : types) words += "J".equals(t) || "D".equals(t) ? 2 : 1;
+        int first = factory.getImplementation().getRegisterCount() - words;
+        var registers = new ArrayList<Integer>();
+        for (var type : List.of("Lcom/facebook/auth/usersession/FbUserSession;", THREAD_KEY, MIG_SCHEME)) {
+            int at = -1, offset = 0;
+            for (var t : types) {
+                if (t.equals(type)) {
+                    if (at >= 0) return false;
+                    at = first + offset;
+                }
+                offset += "J".equals(t) || "D".equals(t) ? 2 : 1;
+            }
+            if (at < 0) return false;
+            registers.add(at);
+        }
+        for (var i : code) for (int r : registers) if (writesRegister(i, r)) return false;
+        int scratch = 0;
+        for (int r = 0; r < Math.min(16, first); r++) if (r != list) scratch++;
+        return list <= 15 && scratch >= 3;
     }
 
     /**
@@ -3909,6 +4005,7 @@ public class CompatReport {
         var markRead = markReadButton(classes);
         if (!markRead.isEmpty()) {
             found.get("mark_read_bar").add(markRead.get(0));
+            found.get("mark_read_bar").add(markRead.get(2));
             found.get("mark_read_click").add(markRead.get(1));
         }
         found.get("text_style").addAll(textStyleField(classes));

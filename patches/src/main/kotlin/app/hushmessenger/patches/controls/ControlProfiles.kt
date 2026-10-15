@@ -141,7 +141,10 @@ internal val BASE_PROFILE = ControlProfile(
         "inbox_promotions" to setOf("LX/265;->A0J()Z", "LX/265;->A0K()Z"),
         "keep_unsent" to setOf("LX/VE7;->A00(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/util/Map;)V"),
         "mark_read_action" to setOf("LX/HXw;->A0V()Z", "LX/JsO;->A0F()Z"),
-        "mark_read_bar" to setOf("LX/7Np;->Da9(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/71j;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V"),
+        "mark_read_bar" to setOf(
+            "LX/7Np;->Da9(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/71j;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V",
+            "LX/953;->A02(Landroid/content/Context;LX/0XS;Lcom/facebook/auth/usersession/FbUserSession;LX/0LY;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/54z;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/6hZ;Lcom/google/common/collect/ImmutableList\$Builder;Lcom/google/common/collect/ImmutableList;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIZZZZZZ)Ljava/lang/Object;",
+        ),
         "mark_read_click" to setOf("LX/CIj;->onClick(Landroid/view/View;)V"),
         "menu_settings" to setOf(
             "LX/9vp;->A1h()V", "LX/HUy;->B04(LX/0MG;)Ljava/util/ArrayList;", "LX/HZu;->onClick(Landroid/view/View;)V",
@@ -327,7 +330,10 @@ internal val PROFILE_346611351 = ControlProfile(
         "inbox_promotions" to setOf("LX/265;->A0J()Z", "LX/265;->A0K()Z"),
         "keep_unsent" to setOf("LX/VAg;->A00(Landroid/content/Intent;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/util/Map;)V"),
         "mark_read_action" to setOf("LX/HUP;->A0V()Z", "LX/JpJ;->A0F()Z"),
-        "mark_read_bar" to setOf("LX/7Kl;->DZy(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/6yf;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V"),
+        "mark_read_bar" to setOf(
+            "LX/7Kl;->DZy(Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/messaging/send/trigger/NavigationTrigger;LX/6yf;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Ljava/lang/String;Z)V",
+            "LX/91z;->A02(Landroid/content/Context;LX/0XS;Lcom/facebook/auth/usersession/FbUserSession;LX/0LY;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/52D;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/6eV;Lcom/google/common/collect/ImmutableList\$Builder;Lcom/google/common/collect/ImmutableList;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIZZZZZZ)Ljava/lang/Object;",
+        ),
         "mark_read_click" to setOf("LX/CEV;->onClick(Landroid/view/View;)V"),
         "menu_settings" to setOf(
             "LX/9sA;->A1h()V", "LX/HRQ;->B04(LX/0MG;)Ljava/util/ArrayList;", "LX/HWL;->onClick(Landroid/view/View;)V",

@@ -326,16 +326,19 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
             } else if (key == MARK_READ_BUTTON) {
                 val recipe = markReadRecipe ?: throw PatchException("Messenger controls: the chat top bar's button recipe is missing")
                 val host = mutableClassDefBy(MARK_READ)
-                val stub = host.methods.singleOrNull { it.hookId() == MARK_READ_BUILD }
+                fun stub(id: String) = host.methods.singleOrNull { it.hookId() == id }
                     ?: throw PatchException("Messenger controls: the Mark as read button's extension stub is missing")
                 // Built before the first edit, so a changed stub stops the patch with Messenger untouched.
-                val built = markReadBuilder(stub, recipe)
+                val built = listOf(stub(MARK_READ_BUILD).let { it to markReadSocketBuilder(it, recipe) },
+                    stub(MARK_READ_BUTTON_BUILD).let { it to markReadBuilder(it, recipe) })
                 injectControl(key, methods)
                 // MutableMethod.implementation has no setter. Keep both method indexes in sync when replacing it.
-                host.methods.remove(stub)
-                host.directMethods.remove(stub)
-                host.methods.add(built)
-                host.directMethods.add(built)
+                for ((old, new) in built) {
+                    host.methods.remove(old)
+                    host.directMethods.remove(old)
+                    host.methods.add(new)
+                    host.directMethods.add(new)
+                }
             } else {
                 injectControl(key, methods)
                 inboxRoute?.let { (route, stub) -> stub.writeInboxRefreshRoute(route) }

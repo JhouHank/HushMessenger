@@ -1,9 +1,9 @@
 package app.hushmessenger.extension;
 
 import android.content.Context;
-import com.facebook.messaging.threadsettings.plugins.threadviewentrypoint.implementation.ThreadSettingsButtonImplementation;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -100,40 +100,62 @@ public class MarkReadButtonTest {
     }
 
     @Test public void theButtonTakesTheDetailsButtonsPlaceInAFullBar() throws Exception {
-        Object voice = new Button(new Listener(new Object())), video = new Button(new Listener(new Object()));
-        Object details = new Button(new Listener(new ThreadSettingsButtonImplementation()));
+        Object voice = new Button("audio_call_button"), video = new Button("video_call_button");
+        Object details = new DetailsButton();
         Object ours = new Object();
         List<Object> full = new ArrayList<>(Arrays.asList(voice, video, details, null));
-        MarkReadButton.place(full, ours);
+        assertTrue(MarkReadButton.place(full, ours));
         assertEquals(Arrays.asList(voice, video, ours, null), full);
 
+        // The newer bar's list has no padding.
+        List<Object> unpadded = new ArrayList<>(Arrays.asList(voice, video, details));
+        assertTrue(MarkReadButton.place(unpadded, ours));
+        assertEquals(Arrays.asList(voice, video, ours), unpadded);
+
         List<Object> roomy = new ArrayList<>(Arrays.asList(voice, details, null));
-        MarkReadButton.place(roomy, ours);
+        assertTrue(MarkReadButton.place(roomy, ours));
         assertEquals("with room, it goes in ahead of details", Arrays.asList(voice, ours, details, null), roomy);
     }
 
+    @Test public void onlyTheSettingsTagMarksTheDetailsButton() throws Exception {
+        assertTrue(MarkReadButton.isDetails(new DetailsButton()));
+        assertFalse(MarkReadButton.isDetails(new Button("circles_settings_button")));
+        assertFalse(MarkReadButton.isDetails(new Button(null)));
+        assertFalse(MarkReadButton.isDetails(new Object()));
+    }
+
     @Test public void withoutADetailsButtonItOnlyTakesAFreeSlot() throws Exception {
-        Object a = new Button(new Listener(new Object())), b = new Button(new Listener(new Object())), c = new Button(new Listener(new Object()));
+        Object a = new Button("a"), b = new Button("b"), c = new Button("c");
         Object ours = new Object();
         List<Object> full = new ArrayList<>(Arrays.asList(a, b, c, null));
-        MarkReadButton.place(full, ours);
+        assertFalse(MarkReadButton.place(full, ours));
         assertEquals("no call button is pushed out", Arrays.asList(a, b, c, null), full);
 
         List<Object> roomy = new ArrayList<>(Arrays.asList(a, null, null));
-        MarkReadButton.place(roomy, ours);
+        assertTrue(MarkReadButton.place(roomy, ours));
         assertEquals(Arrays.asList(a, null, null, ours), roomy);
 
         List<Object> untouched = new ArrayList<>(Arrays.asList(a, null));
-        MarkReadButton.place(untouched, null);
+        assertFalse(MarkReadButton.place(untouched, null));
         assertEquals(Arrays.asList(a, null), untouched);
     }
 
     @Test public void theBarIsLeftAloneWhenTheButtonIsOff() {
         on(true, false);
-        List<Object> buttons = new ArrayList<>(Arrays.asList(new Button(new Listener(new ThreadSettingsButtonImplementation()))));
+        List<Object> buttons = new ArrayList<>(Arrays.asList(new DetailsButton()));
         MarkReadButton.add(buttons, new Object());
         assertEquals(1, buttons.size());
         MarkReadButton.add(null, new Object());
+    }
+
+    @Test public void theNewerBarGetsItsOwnListBackWhenNothingIsAdded() {
+        List<Object> buttons = Collections.unmodifiableList(Arrays.asList(new Button("audio_call_button"), new DetailsButton()));
+        on(true, false);
+        assertSame(buttons, MarkReadButton.addTo(buttons, session, thread, new Object()));
+        // Unpatched, the extension has no button to build, so the list stays Messenger's own.
+        on(true, true);
+        assertSame(buttons, MarkReadButton.addTo(buttons, session, thread, new Object()));
+        assertNull(MarkReadButton.addTo(null, session, thread, new Object()));
     }
 
     /** Messenger's read handler as the patch leaves it: Hide read receipts asks first, then the stock job runs. */
@@ -149,17 +171,18 @@ public class MarkReadButtonTest {
         }
     }
 
-    /** A top bar button and its tap listener, shaped like Messenger's: the listener holds the plugin it calls. */
-    static final class Button {
-        final Listener listener;
+    /** A top bar button shaped like Messenger's: a listener and the test tag, kept in more than one String field. */
+    static class Button {
+        final Object listener = new Object();
+        final String label = "Thread details";
+        final String tag;
 
-        Button(Listener listener) { this.listener = listener; }
+        Button(String tag) { this.tag = tag; }
     }
 
-    static final class Listener {
-        final Object plugin;
-
-        Listener(Object plugin) { this.plugin = plugin; }
+    /** The details button, whose tag sits in its superclass's field. */
+    static final class DetailsButton extends Button {
+        DetailsButton() { super("settings_button"); }
     }
 
     private static final class ThreadKey {

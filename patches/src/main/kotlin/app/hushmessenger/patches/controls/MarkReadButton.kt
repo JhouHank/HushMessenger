@@ -24,7 +24,11 @@ internal const val MARK_READ_BAR = "mark_read_bar"
 internal const val MARK_READ_CLICK = "mark_read_click"
 internal const val MARK_READ = "Lapp/hushmessenger/extension/MarkReadButton;"
 internal const val MARK_READ_ADD = "$MARK_READ->add(Ljava/util/List;Ljava/lang/Object;)V"
+internal const val MARK_READ_ADD_TO = "$MARK_READ->addTo(Ljava/util/List;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/List;"
 internal const val MARK_READ_BUILD = "$MARK_READ->build(Ljava/lang/Object;)Ljava/lang/Object;"
+internal const val MARK_READ_BUTTON_BUILD = "$MARK_READ->button(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+/** MarkReadButton.DETAILS_TAG, the chat details button's test tag, which both top bars' details builder sets. */
+internal const val MARK_READ_DETAILS_TAG = "settings_button"
 internal const val MARK_READ_CLICKED = "$MARK_READ->clicked(Ljava/lang/Object;Landroid/view/View;)Z"
 internal const val MARK_READ_TAG = "$MARK_READ->tag(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
 internal const val MARK_READ_LABEL = "$MARK_READ->label()Ljava/lang/String;"
@@ -43,14 +47,25 @@ private const val COLLECTION_ADD = "Ljava/util/AbstractCollection;->add(Ljava/la
 private const val COLLECTION_ITERATOR = "Ljava/util/AbstractCollection;->iterator()Ljava/util/Iterator;"
 private const val LIST_INIT = "Ljava/util/ArrayList;-><init>(I)V"
 private const val SUB_LIST = "$IMMUTABLE_LIST->subList(II)$IMMUTABLE_LIST"
+private const val LIST_BUILD = "Lcom/google/common/collect/ImmutableList\$Builder;->build()$IMMUTABLE_LIST"
+private const val LIST_COPY = "$IMMUTABLE_LIST->copyOf(Ljava/util/Collection;)$IMMUTABLE_LIST"
+/** What the newer bar's factory may declare it returns: the list it builds, or any type above it. */
+private val FACTORY_RETURNS = setOf("Ljava/lang/Object;", "Ljava/lang/Iterable;", "Ljava/util/Collection;", "Ljava/util/List;", IMMUTABLE_LIST)
 private const val RESOURCES = "Landroid/content/res/Resources;"
 private const val CONTEXT = "Landroid/content/Context;"
+
+/**
+ * Where Messenger's newer chat top bar, a static factory, hands back the button list its builder just built: [site] is
+ * its one return, of [list]. [session], [thread] and [mig] are the parameters that are never reassigned, and [scratch]
+ * three low locals the call may use, since only [list] is read after the site.
+ */
+internal data class MarkReadFactory(val site: Int, val list: Int, val session: Int, val thread: Int, val mig: Int, val scratch: List<Int>)
 
 /**
  * How this build's chat top bar makes its QR scanner button, which the Mark as read button copies with Messenger's own
  * Mark as read icon and a listener that holds the extension's tag. Each value is read from the build at discovery.
  * [site] is the builder's last instruction before it walks the finished list, where [list] and [socket] still hold
- * the list and the plugin socket.
+ * the list and the plugin socket. [factory] is the newer top bar, which calls the same details button builder.
  */
 internal data class MarkReadRecipe(
     val bar: Method,
@@ -75,6 +90,8 @@ internal data class MarkReadRecipe(
     val site: Int,
     val list: Int,
     val socket: Int,
+    val factory: Method,
+    val factorySite: MarkReadFactory,
 )
 
 internal var markReadRecipe: MarkReadRecipe? = null
@@ -145,6 +162,34 @@ internal fun Method.markReadCapMatches(): Boolean {
     val writes = code.filter { it.markWrites(cap) }
     val const = writes.singleOrNull() as? NarrowLiteralInstruction ?: return false
     return (const as Instruction).opcode in setOf(Opcode.CONST_4, Opcode.CONST_16, Opcode.CONST) && const.narrowLiteral == MARK_READ_MOST_BUTTONS
+}
+
+/**
+ * The newer bar's seam: a static factory whose one return hands back the list an ImmutableList builder just built, with
+ * nothing between that build and the return that writes the list, branches or is landed on. The account, chat and
+ * colors are parameters of their own types, each declared once and never reassigned. Null when the shape moved.
+ */
+internal fun Method.markReadFactorySite(): MarkReadFactory? {
+    if (!AccessFlags.STATIC.isSet(accessFlags) || returnType !in FACTORY_RETURNS || implementation == null) return null
+    val code = markCode()
+    val site = code.indices.singleOrNull { code[it].opcode == Opcode.RETURN_OBJECT } ?: return null
+    val list = (code[site] as OneRegisterInstruction).registerA
+    val build = (site - 1 downTo 0).firstOrNull { code[it].markRef()?.toString() == LIST_BUILD } ?: return null
+    if (code[build + 1].opcode != Opcode.MOVE_RESULT_OBJECT || (code[build + 1] as OneRegisterInstruction).registerA != list) return null
+    if ((build + 2 until site).any { code[it].markWrites(list) || code[it] is OffsetInstruction }) return null
+    val edges = markEdges() ?: return null
+    if (edges.any { (_, to) -> to in build + 1..site }) return null
+    val types = parameterTypes.map { it.toString() }
+    fun words(of: List<String>) = of.sumOf { if (it == "J" || it == "D") 2 else 1 }
+    fun param(type: String) = types.indices.singleOrNull { types[it] == type }?.let { i -> parameterRegister(words(types.take(i))) }
+    val session = param(FB_USER_SESSION) ?: return null
+    val thread = param(THREAD_KEY_TYPE) ?: return null
+    val mig = param(MIG_SCHEME) ?: return null
+    if (code.any { insn -> insn.markWrites(session) || insn.markWrites(thread) || insn.markWrites(mig) }) return null
+    val locals = implementation!!.registerCount - words(types)
+    val scratch = (0 until minOf(16, locals)).filter { it != list }.take(3)
+    if (list > 15 || scratch.size < 3) return null
+    return MarkReadFactory(site, list, session, thread, mig, scratch)
 }
 
 /** Reads the recipe from the one builder that names the QR scanner plugin and reads it from the socket, or null. */
@@ -269,31 +314,69 @@ internal fun resolveMarkReadRecipe(classes: Iterable<ClassDef>): MarkReadRecipe?
         }) return null
     val site = bar.markReadSite(list, pluginRead.registerB, socketType) ?: return null
     if (!bar.markReadCapMatches()) return null
+    val tag = tagField ?: return null
+    // The chat details button's builder: the bar's one call that takes the chat colors last and returns a button.
+    val detailsRef = c.mapNotNull { insn ->
+        (insn.markRef() as? MethodReference)?.takeIf { insn.opcode == Opcode.INVOKE_VIRTUAL && it.returnType == specType && it.params().lastOrNull() == MIG_SCHEME }
+    }.map { it.toString() }.distinct().singleOrNull() ?: return null
+    val details = byType[detailsRef.substringBefore("->")]?.methods?.singleOrNull { it.hookId() == detailsRef } ?: return null
+    // It tags the button settings_button, which is how the extension finds the details button in either bar.
+    val dc = details.markCode()
+    if (dc.indices.none { k ->
+            val put = dc[k] as? TwoRegisterInstruction
+            dc[k].opcode == Opcode.IPUT_OBJECT && (dc[k].markRef() as? FieldReference)?.id() == tag &&
+                (k - 1 downTo 0).firstOrNull { dc[it].markWrites(put!!.registerA) }?.let { (dc[it].markRef() as? StringReference)?.string } == MARK_READ_DETAILS_TAG
+        }) return null
+    // The newer bar is the one other method that makes the details button.
+    val titleBar = classes.flatMap { it.methods }.filter { m -> m.hookId() != bar.hookId() && m.markCode().any { it.markRef()?.toString() == detailsRef } }
+        .singleOrNull() ?: return null
+    val titleBarSite = titleBar.markReadFactorySite() ?: return null
+    // Its list goes back through ImmutableList.copyOf, since the bar casts what the factory returns.
+    if (byType[IMMUTABLE_LIST]?.methods?.none { it.hookId() == LIST_COPY && AccessFlags.STATIC.isSet(it.accessFlags) && AccessFlags.PUBLIC.isSet(it.accessFlags) } != false) return null
     return MarkReadRecipe(bar, click, socketType, session, thread, scheme, mig ?: return null, builder, builderScheme ?: return null,
-        tagField ?: return null, listenerField ?: return null, iconSource, iconProvider!!, setter, icon, listenerType,
-        listenerCase ?: return null, target, specType, site, list, pluginRead.registerB)
+        tag, listenerField ?: return null, iconSource, iconProvider!!, setter, icon, listenerType,
+        listenerCase ?: return null, target, specType, site, list, pluginRead.registerB, titleBar, titleBarSite)
 }
 
 internal fun findMarkReadButton(classes: Iterable<ClassDef>): Pair<List<Method>, List<Method>> {
     markReadRecipe = resolveMarkReadRecipe(classes)
-    return markReadRecipe?.let { listOf(it.bar) to listOf(it.click) } ?: (emptyList<Method>() to emptyList())
+    return markReadRecipe?.let { listOf(it.bar, it.factory) to listOf(it.click) } ?: (emptyList<Method>() to emptyList())
 }
 
 private fun markReadRequire(condition: Boolean, detail: String) {
     if (!condition) throw PatchException("Messenger controls: the chat top bar changed ($detail)")
 }
 
+/** Checks either top bar method against the recipe: the older plugin bar's list walk or the newer factory's return. */
 internal fun MutableMethod.validateMarkReadBar(): MarkReadRecipe {
     val recipe = markReadRecipe
-    markReadRequire(recipe != null && recipe.bar.hookId() == hookId(), "no button recipe")
-    markReadRequire(markReadSite(recipe!!.list, recipe.socket, recipe.socketType) == recipe.site, "list walk")
+    markReadRequire(recipe != null && (recipe.bar.hookId() == hookId() || recipe.factory.hookId() == hookId()), "no button recipe")
+    if (recipe!!.factory.hookId() == hookId()) {
+        markReadRequire(markReadFactorySite() == recipe.factorySite, "button list return")
+        return recipe
+    }
+    markReadRequire(markReadSite(recipe.list, recipe.socket, recipe.socketType) == recipe.site, "list walk")
     markReadRequire(markReadCapMatches(), "button limit")
     return recipe
 }
 
 internal fun MutableMethod.injectMarkReadBar() {
     val recipe = validateMarkReadBar()
-    addInstructions(recipe.site, "invoke-static {v${recipe.list}, v${recipe.socket}}, $MARK_READ_ADD")
+    if (recipe.factory.hookId() != hookId()) {
+        addInstructions(recipe.site, "invoke-static {v${recipe.list}, v${recipe.socket}}, $MARK_READ_ADD")
+        return
+    }
+    val f = recipe.factorySite
+    val (a, b, c) = f.scratch
+    addInstructions(f.site, """
+        move-object/from16 v$a, v${f.session}
+        move-object/from16 v$b, v${f.thread}
+        move-object/from16 v$c, v${f.mig}
+        invoke-static {v${f.list}, v$a, v$b, v$c}, $MARK_READ_ADD_TO
+        move-result-object v${f.list}
+        invoke-static {v${f.list}}, $LIST_COPY
+        move-result-object v${f.list}
+    """.trimIndent())
 }
 
 internal fun MutableMethod.validateMarkReadClick(): MarkReadRecipe {
@@ -318,36 +401,57 @@ internal fun MutableMethod.injectMarkReadClick() {
     """.trimIndent(), ExternalLabel("stock_click", getInstruction(0)))
 }
 
-/** The extension's build stub as shipped: static, returning null. */
-internal fun MutableMethod.validateMarkReadStub() {
+/** One of the extension's two builder stubs as shipped: static, not private, returning null. */
+internal fun MutableMethod.validateMarkReadStub(id: String) {
     val code = markCode()
-    if (hookId() != MARK_READ_BUILD || !AccessFlags.STATIC.isSet(accessFlags) || AccessFlags.PRIVATE.isSet(accessFlags) ||
+    if (hookId() != id || !AccessFlags.STATIC.isSet(accessFlags) || AccessFlags.PRIVATE.isSet(accessFlags) ||
         code.map { it.opcode } != listOf(Opcode.CONST_4, Opcode.RETURN_OBJECT) || (code[0] as? NarrowLiteralInstruction)?.narrowLiteral != 0 ||
         implementation!!.tryBlocks.isNotEmpty())
         throw PatchException("Messenger controls: the Mark as read button's extension stub changed")
 }
 
-/**
- * The build stub's replacement: the QR scanner block with the chat's tag as the listener's Object, Messenger's Mark as
- * read icon, the extension's label and test tag. Null whenever the socket isn't the bar's or a value it needs is missing.
- */
-internal fun markReadBuilder(stub: MutableMethod, recipe: MarkReadRecipe): MutableMethod {
-    stub.validateMarkReadStub()
-    val built = MutableMethod(ImmutableMethod(stub.definingClass, stub.name, stub.parameters, stub.returnType, stub.accessFlags,
-        stub.annotations, stub.hiddenApiRestrictions, ImmutableMethodImplementation(7, emptyList(), emptyList(), emptyList())))
+private fun MutableMethod.emptyCopy(registers: Int) = MutableMethod(ImmutableMethod(definingClass, name, parameters, returnType, accessFlags,
+    annotations, hiddenApiRestrictions, ImmutableMethodImplementation(registers, emptyList(), emptyList(), emptyList())))
+
+/** The build(socket) stub's replacement for the older bar: reads the chat, account and colors from the socket for button(). */
+internal fun markReadSocketBuilder(stub: MutableMethod, recipe: MarkReadRecipe): MutableMethod {
+    stub.validateMarkReadStub(MARK_READ_BUILD)
+    val built = stub.emptyCopy(4)
     built.addInstructionsWithLabels(0, """
         instance-of v0, p0, ${recipe.socketType}
         if-eqz v0, :none
         check-cast p0, ${recipe.socketType}
         iget-object v0, p0, ${recipe.session}
         iget-object v1, p0, ${recipe.thread}
-        invoke-static {v0, v1}, $MARK_READ_TAG
+        iget-object v2, p0, ${recipe.scheme}
+        if-eqz v2, :none
+        iget-object v2, v2, ${recipe.mig}
+        invoke-static {v0, v1, v2}, $MARK_READ_BUTTON_BUILD
+        move-result-object v0
+        return-object v0
+        :none
+        const/4 v0, 0x0
+        return-object v0
+    """.trimIndent())
+    return built
+}
+
+/**
+ * The button(session, thread, mig) stub's replacement: the QR scanner block with the chat's tag as the listener's
+ * Object, Messenger's Mark as read icon, the extension's label and test tag. Null whenever the chat isn't known yet or
+ * the colors aren't Messenger's color scheme.
+ */
+internal fun markReadBuilder(stub: MutableMethod, recipe: MarkReadRecipe): MutableMethod {
+    stub.validateMarkReadStub(MARK_READ_BUTTON_BUILD)
+    val built = stub.emptyCopy(7)
+    built.addInstructionsWithLabels(0, """
+        invoke-static {p0, p1}, $MARK_READ_TAG
         move-result-object v1
         if-eqz v1, :none
-        iget-object v0, p0, ${recipe.scheme}
+        instance-of v0, p2, $MIG_SCHEME
         if-eqz v0, :none
-        iget-object v0, v0, ${recipe.mig}
-        if-eqz v0, :none
+        move-object v0, p2
+        check-cast v0, $MIG_SCHEME
         invoke-static {}, $MARK_READ_LABEL
         move-result-object v2
         new-instance v3, ${recipe.builder}
