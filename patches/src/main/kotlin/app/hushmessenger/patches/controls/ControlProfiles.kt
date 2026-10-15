@@ -183,6 +183,7 @@ internal val BASE_PROFILE = ControlProfile(
             "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;",
         ),
         "stories" to setOf("LX/1wW;->A00()Z"),
+        "story_hold" to setOf("LX/NZx;->CMi()V"),
         "subtabs" to setOf("LX/2HF;->run()V"),
         "suggested_replies" to setOf("LX/7Pd;->A06(LX/7Pd;)Z", "LX/7Qb;->A05(LX/7Qb;)Z", "LX/HV8;->A03()Z"),
         "system_camera" to setOf(
@@ -372,6 +373,7 @@ internal val PROFILE_346611351 = ControlProfile(
             "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;",
         ),
         "stories" to setOf("LX/1wW;->A00()Z"),
+        "story_hold" to setOf("LX/NaE;->CMY()V"),
         "subtabs" to setOf("LX/2HF;->run()V"),
         "suggested_replies" to setOf("LX/7MZ;->A06(LX/7MZ;)Z", "LX/7NX;->A05(LX/7NX;)Z", "LX/HRY;->A03()Z"),
         "system_camera" to setOf(

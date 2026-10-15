@@ -179,6 +179,7 @@ public class CompatReport {
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide People tab", List.of("tab_people"));
         PATCHES.put("Hide Notifications tab", List.of("tab_notifications"));
+        PATCHES.put("Hold stories at the end", List.of("story_hold"));
         PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
         PATCHES.put("Hide avatar stickers", List.of("avatar_stickers", "avatar_tabs"));
         PATCHES.put("Restore old emoji drawer", List.of("emoji_drawer"));
@@ -3539,6 +3540,64 @@ public class CompatReport {
         return readers;
     }
 
+    static final String STORY_FINISHED = "story_playback_finished";
+    static final String MONTAGE_VIEWER = "Lcom/facebook/messaging/montage/viewer/MontageViewerFragment;";
+
+    /**
+     * story_hold: the app's only story_playback_finished logger, a public instance ()V whose one hand-off is an
+     * invoke-virtual or invoke-interface {callback, this} of a (page)V method, right after an if-eqz on the callback and
+     * right before return-void, with nothing jumping straight to it and a local other than the callback to spare. The
+     * callback has to call a static (MontageViewerFragment, Integer)V on the viewer. Mirrors StoryHold.kt.
+     */
+    static List<Method> storyHold(List<ClassDef> classes) {
+        var loggers = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) if (literals(method).contains(STORY_FINISHED)) loggers.add(method);
+        if (loggers.size() != 1) return List.of();
+        var completion = loggers.get(0);
+        int flags = completion.getAccessFlags();
+        if (!AccessFlags.PUBLIC.isSet(flags) || AccessFlags.STATIC.isSet(flags) || !completion.getParameterTypes().isEmpty() ||
+            !"V".equals(completion.getReturnType()) || completion.getImplementation() == null) return List.of();
+        var code = instructions(completion);
+        int page = completion.getImplementation().getRegisterCount() - 1;
+        var hands = new ArrayList<Integer>();
+        for (int i = 1; i + 1 < code.size(); i++) {
+            if (!(code.get(i) instanceof FiveRegisterInstruction call) || !(code.get(i) instanceof ReferenceInstruction ri) ||
+                !(ri.getReference() instanceof MethodReference target)) continue;
+            var op = call.getOpcode();
+            if ((op == Opcode.INVOKE_VIRTUAL || op == Opcode.INVOKE_INTERFACE) && call.getRegisterCount() == 2 && call.getRegisterD() == page &&
+                target.getParameterTypes().size() == 1 && "V".equals(target.getReturnType()) && code.get(i + 1).getOpcode() == Opcode.RETURN_VOID &&
+                code.get(i - 1).getOpcode() == Opcode.IF_EQZ && ((OneRegisterInstruction) code.get(i - 1)).getRegisterA() == call.getRegisterC())
+                hands.add(i);
+        }
+        if (hands.size() != 1 || mediaTargets(completion).contains(hands.get(0))) return List.of();
+        var call = (FiveRegisterInstruction) code.get(hands.get(0));
+        boolean spare = false;
+        for (int r = 0; r < page; r++) if (r != call.getRegisterC()) { spare = true; break; }
+        if (!spare) return List.of();
+        var target = (MethodReference) ((ReferenceInstruction) call).getReference();
+        var targetParams = target.getParameterTypes().stream().map(Object::toString).toList();
+        for (var cls : classes) {
+            if (!cls.getType().equals(target.getDefiningClass())) continue;
+            Method callback = null;
+            int matches = 0;
+            for (var method : cls.getMethods()) {
+                if (method.getName().equals(target.getName()) && params(method).equals(targetParams) && method.getReturnType().equals(target.getReturnType())) {
+                    callback = method;
+                    matches++;
+                }
+            }
+            if (matches != 1) return List.of();
+            for (var i : instructions(callback)) {
+                if (i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction cr && cr.getReference() instanceof MethodReference viewer &&
+                    MONTAGE_VIEWER.equals(viewer.getDefiningClass()) && "V".equals(viewer.getReturnType()) &&
+                    viewer.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(MONTAGE_VIEWER, "Ljava/lang/Integer;")))
+                    return List.of(completion);
+            }
+            return List.of();
+        }
+        return List.of();
+    }
+
     static final String PHONE_ID_PROVIDER = ".provider.phoneid";
     static final String GET_PHONE_ID = "com.facebook.GET_PHONE_ID";
     static final String INSTALLED_PACKAGES = "Landroid/content/pm/PackageManager;->getInstalledPackages(I)Ljava/util/List;";
@@ -4002,6 +4061,7 @@ public class CompatReport {
         found.get("nearby_scans").addAll(nearbyScans(classes));
         found.get("wifi_identity").addAll(wifiIdentityReads(classes));
         found.get("phone_id_sync").addAll(phoneIdSync(classes));
+        found.get("story_hold").addAll(storyHold(classes));
         var markRead = markReadButton(classes);
         if (!markRead.isEmpty()) {
             found.get("mark_read_bar").add(markRead.get(0));

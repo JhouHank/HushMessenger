@@ -10,6 +10,10 @@
 - [#59](https://github.com/SysAdminDoc/HushMessenger/issues/59) New **Stop app list and device ID sharing** switch under Privacy. Messenger goes through your installed apps looking for other Meta apps like Facebook and Instagram, then asks them for the device ID Meta uses to link its apps on one phone. With this on it gets an empty app list and skips the asking, so it keeps the ID it already has. It's experimental and starts off.
 - [#62](https://github.com/SysAdminDoc/HushMessenger/issues/62) New **Mark as read button** switch under Privacy, for people who use **Hide read receipts**. It puts Messenger's own Mark as read icon in a chat's top bar. Opening the chat still sends nothing. When you want the other person to see Seen, tap the icon and the chat turns read on your phone too. If the bar is already full, the icon takes the chat details button's spot, since tapping the chat's name opens that page anyway, so the call buttons stay where they are. It's experimental and starts off.
 
+### New
+
+- New **Hold stories at the end** switch under Navigation. When a story finishes, it stays on screen instead of jumping to the next one, so you move on with a tap or a swipe. It works the same for photos and videos, and after the last story the viewer stays open until you close it. It's experimental and starts off.
+
 ### Changed and fixed
 
 - Morphe Manager lists every change of the release your Messenger was patched with, not only a short summary. For that one release Manager shows the patch source's description instead of the changelog, and the description was a single paragraph while older releases listed their changes. It now carries the release's changelog groups after the summary. You'll see it from the next release on.

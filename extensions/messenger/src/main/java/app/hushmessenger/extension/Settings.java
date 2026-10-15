@@ -355,6 +355,12 @@ public final class Settings {
      */
     public static boolean stopPhoneIdSync() { return enabled("phone_id_sync"); }
 
+    /**
+     * Asked when a story card ends on its own, from its timer, its video or a failed load, just before Messenger moves to
+     * the next card. True keeps the card on screen. Taps and swipes never ask.
+     */
+    public static boolean holdStoryAtEnd() { return enabled("story_hold"); }
+
     /** What Android tells an app that can't see the phone's location about the Wi-Fi network it's on. */
     static final String HIDDEN_WIFI_NAME = "<unknown ssid>";
     static final String HIDDEN_WIFI_BSSID = "02:00:00:00:00:00";

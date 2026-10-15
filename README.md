@@ -103,6 +103,7 @@ The screenshots below show the settings in the current release, in the dark and 
 | Use the phone's camera app | A chat's camera button opens your own camera app. Photos only. |
 | Open web links externally | Opens http and https links in your default browser. |
 | Slide chats in and out | Slides a chat in from the side when you open it and back out when you leave. |
+| Hold stories at the end | A story stays on screen when it ends, photo or video, until you tap or swipe to the next one. The last one stays open until you close it. Experimental. |
 | Turn off the swipe up for disappearing messages | Swiping up at the bottom of a chat no longer turns on disappearing messages. |
 | Allow chat bubbles | **Stock**, **Chat Heads** or **Native Bubbles** (Android 11 and newer). See [Chat heads and bubbles](#chat-heads-and-bubbles). |
 | Unlock app icons | Every icon in Messenger's App icon setting becomes selectable without a subscription. |

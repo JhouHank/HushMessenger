@@ -158,6 +158,7 @@ hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/Ephe
 hook screenshot_viewers Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;->onResume()V
 hook screenshot_viewers Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;->onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;
 hook stories LX/1wW;->A00()Z
+hook story_hold LX/NZx;->CMi()V
 hook subtabs LX/2HF;->run()V
 hook suggested_replies LX/7Pd;->A06(LX/7Pd;)Z
 hook suggested_replies LX/7Qb;->A05(LX/7Qb;)Z
