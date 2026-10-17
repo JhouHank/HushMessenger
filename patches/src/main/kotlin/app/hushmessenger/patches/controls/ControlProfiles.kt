@@ -191,6 +191,7 @@ internal val BASE_PROFILE = ControlProfile(
         "system_camera" to setOf(
             "LX/0FR;->A01(Landroid/content/Context;Landroid/net/Uri;)Landroid/content/res/AssetFileDescriptor;",
             "LX/153;->A00(Landroid/content/Context;Landroid/net/Uri;)Ljava/lang/Boolean;",
+            "LX/5g7;->A01(Lcom/facebook/xapp/messaging/composer/camera/event/ActivateCameraEvent;LX/5WP;LX/6iB;)V",
             "LX/5nw;->A00(Landroid/content/Context;Landroid/os/Bundle;Landroidx/fragment/app/Fragment;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/Cer;)LX/6iB;",
             "LX/5ws;->C0d(Landroid/os/Bundle;)Z",
             "LX/7GX;->DhA(Lcom/facebook/messaging/montage/composer/model/MontageComposerFragmentParams;Lcom/facebook/messaging/send/trigger/NavigationTrigger;)V",
@@ -383,6 +384,7 @@ internal val PROFILE_346611351 = ControlProfile(
         "system_camera" to setOf(
             "LX/0FR;->A01(Landroid/content/Context;Landroid/net/Uri;)Landroid/content/res/AssetFileDescriptor;",
             "LX/153;->A00(Landroid/content/Context;Landroid/net/Uri;)Ljava/lang/Boolean;",
+            "LX/5dL;->A01(Lcom/facebook/xapp/messaging/composer/camera/event/ActivateCameraEvent;LX/5Td;LX/6f7;)V",
             "LX/5lA;->A00(Landroid/content/Context;Landroid/os/Bundle;Landroidx/fragment/app/Fragment;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;LX/CaZ;)LX/6f7;",
             "LX/5u6;->C0W(Landroid/os/Bundle;)Z",
             "LX/7DT;->Dgz(Lcom/facebook/messaging/montage/composer/model/MontageComposerFragmentParams;Lcom/facebook/messaging/send/trigger/NavigationTrigger;)V",

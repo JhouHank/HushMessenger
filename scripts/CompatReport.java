@@ -2654,6 +2654,7 @@ public class CompatReport {
     static List<Method> systemCameraLaunches(List<ClassDef> classes) {
         var launches = new ArrayList<Method>();
         var factories = new ArrayList<Method>();
+        var captures = new ArrayList<Method>();
         var starts = new ArrayList<Method>();
         var checks = new ArrayList<Method>();
         int readers = 0;
@@ -2681,12 +2682,15 @@ public class CompatReport {
             if ("V".equals(m.getReturnType()) && params.equals(List.of(MONTAGE_PARAMS, NAVIGATION_TRIGGER)) &&
                 !AccessFlags.STATIC.isSet(m.getAccessFlags()) && buildsIntent && hasLiteral(m, 7377)) launches.add(m);
             if (isChatCameraFactory(m)) factories.add(m);
+            if (AccessFlags.STATIC.isSet(m.getAccessFlags()) && "V".equals(m.getReturnType()) && params.size() == 3 &&
+                "Lcom/facebook/xapp/messaging/composer/camera/event/ActivateCameraEvent;".equals(params.get(0))) captures.add(m);
             if (isLauncherStart(m)) starts.add(m);
             if (isThirdPartyUriCheck(m) || isInternalFileOpen(m)) checks.add(m);
         }
         if (readers != 1) return List.of();
         if (!readsChatCamera) return launches;
         launches.addAll(factories);
+        launches.addAll(captures);
         var launcher = factories.size() == 1 ? chatCameraLauncherType(factories.get(0)) : null;
         for (var m : starts) if (m.getDefiningClass().equals(launcher)) launches.add(m);
         launches.addAll(checks);
