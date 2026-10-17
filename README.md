@@ -115,7 +115,7 @@ The screenshots below show the settings in the current release, in the dark and 
 ### Patches without a switch
 
 - **Install beside Meta apps** renames Messenger's two shared Meta permissions so a patched Messenger installs next to a stock or patched Facebook. If you patch [Hushfacebook](https://github.com/SysAdminDoc/Hushfacebook) too, sign both with the same key.
-- **Restore screens on re-signed builds** answers Messenger's check of its own certificate with Meta's, so a re-signed build opens to your chats instead of a blank screen.
+- **Restore screens on re-signed builds** answers Messenger's check of its own certificate with Meta's, so a re-signed build opens to your chats instead of a blank screen. It also opens Threads links and Instagram video links in a Threads or Instagram you patched yourself. Messenger only hands those to apps signed by Meta and does nothing otherwise, so now the link goes to the app the normal way, or to your browser if the app can't take it.
 - **Clone install under another package name** installs a second Messenger beside the first, as `com.facebook.orca.hush` and **Messenger Clone** unless you change them. Push notifications may not reach the copy, and Root Mount can't use it.
 - **Spoof package version** gives Messenger a very high version code (2147483647 unless you pick another) so the Play Store stops offering updates. Keep it selected with the same number when you patch a later build, since Android won't install a lower code over a higher one.
 - **Custom new-message sound** plays a sound file you pick when you patch (.ogg, .mp3, .m4a or .wav, 1 MB or less) in place of Messenger's new-message sound.
