@@ -30,7 +30,7 @@ Every switch starts off, so a freshly patched Messenger behaves like stock until
 
 ## Install
 
-1. **Get the APK.** HushMessenger patches arm64 Messenger 583.0.0.29.95 only. Download one from [APKMirror's 583.0.0.29.95 page](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/) and check its version code against the [supported builds](#supported-messenger-builds). A 32-bit build shares the version name and won't work.
+1. **Get the APK.** HushMessenger patches arm64 Messenger 583.0.0.29.95 only. Download one from [APKMirror's 583.0.0.29.95 page](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). Every arm64 build there is one of the [supported builds](#supported-messenger-builds). A 32-bit build shares the version name and won't work.
 2. **Add the source.** Open the link above on your phone with Morphe Manager (1.34.0 or newer) installed. Or in Manager open **Sources**, tap **+**, choose **Remote** and enter `github.com/SysAdminDoc/HushMessenger`. The card should show **57 patches**. If it shows an older version, tap its refresh button.
 3. **Patch Messenger.** The default selection includes every switch. Three patches start unselected because they change the app package itself: **Clone install under another package name**, **Spoof package version** and **Custom new-message sound**. To add one, turn on **Settings → Advanced → Expert mode** in Manager and use **Choose patches**.
 4. **Keep one source.** Don't add the remote source and a local copy together, and don't mix in Messenger patches from other sources.
@@ -152,19 +152,27 @@ With **Hide read receipts** on, a chat you open stays unread on your phone, beca
 | --- | --- |
 | Package | `com.facebook.orca` |
 | Version | `583.0.0.29.95` |
-| Version codes | `346611351`, `346611369`, `346611423`, `346611438`, `346611439`, `346611440` |
+| Version codes | `346611350`, `346611351`, `346611353`, `346611369`, `346611386`, `346611418`, `346611420`, `346611422`, `346611423`, `346611435`, `346611436`, `346611438`, `346611439`, `346611440` |
 | Architecture | `arm64-v8a` |
 | Minimum Android version | Android 9 (API 28) |
 | APKMirror downloads | [All variants of 583.0.0.29.95](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). Every arm64 one works. |
 
-All five arm64 builds APKMirror lists for 583.0.0.29.95 work, and so does build 346611440, which isn't on APKMirror. The patch checks the version code before it changes anything and stops on a build that isn't listed. Older Messenger versions aren't supported by current bundles. v0.23.0 still takes 582.0.0.61.92.
+All 13 arm64 builds APKMirror lists for 583.0.0.29.95 work, the nodpi ones Morphe Manager's download button opens included, and so does build 346611440, which isn't on APKMirror. The patch checks the version code before it changes anything and stops on a build that isn't listed. Older Messenger versions aren't supported by current bundles. v0.23.0 still takes 582.0.0.61.92.
 
 SHA-256 of the stock APKs the checks ran against:
 
 ```text
+346611350  10fbf15046ec8087c99b45f1bbbc0d836d932077d68b0e5747a4327c0a8ead8e
 346611351  675856b8762abf8e4a7f1bc41228e2baa5464e276cd1fef7ac5ce822c7fbfba5
+346611353  f8cad3acfe2d56efeabced57cadbdac5cea5836c56dc43c412c6f470aa913c25
 346611369  8f22f198e7e5fc69b6e0fd416b25e43924c9cdb9a25585fd84080c41f2b0656d
+346611386  e0f4a2969107768022039cdb960045f6d2e110d818c69249b21b002cc6a5ba4d
+346611418  0d45dbea76f5b425047575634c21b50297684dbf596e9fc7cf9690584abd20a1
+346611420  7b27042e9d4d2b2d68d5fa68af8adb43a713c9c812ca6b1506574729cd2cbb28
+346611422  fce6bd8d19e2a41c52573b135502e6c350bff36f2ee194083a6e0ce0b1990e88
 346611423  4986bcb22182d0d17d6814a0aaa30a3333d462d9ce61f000064e125d20a8c796
+346611435  23205233ff75ef682204b5dcaca9a290d832509b0f731a569ef00923e42afbdc
+346611436  833e46c02f4e10b2d5978cec4e599a68ca286b16411dde0b351961a5383acfaa
 346611438  fda7b7e9818aca3183d4c27097be8d350aeeb8f5efe0f8e07e1a8eca7ac75fd3
 346611439  6150df6d26e0beb6653dc69b4ae9ccde63e713eccd23e6a2a055cc3728019771
 346611440  cbb1b91799aba7a39afbd34f3daf3d325d1c715c8f41110cb95c44c45c7283bd
