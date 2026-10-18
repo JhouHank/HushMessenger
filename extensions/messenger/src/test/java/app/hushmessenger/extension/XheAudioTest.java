@@ -50,6 +50,12 @@ public class XheAudioTest {
     @After public void restoreLimits() {
         XheAudio.limits = new XheAudio.Limits();
         assertEquals("every conversion slot is given back", XheAudio.SLOTS, XheAudio.WORKERS.availablePermits());
+        assertEquals("every claim on the disk and the cache is given back", 0, XheAudio.claimed());
+    }
+
+    /** A conversion's budget of [ms], watching the disk this test writes to with no reserve. */
+    private XheAudio.Work budget(long ms) {
+        return new XheAudio.Work(ms, folder.getRoot(), 0);
     }
 
     private static ByteBuffer config(int... bytes) {
@@ -372,11 +378,19 @@ public class XheAudioTest {
 
     /** Has the platform read [file] as one picture, [xhe] xHE-AAC sound tracks and [plain] AAC-LC ones. */
     private static void readAs(File file, int xhe, int plain) {
+        readAs(file, xhe, plain, -1);
+    }
+
+    /** [readAs] with every track lasting [us] microseconds, or saying nothing of it when [us] is below zero. */
+    private static void readAs(File file, int xhe, int plain, long us) {
         DataSource source = DataSource.toDataSource(file.getPath());
-        ShadowMediaExtractor.addTrack(source, MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 320, 240), new byte[16]);
+        MediaFormat picture = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 320, 240);
+        if (us >= 0) picture.setLong(MediaFormat.KEY_DURATION, us);
+        ShadowMediaExtractor.addTrack(source, picture, new byte[16]);
         for (int i = 0; i < xhe + plain; i++) {
             MediaFormat sound = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48_000, 2);
             sound.setByteBuffer("csd-0", i < xhe ? config(0xF9, 0x40) : config(0x12, 0x10));
+            if (us >= 0) sound.setLong(MediaFormat.KEY_DURATION, us);
             ShadowMediaExtractor.addTrack(source, sound, new byte[16]);
         }
     }
@@ -465,7 +479,7 @@ public class XheAudioTest {
     }
 
     @Test public void aConversionStopsWhereverItsTimeRunsOut() throws Exception {
-        XheAudio.Work work = new XheAudio.Work(1_000);
+        XheAudio.Work work = budget(1_000);
         work.check();
         ShadowSystemClock.advanceBy(Duration.ofMillis(999));
         work.check();
@@ -480,7 +494,7 @@ public class XheAudioTest {
         expectOutOfTime(() -> XheAudio.reencode(video, folder.newFile("late.out.mp4"), work));
         expectOutOfTime(() -> XheAudio.join(video, sound, folder.newFile("late.joined.mp4"), work));
         File joined = folder.newFile("on-time.joined.mp4");
-        XheAudio.join(video, sound, joined, new XheAudio.Work(1_000));
+        XheAudio.join(video, sound, joined, budget(1_000));
         assertTrue("with time left the join runs to the end", joined.length() > 0);
     }
 
@@ -620,7 +634,7 @@ public class XheAudioTest {
         };
         File out = folder.newFile("endless.source");
         try {
-            XheAudio.copyAndName(endless, out, limits, new XheAudio.Work(limits.workMs));
+            XheAudio.copyAndName(endless, out, limits, budget(limits.workMs));
             fail("the copy has no end");
         } catch (XheAudio.OverBudget expected) {
             assertTrue(out.length() + " bytes", out.length() <= limits.inputBytes);
@@ -634,7 +648,7 @@ public class XheAudioTest {
             @Override public int read(byte[] b, int off, int len) { return 0; }
         };
         try {
-            XheAudio.copyAndName(silent, folder.newFile("silent.source"), limits, new XheAudio.Work(limits.workMs));
+            XheAudio.copyAndName(silent, folder.newFile("silent.source"), limits, budget(limits.workMs));
             fail("the copy never ends");
         } catch (XheAudio.OverBudget wrong) {
             fail("a stalled provider is a failure, not a limit: " + wrong.getMessage());
@@ -719,7 +733,7 @@ public class XheAudioTest {
         Thread copy = new Thread(() -> {
             Thread.currentThread().interrupt();
             try {
-                XheAudio.copyAndName(new ByteArrayInputStream(bytes), out, XheAudio.limits, new XheAudio.Work(XheAudio.limits.workMs));
+                XheAudio.copyAndName(new ByteArrayInputStream(bytes), out, XheAudio.limits, budget(XheAudio.limits.workMs));
                 answer[0] = "copied";
             } catch (InterruptedIOException expected) {
                 answer[0] = "stopped";
@@ -762,6 +776,95 @@ public class XheAudioTest {
         assertArrayEquals(renamed(bytes), sentBytes(sent));
         onlyFinishedCopies(2);
         assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
+    @Test public void twoConversionsAtOnceNeverCountTheSameRoom() throws Exception {
+        File cache = pickedCache();
+        assertTrue(cache.isDirectory() || cache.mkdirs());
+        long now = System.currentTimeMillis();
+        long need = 1L << 30;
+        XheAudio.Limits limits = new XheAudio.Limits();
+        // Free space for one conversion and a half above the reserve, and a cache share that holds plenty.
+        limits.reserveBytes = cache.getUsableSpace() - need - need / 2;
+        limits.cacheBytes = Long.MAX_VALUE / 4;
+        XheAudio.makeRoom(cache, need, now, limits);
+        try {
+            XheAudio.makeRoom(cache, need, now, limits);
+            fail("the second conversion counted the first one's room");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("the phone is nearly full", expected.getMessage());
+        }
+        try {
+            XheAudio.claimDisk(cache, need, limits);
+            fail("a shared video's conversion counted it too");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("the phone is nearly full", expected.getMessage());
+        }
+        XheAudio.unclaim(need, true);
+        XheAudio.claimDisk(cache, need, limits);
+        XheAudio.unclaim(need, false);
+
+        // The cache's share is held the same way.
+        limits.reserveBytes = Long.MIN_VALUE / 4;
+        limits.cacheBytes = need + need / 2;
+        XheAudio.makeRoom(cache, need, now, limits);
+        try {
+            XheAudio.makeRoom(cache, need, now, limits);
+            fail("the second conversion counted the first one's share of the cache");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("the converted copies fill their share of the cache", expected.getMessage());
+        }
+        XheAudio.unclaim(need, true);
+    }
+
+    @Test public void aConversionStopsOnceTheDiskReachesItsReserve() throws Exception {
+        XheAudio.Work roomy = new XheAudio.Work(60_000, folder.getRoot(), 0);
+        for (int i = 0; i < 3 * XheAudio.ROOM_ROUNDS; i++) roomy.check();
+        XheAudio.Work full = new XheAudio.Work(60_000, folder.getRoot(), Long.MAX_VALUE);
+        try {
+            full.check();
+            fail("the disk is below its reserve");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("the phone is nearly full", expected.getMessage());
+        }
+        File out = folder.newFile("full.source");
+        try {
+            XheAudio.copyAndName(new ByteArrayInputStream(samsungRecording()), out, XheAudio.limits,
+                new XheAudio.Work(60_000, folder.getRoot(), Long.MAX_VALUE));
+            fail("the copy went on below the reserve");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("nothing was written", 0, out.length());
+        }
+    }
+
+    @Test public void aCopyHandedOutAgainIsntClearedForRoom() throws Exception {
+        File cache = pickedCache();
+        assertTrue(cache.isDirectory() || cache.mkdirs());
+        File done = new File(cache, finishedName('d'));
+        Files.write(done.toPath(), new byte[64]);
+        assertTrue(done.setLastModified(System.currentTimeMillis() - XheAudio.ACTIVE_MS - 60_000));
+        assertTrue(XheAudio.reuse(done));
+        XheAudio.Limits limits = new XheAudio.Limits();
+        limits.cacheBytes = 64;
+        try {
+            XheAudio.makeRoom(cache, 1, System.currentTimeMillis(), limits);
+            fail("the only copy is in use, so there's no room");
+        } catch (XheAudio.OverBudget expected) {
+            assertTrue("the send reading it keeps it", done.exists());
+        }
+        assertFalse("a copy that's gone isn't handed out", XheAudio.reuse(new File(cache, finishedName('e'))));
+    }
+
+    @Test public void aConversionCountsItsNewSoundAsWellAsTheVideo() throws Exception {
+        File timed = folder.newFile("VID_timed.mp4");
+        File untimed = folder.newFile("VID_untimed.mp4");
+        Files.write(timed.toPath(), new byte[1000]);
+        Files.write(untimed.toPath(), new byte[1000]);
+        readAs(timed, 1, 0, 10_000_000);
+        readAsXhe(untimed, 1);
+        long secondOfSound = XheAudio.BIT_RATE / 8;
+        assertEquals("a joined copy, and eleven seconds of sound twice", 1000 + 2 * 11 * secondOfSound, XheAudio.converting(timed));
+        assertEquals("a second of sound when the track doesn't say", 1000 + 2 * secondOfSound, XheAudio.converting(untimed));
     }
 
     @Test public void theSwitchSitsUnderConversationsAndStartsOff() {

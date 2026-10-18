@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -106,6 +105,18 @@ public final class XheAudio {
     /** A converted copy sent or reused this recently may still be read by its send, so it's never cleared for room. */
     static final long ACTIVE_MS = 60L * 60 * 1000;
 
+    /** Guards the cache's files and the room conversions have claimed, so two at once never count the same space. */
+    private static final Object ROOM = new Object();
+
+    /** Bytes the conversions running now may still write, held against the disk's reserve. */
+    private static long claimedDisk;
+
+    /** The part of {@link #claimedDisk} headed for the picked-video cache, held against {@link Limits#cacheBytes}. */
+    private static long claimedCache;
+
+    /** How many rounds of a conversion pass between looks at the disk's free space. */
+    static final int ROOM_ROUNDS = 16;
+
     /**
      * What one conversion may take on. Past any of these the video goes to Messenger as it is, which isn't a hook
      * failure. Tests swap in smaller ones.
@@ -134,20 +145,28 @@ public final class XheAudio {
 
     /**
      * One conversion's time, checked between reads and between codec rounds and once more before its copy is kept,
-     * so work that ran too long or was cancelled never puts a copy in place later. A read that the platform or a
-     * provider blocks in can't be stopped from here: it holds its slot until it returns, and other sends go ahead
-     * without a conversion once {@link Limits#slotWaitMs} is up.
+     * so work that ran too long or was cancelled never puts a copy in place later. Every {@link #ROOM_ROUNDS} rounds
+     * it also looks at the free space where the conversion writes, so conversions writing at once, or anything else
+     * filling the phone, stop it at the reserve. A read that the platform or a provider blocks in can't be stopped
+     * from here: it holds its slot until it returns, and other sends go ahead without a conversion once
+     * {@link Limits#slotWaitMs} is up.
      */
     static final class Work {
         final long deadline;
+        private final File folder;
+        private final long reserveBytes;
+        private int rounds;
 
-        Work(long budgetMs) {
+        Work(long budgetMs, File folder, long reserveBytes) {
             deadline = SystemClock.elapsedRealtime() + budgetMs;
+            this.folder = folder;
+            this.reserveBytes = reserveBytes;
         }
 
         void check() throws IOException {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("the conversion was cancelled");
             if (SystemClock.elapsedRealtime() >= deadline) throw new OverBudget("the conversion ran out of time");
+            if (rounds++ % ROOM_ROUNDS == 0 && folder.getUsableSpace() < reserveBytes) throw new OverBudget("the phone is nearly full");
         }
     }
 
@@ -224,16 +243,16 @@ public final class XheAudio {
         if (!wanted) return null;
         Limits limits = XheAudio.limits;
         if (isFile && input.length() > limits.inputBytes) throw new OverBudget("the picked video is bigger than a conversion takes");
+        File folder = new File(context.getCacheDir(), PICKED);
         takeSlot();
         try {
-            return convertPicked(context, uri, input, limits, new Work(limits.workMs));
+            return convertPicked(context, uri, input, folder, limits, new Work(limits.workMs, folder, limits.reserveBytes));
         } finally {
             WORKERS.release();
         }
     }
 
-    private static File convertPicked(Context context, Uri uri, File input, Limits limits, Work work) throws IOException {
-        File folder = new File(context.getCacheDir(), PICKED);
+    private static File convertPicked(Context context, Uri uri, File input, File folder, Limits limits, Work work) throws IOException {
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("the cache has no room for the converted video");
         long now = System.currentTimeMillis();
         prune(folder, now);
@@ -241,6 +260,7 @@ public final class XheAudio {
         File copied = File.createTempFile(SCRATCH, ".source", folder);
         File sound = null;
         File joined = null;
+        long claimed = 0;
         try {
             String name;
             try (InputStream in = input != null ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri)) {
@@ -248,15 +268,14 @@ public final class XheAudio {
                 name = copyAndName(in, copied, limits, work);
             }
             File done = new File(folder, name + ".mp4");
-            if (done.length() > 0) {
-                done.setLastModified(now);
-                return done;
-            }
+            if (reuse(done)) return done;
             boolean xhe = needsFix(copied);
             // The video changed after the first look, and what was copied needs nothing.
             if (!xhe && !hasSamsungBox(copied)) return null;
-            // A conversion writes a second copy beside the first; a renamed Samsung box only moves the first.
-            makeRoom(folder, xhe ? copied.length() : 0, now, limits);
+            // A conversion writes beside the copy; a renamed Samsung box only moves it.
+            long need = xhe ? converting(copied) : 0;
+            makeRoom(folder, need, now, limits);
+            claimed = need;
             if (xhe) {
                 sound = File.createTempFile(SCRATCH, ".sound.mp4", folder);
                 joined = File.createTempFile(SCRATCH, ".joined.mp4", folder);
@@ -276,13 +295,14 @@ public final class XheAudio {
             copied.delete();
             if (sound != null) sound.delete();
             if (joined != null) joined.delete();
+            unclaim(claimed, true);
         }
     }
 
     /**
      * Copies [in] to [out] and answers the name its converted copy is kept under: the SHA-256 of {@link #CONVERSION}
-     * and every byte copied, in hex. Stops past {@link Limits#inputBytes}, when the disk gets down to its reserve,
-     * when [work] runs out, and when the stream keeps answering with nothing.
+     * and every byte copied, in hex. Stops past {@link Limits#inputBytes}, when [work] runs out or finds the disk at
+     * its reserve, and when the stream keeps answering with nothing.
      */
     static String copyAndName(InputStream in, File out, Limits limits, Work work) throws IOException {
         MessageDigest digest;
@@ -295,7 +315,6 @@ public final class XheAudio {
         try (OutputStream to = new FileOutputStream(out)) {
             byte[] buffer = new byte[1 << 16];
             long copied = 0;
-            long roomCheckAt = 0;
             int empty = 0;
             for (int read; (read = in.read(buffer)) != -1; ) {
                 work.check();
@@ -306,10 +325,6 @@ public final class XheAudio {
                 empty = 0;
                 copied += read;
                 if (copied > limits.inputBytes) throw new OverBudget("the picked video is bigger than a conversion takes");
-                if (copied >= roomCheckAt) {
-                    if (out.getUsableSpace() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
-                    roomCheckAt = copied + (16 << 20);
-                }
                 to.write(buffer, 0, read);
                 digest.update(buffer, 0, read);
             }
@@ -325,8 +340,20 @@ public final class XheAudio {
      * a reader never sees half of one.
      */
     static File publish(File made, File done) throws IOException {
-        if (done.length() > 0 || made.renameTo(done) || done.length() > 0) return done;
+        if (reuse(done) || made.renameTo(done) || reuse(done)) return done;
         throw new IOException("the converted video could not be kept");
+    }
+
+    /**
+     * Whether [done] is a finished copy to hand out. It's marked used now, under the lock clearing takes too, so no
+     * other conversion clears it for room while this send reads it.
+     */
+    static boolean reuse(File done) {
+        synchronized (ROOM) {
+            if (done.length() <= 0) return false;
+            done.setLastModified(System.currentTimeMillis());
+            return done.isFile();
+        }
     }
 
     /**
@@ -334,12 +361,14 @@ public final class XheAudio {
      * conversion's time, which a conversion that's still running can't have left.
      */
     static void prune(File folder, long now) {
-        File[] old = folder.listFiles();
-        if (old == null) return;
-        long scratch = 2 * limits.workMs;
-        for (File file : old) {
-            long age = now - file.lastModified();
-            if (age > KEEP_MS || (file.getName().startsWith(SCRATCH) && age > scratch)) file.delete();
+        synchronized (ROOM) {
+            File[] old = folder.listFiles();
+            if (old == null) return;
+            long scratch = 2 * limits.workMs;
+            for (File file : old) {
+                long age = now - file.lastModified();
+                if (age > KEEP_MS || (file.getName().startsWith(SCRATCH) && age > scratch)) file.delete();
+            }
         }
     }
 
@@ -351,22 +380,67 @@ public final class XheAudio {
     /**
      * Makes room in [folder] for [need] more bytes inside {@link Limits#cacheBytes} by clearing the oldest finished
      * copies that no send has used in {@link #ACTIVE_MS}, and throws when that isn't enough or the disk would drop
-     * below its reserve. Copies a send may still be reading, and other conversions' files, are never cleared.
+     * below its reserve. Copies a send may still be reading, and other conversions' files, are never cleared. The room
+     * stays claimed against both until {@link #unclaim}, so a conversion starting meanwhile counts it as taken.
      */
     static void makeRoom(File folder, long need, long now, Limits limits) throws IOException {
-        if (folder.getUsableSpace() - need < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
-        File[] files = folder.listFiles();
-        if (files == null) throw new IOException("the converted copies could not be listed");
-        long used = 0;
-        for (File file : files) used += file.length();
-        Arrays.sort(files, Comparator.comparingLong(File::lastModified));
-        for (File file : files) {
-            if (used + need <= limits.cacheBytes) return;
-            if (!finished(file.getName()) || now - file.lastModified() < ACTIVE_MS) continue;
-            long size = file.length();
-            if (file.delete()) used -= size;
+        synchronized (ROOM) {
+            if (folder.getUsableSpace() - claimedDisk - need < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+            File[] files = folder.listFiles();
+            if (files == null) throw new IOException("the converted copies could not be listed");
+            // What another conversion has written so far counts on disk and again in its claim, which errs toward room.
+            long used = claimedCache;
+            // Each file's time is read once: one still being written changes, and a sort on changing keys can throw.
+            List<long[]> clearable = new ArrayList<>();
+            for (int i = 0; i < files.length; i++) {
+                used += files[i].length();
+                long modified = files[i].lastModified();
+                if (finished(files[i].getName()) && now - modified >= ACTIVE_MS) clearable.add(new long[] {modified, i});
+            }
+            clearable.sort(Comparator.comparingLong(entry -> entry[0]));
+            for (long[] entry : clearable) {
+                if (used + need <= limits.cacheBytes) break;
+                File file = files[(int) entry[1]];
+                long size = file.length();
+                if (file.delete()) used -= size;
+            }
+            if (used + need > limits.cacheBytes) throw new OverBudget("the converted copies fill their share of the cache");
+            claimedDisk += need;
+            claimedCache += need;
         }
-        if (used + need > limits.cacheBytes) throw new OverBudget("the converted copies fill their share of the cache");
+    }
+
+    /** Holds [need] bytes against the disk's reserve in [folder] until {@link #unclaim}, or throws when they don't fit. */
+    static void claimDisk(File folder, long need, Limits limits) throws IOException {
+        synchronized (ROOM) {
+            if (folder.getUsableSpace() - claimedDisk - need < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+            claimedDisk += need;
+        }
+    }
+
+    /** Gives back the [need] bytes {@link #makeRoom} ([cached]) or {@link #claimDisk} held for one conversion. */
+    static void unclaim(long need, boolean cached) {
+        synchronized (ROOM) {
+            claimedDisk -= need;
+            if (cached) claimedCache -= need;
+        }
+    }
+
+    /** What the conversions running now have claimed, nothing once all of them are done. */
+    static long claimed() {
+        synchronized (ROOM) {
+            return claimedDisk + claimedCache;
+        }
+    }
+
+    /**
+     * The most converting [video] writes beside it: a joined copy the size of the video, and the new sound twice, on
+     * its own and inside that copy. The sound's length comes from its track, or counts as a second when it gives none.
+     */
+    static long converting(File video) {
+        Tracks tracks = Tracks.of(source -> source.setDataSource(video.getPath()));
+        long seconds = (tracks == null ? 0 : Math.max(0, tracks.soundUs)) / 1_000_000 + 1;
+        return video.length() + 2 * seconds * BIT_RATE / 8;
     }
 
     /**
@@ -384,12 +458,15 @@ public final class XheAudio {
         Limits limits = XheAudio.limits;
         if (file.length() > limits.inputBytes) throw new OverBudget("the shared video is bigger than a conversion takes");
         File folder = file.getAbsoluteFile().getParentFile();
-        if (folder.getUsableSpace() - file.length() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+        long need = converting(file);
         takeSlot();
         File sound = null;
         File joined = null;
+        long claimed = 0;
         try {
-            Work work = new Work(limits.workMs);
+            claimDisk(folder, need, limits);
+            claimed = need;
+            Work work = new Work(limits.workMs, folder, limits.reserveBytes);
             sound = File.createTempFile(file.getName() + ".hush-", ".sound.mp4", folder);
             joined = File.createTempFile(file.getName() + ".hush-", ".joined.mp4", folder);
             reencode(file, sound, work);
@@ -402,6 +479,7 @@ public final class XheAudio {
             WORKERS.release();
             if (sound != null) sound.delete();
             if (joined != null) joined.delete();
+            unclaim(claimed, false);
         }
     }
 
@@ -439,11 +517,15 @@ public final class XheAudio {
             && out.sounds == in.sounds && out.sounds > 0 && out.xhe == 0;
     }
 
-    /** How many picture and sound tracks a video holds, and how many of the sounds are xHE-AAC. */
+    /**
+     * How many picture and sound tracks a video holds, how many of the sounds are xHE-AAC, and how long the longest
+     * sound lasts in microseconds, -1 when no sound track says.
+     */
     static final class Tracks {
         int pictures;
         int sounds;
         int xhe;
+        long soundUs = -1;
 
         /** The tracks of what [opener] opens, or null when the platform can't read it. */
         static Tracks of(Opener opener) {
@@ -462,6 +544,7 @@ public final class XheAudio {
                     if (mime.startsWith("video/")) tracks.pictures++;
                     if (!mime.startsWith("audio/")) continue;
                     tracks.sounds++;
+                    if (format.containsKey(MediaFormat.KEY_DURATION)) tracks.soundUs = Math.max(tracks.soundUs, format.getLong(MediaFormat.KEY_DURATION));
                     if (MediaFormat.MIMETYPE_AUDIO_AAC.equalsIgnoreCase(mime) && objectType(format.getByteBuffer("csd-0")) == XHE_OBJECT_TYPE) {
                         tracks.xhe++;
                     }
