@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
@@ -458,6 +459,7 @@ public class XheAudioTest {
         assertTrue("an original that doesn't say can't be compared", XheAudio.repaired(cut, untimed));
         assertTrue("a long video gets a hundredth of its length", XheAudio.lasts(99_100_000, 100_000_000));
         assertFalse(XheAudio.lasts(98_900_000, 100_000_000));
+        assertTrue("an original that says it lasts nothing isn't compared", XheAudio.lasts(-1, 0));
     }
 
     @Test public void aRecordingThatEndsInsideABoxIsSentAsItIs() throws Exception {
@@ -481,6 +483,26 @@ public class XheAudioTest {
         File notMp4 = folder.newFile("VID_not.mp4");
         Files.write(notMp4.toPath(), join(box("mdat", new byte[16]), box("sefd", new byte[8])));
         assertFalse(XheAudio.whole(notMp4));
+        assertFalse("an empty file holds no boxes", XheAudio.whole(folder.newFile("VID_empty.mp4")));
+    }
+
+    @Test public void aSendCancelledDuringTheBoxWalkIsACancel() throws Exception {
+        File recording = folder.newFile("VID_cancel.mp4");
+        Files.write(recording.toPath(), samsungRecording());
+        Throwable[] thrown = new Throwable[1];
+        boolean[] answer = new boolean[1];
+        Thread send = new Thread(() -> {
+            Thread.currentThread().interrupt();
+            try {
+                answer[0] = XheAudio.whole(recording);
+            } catch (Throwable error) {
+                thrown[0] = error;
+            }
+        });
+        send.start();
+        send.join(10_000);
+        assertFalse(send.isAlive());
+        assertTrue("answered " + answer[0] + ", threw " + thrown[0], thrown[0] instanceof ClosedByInterruptException);
     }
 
     @Test public void aVideoWithTwoXheSoundsIsLeftForMessenger() throws Exception {

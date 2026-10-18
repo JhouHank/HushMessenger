@@ -645,12 +645,15 @@ public final class XheAudio {
 
     /**
      * Whether [file] is an MP4 whose top-level boxes reach exactly to its end. A copy cut off partway ends inside its
-     * last box, so it isn't, and neither is a file that can't be read or doesn't open with {@code ftyp}.
+     * last box, so it isn't, and neither is a file that can't be read or doesn't open with {@code ftyp}. A send
+     * cancelled during the walk comes back as the cancel, not as a cut file.
      */
-    static boolean whole(File file) {
+    static boolean whole(File file) throws ClosedByInterruptException {
         try (FileInputStream in = new FileInputStream(file)) {
             FileChannel channel = in.getChannel();
             return walk(channel, new ArrayList<>()) == channel.size();
+        } catch (ClosedByInterruptException cancelled) {
+            throw cancelled;
         } catch (IOException unreadable) {
             return false;
         }
@@ -658,10 +661,11 @@ public final class XheAudio {
 
     /**
      * Walks [channel]'s top-level boxes, adding where each Samsung box starts to [found], and answers how far the boxes
-     * that fit reach: -1 when the first isn't {@code ftyp}, the end once {@link #MOST_BOXES} were read.
+     * that fit reach: -1 when it doesn't open with {@code ftyp}, the end once {@link #MOST_BOXES} were read.
      */
     private static long walk(FileChannel channel, List<Long> found) throws IOException {
         long end = channel.size();
+        if (end < 8) return -1;
         ByteBuffer header = ByteBuffer.allocate(16);
         long at = 0;
         for (int count = 0; end - at >= 8; count++) {
