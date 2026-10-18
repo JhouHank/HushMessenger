@@ -73,6 +73,7 @@ public class OriginalPhotoTest {
         OriginalPhoto.completion = Runnable::run;
         OriginalPhoto.inputOpener = java.io.FileInputStream::new;
         OriginalPhoto.freeMemory = () -> Long.MAX_VALUE;
+        OriginalPhoto.decoder = BitmapFactory::decodeFile;
         OriginalPhoto.tempDir = folder.getRoot().toPath().resolve("copies").toFile();
         assertTrue(OriginalPhoto.tempDir.mkdirs());
         ShadowLog.clear();
@@ -101,6 +102,7 @@ public class OriginalPhotoTest {
         OriginalPhoto.tempDir = null;
         OriginalPhoto.inputOpener = java.io.FileInputStream::new;
         OriginalPhoto.freeMemory = OriginalPhoto::freeMemory;
+        OriginalPhoto.decoder = BitmapFactory::decodeFile;
     }
 
     private static byte[] encode(int width, int height, ColorSpace space) {
@@ -801,6 +803,35 @@ public class OriginalPhotoTest {
         OriginalPhoto.freeMemory = () -> 4200L * 300 * 4 * 2 - 1;
         assertEquals(4096, OriginalPhoto.decodeWidth(photo.getPath(), 4096, 4096), 0);
         assertEquals(4200, OriginalPhoto.decodeFile(photo.getPath()).getWidth());
+    }
+
+    @Test public void aDecodeThatRunsOutOfMemoryTriesAgainAtHalfTheSizeUntilOneSixtyFourth() throws Exception {
+        File photo = jpeg(4200, 300);
+        switchOn();
+        List<Integer> samples = new ArrayList<>();
+        OriginalPhoto.decoder = (path, options) -> {
+            samples.add(options.inSampleSize);
+            if (samples.size() < 3) throw new OutOfMemoryError("test");
+            return BitmapFactory.decodeFile(path, options);
+        };
+        assertEquals(4200, OriginalPhoto.decodeWidth(photo.getPath(), 4096, 4096), 0);
+        assertEquals(4200, OriginalPhoto.decodeHeight(photo.getPath(), 4200, 4096), 0);
+        Bitmap smaller = OriginalPhoto.decodeFile(photo.getPath());
+        assertEquals(Arrays.asList(1, 2, 4), samples);
+        assertEquals("two misses, then a quarter", 1050, smaller.getWidth());
+        assertEquals(75, smaller.getHeight());
+        assertTrue(Settings.hookErrors.isEmpty());
+
+        samples.clear();
+        OriginalPhoto.decoder = (path, options) -> {
+            samples.add(options.inSampleSize);
+            throw new OutOfMemoryError("test");
+        };
+        assertEquals(4200, OriginalPhoto.decodeWidth(photo.getPath(), 4096, 4096), 0);
+        assertNull("past 1/64 it fails the way a decode fails", OriginalPhoto.decodeFile(photo.getPath()));
+        assertEquals(Arrays.asList(1, 2, 4, 8, 16, 32, OriginalPhoto.MAX_SAMPLE), samples);
+        assertTrue(Settings.hookErrors.containsKey(OriginalPhoto.KEY));
+        for (String line : logs()) assertFalse(line, line.contains(photo.getName()));
     }
 
     @Test public void aPhotoItCantReadKeepsMessengersDecodeAndLogsNoPath() throws Exception {

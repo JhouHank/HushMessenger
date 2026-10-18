@@ -50,6 +50,9 @@ public final class OriginalPhoto {
     static final String NATIVE_TRANSCODER = "ENABLE_UIT_TRANSCODING";
     /** The bitmap memory one decode may use right now. */
     static LongSupplier freeMemory = OriginalPhoto::freeMemory;
+    interface Decoder { Bitmap decode(String path, BitmapFactory.Options options); }
+    /** decodeFile's pixel decode, the step that can run out of memory. */
+    static Decoder decoder = BitmapFactory::decodeFile;
     /** What this thread's decodeBitmap call asked for, from its entry to its one decodeFile. */
     private static final ThreadLocal<Decode> DECODE = new ThreadLocal<>();
     /** Completes async sends off the calling thread, the way Messenger's own transcoder does. */
@@ -352,7 +355,7 @@ public final class OriginalPhoto {
         }
         while (true) {
             try {
-                return BitmapFactory.decodeFile(path, options);
+                return decoder.decode(path, options);
             } catch (OutOfMemoryError error) {
                 if (options.inSampleSize >= MAX_SAMPLE) {
                     Settings.hookFailedPrivately(KEY, "Original photo ran out of memory on a photo", error);
