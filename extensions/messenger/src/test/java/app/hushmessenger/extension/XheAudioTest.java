@@ -373,6 +373,61 @@ public class XheAudioTest {
         readAs(file, sounds, 0);
     }
 
+    @Test public void onlyAVideoWhoseOneSoundIsXheIsConverted() throws Exception {
+        File one = folder.newFile("one.mp4");
+        File two = folder.newFile("two.mp4");
+        File mixed = folder.newFile("mixed.mp4");
+        readAsXhe(one, 1);
+        readAsXhe(two, 2);
+        readAs(mixed, 1, 1);
+        assertTrue(XheAudio.needsFix(one));
+        assertFalse("the repair writes one sound, so the second would be lost", XheAudio.needsFix(two));
+        assertFalse(XheAudio.needsFix(mixed));
+    }
+
+    @Test public void aConversionMissingASoundTrackIsntWhole() throws Exception {
+        File one = folder.newFile("one.mp4");
+        File two = folder.newFile("two.mp4");
+        File madeOne = folder.newFile("made-one.mp4");
+        File madeTwo = folder.newFile("made-two.mp4");
+        File stillXhe = folder.newFile("still-xhe.mp4");
+        readAsXhe(one, 1);
+        readAsXhe(two, 2);
+        readAs(madeOne, 0, 1);
+        readAs(madeTwo, 0, 2);
+        readAsXhe(stillXhe, 1);
+        assertTrue(XheAudio.repaired(madeOne, one));
+        assertFalse("one sound out of two isn't a repair", XheAudio.repaired(madeOne, two));
+        assertTrue(XheAudio.repaired(madeTwo, two));
+        assertFalse(XheAudio.repaired(madeTwo, one));
+        assertFalse(XheAudio.repaired(stillXhe, one));
+    }
+
+    @Test public void aVideoWithTwoXheSoundsIsLeftForMessenger() throws Exception {
+        File picked = folder.newFile("VID_two_sounds.mp4");
+        byte[] bytes = "two sounds".getBytes(StandardCharsets.US_ASCII);
+        Files.write(picked.toPath(), bytes);
+        readAsXhe(picked, 2);
+        File copy = folder.newFile("orca_share_media44.mp4");
+        Files.write(copy.toPath(), bytes);
+        readAsXhe(copy, 2);
+        File tagged = folder.newFile("orca_share_media45.mp4");
+        byte[] recording = samsungRecording();
+        Files.write(tagged.toPath(), recording);
+        readAsXhe(tagged, 2);
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+
+        assertEquals(picked.getPath(), fromTranscoder(picked.getPath()));
+        fromCopyThread(copy);
+        fromCopyThread(tagged);
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        assertArrayEquals(bytes, Files.readAllBytes(picked.toPath()));
+        assertArrayEquals(bytes, Files.readAllBytes(copy.toPath()));
+        assertArrayEquals("the Samsung box is still renamed, which keeps every track", renamed(recording), Files.readAllBytes(tagged.toPath()));
+        File cache = new File(RuntimeEnvironment.getApplication().getCacheDir(), XheAudio.PICKED);
+        assertFalse("nothing was converted", cache.exists());
+    }
+
     @Test public void aSamsungRecordingWhoseSoundCantBeConvertedKeepsItsCopyAsItWas() throws Exception {
         File copy = folder.newFile("orca_share_media43.mp4");
         byte[] bytes = samsungRecording();

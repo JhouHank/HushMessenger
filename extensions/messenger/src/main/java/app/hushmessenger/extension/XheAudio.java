@@ -257,8 +257,9 @@ public final class XheAudio {
     }
 
     /**
-     * Whether [file] has a picture, at least one sound track, and only xHE-AAC sound. A copy the platform can't parse
-     * is none of those, so it stays as it is without counting as a hook failure.
+     * Whether [file] has a picture and one sound track, in xHE-AAC. A video with more sound tracks stays Messenger's to
+     * handle, since the repair writes only one. A copy the platform can't parse is none of those, so it stays as it is
+     * without counting as a hook failure.
      */
     static boolean needsFix(File file) {
         return needsFix(source -> source.setDataSource(file.getPath()));
@@ -275,17 +276,18 @@ public final class XheAudio {
 
     private static boolean needsFix(Opener opener) {
         Tracks tracks = Tracks.of(opener);
-        return tracks != null && tracks.pictures > 0 && tracks.sounds > 0 && tracks.xhe == tracks.sounds;
+        return tracks != null && tracks.pictures > 0 && tracks.sounds == 1 && tracks.xhe == 1;
     }
 
     /**
-     * Whether the converted [made] is whole: every picture track [from] has, its sound, and no xHE-AAC left. A muxer
+     * Whether the converted [made] is whole: every picture and sound track [from] has, and no xHE-AAC left. A muxer
      * that stopped early, or a file the platform can't parse, isn't.
      */
     static boolean repaired(File made, File from) {
         Tracks out = Tracks.of(source -> source.setDataSource(made.getPath()));
         Tracks in = Tracks.of(source -> source.setDataSource(from.getPath()));
-        return out != null && in != null && out.pictures == in.pictures && out.pictures > 0 && out.sounds == 1 && out.xhe == 0;
+        return out != null && in != null && out.pictures == in.pictures && out.pictures > 0
+            && out.sounds == in.sounds && out.sounds > 0 && out.xhe == 0;
     }
 
     /** How many picture and sound tracks a video holds, and how many of the sounds are xHE-AAC. */

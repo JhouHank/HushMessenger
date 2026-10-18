@@ -27,6 +27,7 @@
 - The README's help for a source that shows an old version pointed at v0.23.0. It points at the latest release now, so it can't fall behind again.
 - **Fix videos that won't send** ties the converted copy of a video you pick in a chat to that exact video. Two videos with the same size and date could end up sharing one copy, and a video edited under the same name could send the version from before the edit. Each conversion also works in files of its own now, so two sends at once can't get in each other's way.
 - When **Fix videos that won't send** can't convert a shared video's sound, the copy Messenger sends is left exactly as it was. A Samsung recording used to lose its tag before the conversion started, so a conversion that failed partway still changed the file.
+- A video with more than one xHE-AAC sound track, like a film with two languages, is now left for Messenger to handle as it is. **Fix videos that won't send** keeps only one sound track when it converts, so it used to drop the others.
 
 ## 0.24.0 (2026-10-14)
 
