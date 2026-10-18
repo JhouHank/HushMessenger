@@ -83,6 +83,12 @@ public final class XheAudio {
     /** Room for one picture sample while joining; a larger one throws and the copy stays as it was. */
     static final int SAMPLE_BYTES = 8 << 20;
 
+    /**
+     * How much shorter than its original a converted track may come out, for the encoder's start-up delay and the last
+     * block's rounding. A long video gets a hundredth of its length instead when that's more.
+     */
+    static final long SLACK_US = 500_000;
+
     /** The cache folder that holds converted copies of videos picked in a chat until Messenger has sent them. */
     static final String PICKED = "hush-xhe";
 
@@ -284,6 +290,8 @@ public final class XheAudio {
                 join(copied, sound, joined, work);
                 if (!repaired(joined, copied)) throw new IOException("the converted video came out incomplete");
             } else {
+                // Nothing here reads the picture, so a copy that came in cut short would go out that way.
+                if (!whole(copied)) throw new IOException("the picked video came in cut short");
                 long size = copied.length();
                 dropSamsungBoxes(copied);
                 if (copied.length() != size || hasSamsungBox(copied)) throw new IOException("the renamed video came out wrong");
@@ -507,24 +515,32 @@ public final class XheAudio {
     }
 
     /**
-     * Whether the converted [made] is whole: every picture and sound track [from] has, and no xHE-AAC left. A muxer
-     * that stopped early, or a file the platform can't parse, isn't.
+     * Whether the converted [made] is whole: every picture and sound track [from] has, each as long as the one it came
+     * from, and no xHE-AAC left. A join or re-encode that stopped early, a copy whose length it doesn't say when
+     * [from]'s does, and a file the platform can't parse aren't.
      */
     static boolean repaired(File made, File from) {
         Tracks out = Tracks.of(source -> source.setDataSource(made.getPath()));
         Tracks in = Tracks.of(source -> source.setDataSource(from.getPath()));
         return out != null && in != null && out.pictures == in.pictures && out.pictures > 0
-            && out.sounds == in.sounds && out.sounds > 0 && out.xhe == 0;
+            && out.sounds == in.sounds && out.sounds > 0 && out.xhe == 0
+            && lasts(out.pictureUs, in.pictureUs) && lasts(out.soundUs, in.soundUs);
+    }
+
+    /** Whether a track lasting [made] microseconds is all of one lasting [from], within {@link #SLACK_US}. */
+    static boolean lasts(long made, long from) {
+        return from <= 0 || made >= from - Math.max(SLACK_US, from / 100);
     }
 
     /**
      * How many picture and sound tracks a video holds, how many of the sounds are xHE-AAC, and how long the longest
-     * sound lasts in microseconds, -1 when no sound track says.
+     * picture and sound last in microseconds, -1 when no track of that kind says.
      */
     static final class Tracks {
         int pictures;
         int sounds;
         int xhe;
+        long pictureUs = -1;
         long soundUs = -1;
 
         /** The tracks of what [opener] opens, or null when the platform can't read it. */
@@ -541,10 +557,14 @@ public final class XheAudio {
                     MediaFormat format = source.getTrackFormat(i);
                     String mime = format.getString(MediaFormat.KEY_MIME);
                     if (mime == null) continue;
-                    if (mime.startsWith("video/")) tracks.pictures++;
+                    long us = format.containsKey(MediaFormat.KEY_DURATION) ? format.getLong(MediaFormat.KEY_DURATION) : -1;
+                    if (mime.startsWith("video/")) {
+                        tracks.pictures++;
+                        tracks.pictureUs = Math.max(tracks.pictureUs, us);
+                    }
                     if (!mime.startsWith("audio/")) continue;
                     tracks.sounds++;
-                    if (format.containsKey(MediaFormat.KEY_DURATION)) tracks.soundUs = Math.max(tracks.soundUs, format.getLong(MediaFormat.KEY_DURATION));
+                    tracks.soundUs = Math.max(tracks.soundUs, us);
                     if (MediaFormat.MIMETYPE_AUDIO_AAC.equalsIgnoreCase(mime) && objectType(format.getByteBuffer("csd-0")) == XHE_OBJECT_TYPE) {
                         tracks.xhe++;
                     }
@@ -599,18 +619,41 @@ public final class XheAudio {
      */
     static List<Long> samsungBoxes(FileChannel channel) throws IOException {
         List<Long> found = new ArrayList<>();
+        walk(channel, found);
+        return found;
+    }
+
+    /**
+     * Whether [file] is an MP4 whose top-level boxes reach exactly to its end. A copy cut off partway ends inside its
+     * last box, so it isn't, and neither is a file that can't be read or doesn't open with {@code ftyp}.
+     */
+    static boolean whole(File file) {
+        try (FileInputStream in = new FileInputStream(file)) {
+            FileChannel channel = in.getChannel();
+            return walk(channel, new ArrayList<>()) == channel.size();
+        } catch (IOException unreadable) {
+            return false;
+        }
+    }
+
+    /**
+     * Walks [channel]'s top-level boxes, adding where each Samsung box starts to [found], and answers how far the boxes
+     * that fit reach: -1 when the first isn't {@code ftyp}, the end once {@link #MOST_BOXES} were read.
+     */
+    private static long walk(FileChannel channel, List<Long> found) throws IOException {
         long end = channel.size();
         ByteBuffer header = ByteBuffer.allocate(16);
         long at = 0;
-        for (int count = 0; count < MOST_BOXES && end - at >= 8; count++) {
+        for (int count = 0; end - at >= 8; count++) {
+            if (count == MOST_BOXES) return end;
             header.clear();
             if (end - at < 16) header.limit(8);
             while (header.hasRemaining()) {
-                if (channel.read(header, at + header.position()) < 0) return found;
+                if (channel.read(header, at + header.position()) < 0) return at;
             }
             long size = header.getInt(0) & 0xffffffffL;
             int type = header.getInt(4);
-            if (count == 0 && type != FILE_TYPE_BOX) return found;
+            if (count == 0 && type != FILE_TYPE_BOX) return -1;
             if (size == 1) {
                 // A 64-bit size follows the type.
                 if (header.limit() < 16) break;
@@ -625,7 +668,7 @@ public final class XheAudio {
             if (type == SAMSUNG_BOX) found.add(at);
             at += size;
         }
-        return found;
+        return at;
     }
 
     /**

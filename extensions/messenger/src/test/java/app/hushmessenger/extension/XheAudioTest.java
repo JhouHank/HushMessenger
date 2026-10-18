@@ -383,14 +383,19 @@ public class XheAudioTest {
 
     /** [readAs] with every track lasting [us] microseconds, or saying nothing of it when [us] is below zero. */
     private static void readAs(File file, int xhe, int plain, long us) {
+        readAs(file, xhe, plain, us, us);
+    }
+
+    /** [readAs] with the picture lasting [pictureUs] and every sound [soundUs], below zero for a track that doesn't say. */
+    private static void readAs(File file, int xhe, int plain, long pictureUs, long soundUs) {
         DataSource source = DataSource.toDataSource(file.getPath());
         MediaFormat picture = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 320, 240);
-        if (us >= 0) picture.setLong(MediaFormat.KEY_DURATION, us);
+        if (pictureUs >= 0) picture.setLong(MediaFormat.KEY_DURATION, pictureUs);
         ShadowMediaExtractor.addTrack(source, picture, new byte[16]);
         for (int i = 0; i < xhe + plain; i++) {
             MediaFormat sound = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48_000, 2);
             sound.setByteBuffer("csd-0", i < xhe ? config(0xF9, 0x40) : config(0x12, 0x10));
-            if (us >= 0) sound.setLong(MediaFormat.KEY_DURATION, us);
+            if (soundUs >= 0) sound.setLong(MediaFormat.KEY_DURATION, soundUs);
             ShadowMediaExtractor.addTrack(source, sound, new byte[16]);
         }
     }
@@ -427,6 +432,55 @@ public class XheAudioTest {
         assertTrue(XheAudio.repaired(madeTwo, two));
         assertFalse(XheAudio.repaired(madeTwo, one));
         assertFalse(XheAudio.repaired(stillXhe, one));
+    }
+
+    @Test public void aConversionThatComesOutShortIsntWhole() throws Exception {
+        File from = folder.newFile("from.mp4");
+        File whole = folder.newFile("whole.mp4");
+        File close = folder.newFile("close.mp4");
+        File cut = folder.newFile("cut.mp4");
+        File untimed = folder.newFile("untimed.mp4");
+        File shortPicture = folder.newFile("short-picture.mp4");
+        File shortSound = folder.newFile("short-sound.mp4");
+        readAs(from, 1, 0, 10_000_000);
+        readAs(whole, 0, 1, 10_000_000);
+        readAs(close, 0, 1, 9_600_000);
+        readAs(cut, 0, 1, 4_000_000);
+        readAs(untimed, 0, 1);
+        readAs(shortPicture, 0, 1, 4_000_000, 10_000_000);
+        readAs(shortSound, 0, 1, 10_000_000, 4_000_000);
+        assertTrue(XheAudio.repaired(whole, from));
+        assertTrue("the encoder's start-up and last block may trim a little", XheAudio.repaired(close, from));
+        assertFalse("a join that stopped at four seconds", XheAudio.repaired(cut, from));
+        assertFalse("a copy that doesn't say how long it is, when its original does", XheAudio.repaired(untimed, from));
+        assertFalse(XheAudio.repaired(shortPicture, from));
+        assertFalse(XheAudio.repaired(shortSound, from));
+        assertTrue("an original that doesn't say can't be compared", XheAudio.repaired(cut, untimed));
+        assertTrue("a long video gets a hundredth of its length", XheAudio.lasts(99_100_000, 100_000_000));
+        assertFalse(XheAudio.lasts(98_900_000, 100_000_000));
+    }
+
+    @Test public void aRecordingThatEndsInsideABoxIsSentAsItIs() throws Exception {
+        // The picture data says it runs to a megabyte, and the copy stops 64 bytes in.
+        ByteBuffer cut = ByteBuffer.allocate(8 + 64);
+        cut.putInt(1 << 20).put("mdat".getBytes(StandardCharsets.US_ASCII));
+        byte[] bytes = join(FILE_TYPE, box("sefd", new byte[8]), cut.array());
+        String path = pickedRecording("VID_cut.mp4", bytes);
+        File picked = new File(folder.getRoot(), "VID_cut.mp4");
+        assertTrue(XheAudio.hasSamsungBox(picked));
+        assertFalse(XheAudio.whole(picked));
+
+        assertEquals(path, fromTranscoder(path));
+        assertTrue("the failure is recorded", Settings.hookErrorAt(XheAudio.KEY) > 0);
+        assertArrayEquals(bytes, Files.readAllBytes(picked.toPath()));
+        noCopies();
+
+        File recording = folder.newFile("VID_whole.mp4");
+        Files.write(recording.toPath(), samsungRecording());
+        assertTrue(XheAudio.whole(recording));
+        File notMp4 = folder.newFile("VID_not.mp4");
+        Files.write(notMp4.toPath(), join(box("mdat", new byte[16]), box("sefd", new byte[8])));
+        assertFalse(XheAudio.whole(notMp4));
     }
 
     @Test public void aVideoWithTwoXheSoundsIsLeftForMessenger() throws Exception {
