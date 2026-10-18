@@ -97,7 +97,7 @@ The screenshots below show the settings in the current release, in the dark and 
 | Keep unsent messages | Keeps messages on the older unsend routes and marks them "[unsent]". Encrypted chats aren't covered. |
 | Allow screenshots | Lets you screenshot protected photos and media, view-once included, with no screenshot notice to the sender. |
 | Use system emoji | Draws emoji with your phone's own set on Android 12 and newer. |
-| Send photos at original quality | With HD on, a JPEG photo up to 20 MB goes out with its own image data instead of Messenger's re-encoded copy. Location and camera details are stripped, as Messenger does. |
+| Send photos at original quality | With HD on, a JPEG photo up to 20 MB goes out at its full size instead of Messenger's smaller copy. Location and camera details are stripped, as Messenger does. |
 | Send videos without re-encoding | A video up to 25 MB goes out as it is. |
 | Fix videos that won't send | A video whose only sound is xHE-AAC gets that sound converted to regular AAC, and a Samsung screen recording loses the tag Samsung's recorder adds when Messenger's media check rejects it, so neither ends in "Unable to send". Works for videos shared in from another app and ones picked in a chat. |
 | Use the phone's camera app | A chat's camera button opens your own camera app. Photos only. |

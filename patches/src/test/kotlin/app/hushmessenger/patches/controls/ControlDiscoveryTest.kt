@@ -63,7 +63,12 @@ class ControlDiscoveryTest {
                     "allow_screenshot" -> if (id.contains("(Landroid/view/Window;)")) SECURE_WINDOW_BODY else "return-void"
                     "keep_unsent" -> "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"\nreturn-void"
                     "ai_search" -> "const-string v0, \"com.facebook.messaging.search.aiagent.plugins.implementations.SearchAiagentImplementationsKillSwitch\"\nconst/4 v0, 0x1\nreturn v0"
-                    "original_photo" -> if (id.endsWith(")[B")) "const/4 v0, 0x0\nreturn-object v0" else "return-void"
+                    "original_photo" -> when {
+                        id == TRANSCODE_CONFIG -> TRANSCODE_CONFIG_BODY
+                        id == DECODE_BITMAP -> DECODE_BITMAP_BODY
+                        id.endsWith(")[B") -> "const/4 v0, 0x0\nreturn-object v0"
+                        else -> "return-void"
+                    }
                     ORIGINAL_VIDEO -> VIDEO_TRANSCODE_BODY.replaceFirst("\n", "\n$TRANSCODE_SOURCE_PARSE\n")
                     "emoji_typeface" -> "const-string v0, \"FacebookEmojiTypefaceProviderImpl\"\nconst/4 v0, 0x0\nreturn-object v0"
                     "avatar_tabs" -> """
@@ -232,9 +237,9 @@ class ControlDiscoveryTest {
 
     @Test fun photoHooksAreOnlyTheTranscodersOwnEntryPoints() {
         val fixture = completeFixture()
-        assertEquals(setOf(TRANSCODE_IMAGE, TRANSCODE_IMAGE_ASYNC), mirroredControls(fixture).getValue("original_photo").map { it.hookId() }.toSet())
-        // The same entry points on some other class aren't the encrypted-chat photo path.
-        val lookalike = fixtureClass("LX/Fixture;", listOf(TRANSCODE_IMAGE, TRANSCODE_IMAGE_ASYNC).map {
+        assertEquals(ORIGINAL_PHOTO_HOOKS, mirroredControls(fixture).getValue("original_photo").map { it.hookId() }.toSet())
+        // The same methods on some other class aren't the encrypted-chat photo path.
+        val lookalike = fixtureClass("LX/Fixture;", ORIGINAL_PHOTO_HOOKS.map {
             fixtureMethod(it.replace(MEDIA_TRANSCODER, "LX/Fixture;"), "return-void", registers = 22)
         })
         validateControls(mirroredControls(fixture + lookalike), setOf("original_photo"))

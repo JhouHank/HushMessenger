@@ -222,6 +222,8 @@ public class CompatReport {
     }
 
     static final Set<String> ORIGINAL_PHOTO_HOOKS = Set.of(
+        "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->getTranscodeConfig()Ljava/util/Map;",
+        "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->decodeBitmap(Ljava/lang/String;DD)Landroid/graphics/Bitmap;",
         "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImage(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;)[B",
         "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->transcodeImageAsync(Ljava/lang/String;DDLjava/lang/String;Ljava/util/Map;Lcom/facebook/msys/mci/TranscodeImageCompletionCallback;)V");
     static final String ORIGINAL_VIDEO_HOOK = "Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;->A05(" +
@@ -4528,7 +4530,7 @@ public class CompatReport {
                     found.get("ai_search").add(method);
                 }
 
-                // original_photo: the encrypted-chat photo transcoder's two entry points, named the same in every build
+                // original_photo: the encrypted-chat photo transcoder's entry points, its config and its Java decode, named the same in every build
                 if ("Lcom/facebook/msys/mci/transcoder/DefaultMediaTranscoder;".equals(cls.getType()) &&
                     !isStatic && ORIGINAL_PHOTO_HOOKS.contains(hookId(method))) {
                     found.get("original_photo").add(method);

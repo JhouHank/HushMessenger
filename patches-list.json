@@ -2488,7 +2488,7 @@
         },
         {
             "name": "Send photos at original quality",
-            "description": "With HD on, sends a JPEG photo as the original image instead of Messenger's recompressed copy, so it stays sharper. Photos over 20 MB are still compressed. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "With HD on, sends a JPEG photo at its full size instead of Messenger's smaller copy, so it stays sharp. Location is still removed. Photos over 20 MB are still made smaller. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Conversations",
             "dependencies": [
