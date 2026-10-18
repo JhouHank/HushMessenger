@@ -3,6 +3,7 @@ package app.hushmessenger.extension;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 
@@ -14,15 +15,29 @@ import android.net.Uri;
  */
 final class GalleryPicker {
     static final String KEY = "external_gallery";
+    private static final String[] MEDIA = {"image/*", "video/*"};
 
     private GalleryPicker() {}
 
     /** A pick for a photo or a video when some app on the phone answers it, otherwise null. */
     static Intent pickIntent(Context context) {
         if (context == null) return null;
-        Intent pick = new Intent(Intent.ACTION_PICK).setType("image/*")
-            .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"image/*", "video/*"});
-        return pick.resolveActivity(context.getPackageManager()) == null ? null : pick;
+        PackageManager packages = context.getPackageManager();
+        Intent photos = new Intent(Intent.ACTION_PICK).setType("image/*").putExtra(Intent.EXTRA_MIME_TYPES, MEDIA);
+        ResolveInfo opens = packages.resolveActivity(photos, PackageManager.MATCH_DEFAULT_ONLY);
+        if (opens == null || opens.activityInfo == null) return null;
+        // Samsung's Gallery shows only photos for a photo pick and skips the type list, but shows both for any type. Any
+        // type also reaches contact pickers, so it goes only to the one gallery app Android opens without asking.
+        String app = opens.activityInfo.packageName;
+        boolean gallery = false;
+        for (ResolveInfo candidate : packages.queryIntentActivities(photos, PackageManager.MATCH_DEFAULT_ONLY)) {
+            if (candidate.activityInfo != null && app.equals(candidate.activityInfo.packageName)) gallery = true;
+        }
+        if (gallery) {
+            Intent media = new Intent(Intent.ACTION_PICK).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, MEDIA).setPackage(app);
+            if (media.resolveActivity(packages) != null) return media;
+        }
+        return photos;
     }
 
     /** The pick screen when Android knows it under this package's own name and a gallery app answers a pick, otherwise null. */

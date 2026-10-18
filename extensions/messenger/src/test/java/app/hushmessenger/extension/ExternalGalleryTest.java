@@ -41,12 +41,31 @@ public class ExternalGalleryTest {
     }
 
     /** A gallery app that answers a photo pick, as Samsung's Gallery and Google Photos do. */
-    private void installGallery() {
+    private ResolveInfo installGallery() {
         ResolveInfo gallery = new ResolveInfo();
         gallery.activityInfo = new ActivityInfo();
         gallery.activityInfo.packageName = "com.example.gallery";
         gallery.activityInfo.name = "com.example.gallery.Pick";
         shadowOf(app.getPackageManager()).addResolveInfoForIntent(new Intent(Intent.ACTION_PICK).setType("image/*"), gallery);
+        return gallery;
+    }
+
+    @Test public void theGalleryAppAndroidOpensOnItsOwnIsAskedForPhotosAndVideosTogether() {
+        ResolveInfo gallery = installGallery();
+        assertEquals("Without an any-type pick the gallery app gets a photo pick", "image/*", GalleryPicker.pickIntent(app).getType());
+        // Samsung's Gallery shows videos only for an any-type pick. A contacts app answers one too, so it's asked by name.
+        ResolveInfo contacts = new ResolveInfo();
+        contacts.activityInfo = new ActivityInfo();
+        contacts.activityInfo.packageName = "com.example.contacts";
+        contacts.activityInfo.name = "com.example.contacts.Pick";
+        shadowOf(app.getPackageManager()).addResolveInfoForIntent(new Intent(Intent.ACTION_PICK).setType("*/*"), contacts);
+        shadowOf(app.getPackageManager()).addResolveInfoForIntent(
+            new Intent(Intent.ACTION_PICK).setType("*/*").setPackage("com.example.gallery"), gallery);
+        Intent pick = GalleryPicker.pickIntent(app);
+        assertEquals("*/*", pick.getType());
+        assertEquals("com.example.gallery", pick.getPackage());
+        assertNull(pick.getComponent());
+        assertEquals(Arrays.asList("image/*", "video/*"), Arrays.asList(pick.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
     }
 
     /** The chat camera launcher's start: its own extras, then the ones it's handed, on a new intent for its screen. */
