@@ -25,6 +25,7 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -103,6 +104,9 @@ public final class XheAudio {
 
     /** How the files one conversion works in start. Each gets a name of its own, so two conversions never share one. */
     static final String SCRATCH = "pick-";
+
+    /** What goes after a shared copy's name in the files its conversion writes beside it. */
+    static final String BESIDE = ".hush-";
 
     /** How many conversions run at once. A send that finds both busy waits {@link Limits#slotWaitMs}, then goes as is. */
     static final int SLOTS = 2;
@@ -196,7 +200,8 @@ public final class XheAudio {
         try {
             if (file == null || Looper.myLooper() == Looper.getMainLooper() || !Settings.enabled(KEY)) return;
             fix(file);
-        } catch (OverBudget | InterruptedIOException skipped) {
+        } catch (OverBudget | InterruptedIOException | ClosedByInterruptException skipped) {
+            // A file read when Messenger cancels the send ends in ClosedByInterruptException, which isn't a failure.
             android.util.Log.w("HushMessenger", "Left the shared video as it is: " + skipped.getMessage());
         } catch (Throwable error) {
             Settings.hookFailedPrivately(KEY, "Can't convert the shared video's sound", error);
@@ -219,7 +224,7 @@ public final class XheAudio {
             File copy = context == null ? null : convertPicked(context, source);
             if (copy == null) return source;
             return source.startsWith("/") ? copy.getPath() : Uri.fromFile(copy).toString();
-        } catch (OverBudget | InterruptedIOException skipped) {
+        } catch (OverBudget | InterruptedIOException | ClosedByInterruptException skipped) {
             android.util.Log.w("HushMessenger", "Sent the picked video as it is: " + skipped.getMessage());
             return source;
         } catch (Throwable error) {
@@ -463,10 +468,11 @@ public final class XheAudio {
     static boolean fix(File file) throws IOException {
         String name = file.getName().toLowerCase(java.util.Locale.ROOT);
         if (!name.endsWith(".mp4") && !name.endsWith(".m4v")) return false;
-        if (!needsFix(file)) return dropSamsungBoxes(file);
         Limits limits = XheAudio.limits;
-        if (file.length() > limits.inputBytes) throw new OverBudget("the shared video is bigger than a conversion takes");
         File folder = file.getAbsoluteFile().getParentFile();
+        clearLeftovers(folder, System.currentTimeMillis(), limits);
+        if (!needsFix(file)) return dropSamsungBoxes(file);
+        if (file.length() > limits.inputBytes) throw new OverBudget("the shared video is bigger than a conversion takes");
         long need = converting(file);
         takeSlot();
         File sound = null;
@@ -476,8 +482,8 @@ public final class XheAudio {
             claimDisk(folder, need, limits);
             claimed = need;
             Work work = new Work(limits.workMs, folder, limits.reserveBytes);
-            sound = File.createTempFile(file.getName() + ".hush-", ".sound.mp4", folder);
-            joined = File.createTempFile(file.getName() + ".hush-", ".joined.mp4", folder);
+            sound = File.createTempFile(file.getName() + BESIDE, ".sound.mp4", folder);
+            joined = File.createTempFile(file.getName() + BESIDE, ".joined.mp4", folder);
             reencode(file, sound, work);
             join(file, sound, joined, work);
             if (!repaired(joined, file)) throw new IOException("the converted video came out incomplete");
@@ -489,6 +495,19 @@ public final class XheAudio {
             if (sound != null) sound.delete();
             if (joined != null) joined.delete();
             unclaim(claimed, false);
+        }
+    }
+
+    /**
+     * Deletes what a shared video's conversion wrote beside the copies in [folder] when Messenger was closed partway,
+     * once nothing has written to it for twice as long as a conversion may run.
+     */
+    static void clearLeftovers(File folder, long now, Limits limits) {
+        File[] left = folder == null ? null : folder.listFiles((dir, name) ->
+            name.contains(BESIDE) && (name.endsWith(".sound.mp4") || name.endsWith(".joined.mp4")));
+        if (left == null) return;
+        for (File file : left) {
+            if (now - file.lastModified() >= 2 * limits.workMs) file.delete();
         }
     }
 

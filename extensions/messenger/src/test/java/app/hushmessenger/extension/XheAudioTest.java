@@ -661,6 +661,30 @@ public class XheAudioTest {
         assertEquals(Arrays.asList(copy.getName(), working.getName()), Arrays.asList(names));
     }
 
+    @Test public void filesAConversionLeftBesideASharedCopyAreCleared() throws Exception {
+        byte[] plain = "plain".getBytes(StandardCharsets.US_ASCII);
+        File shared = folder.newFile("orca_share_media46.mp4");
+        Files.write(shared.toPath(), plain);
+        long now = System.currentTimeMillis();
+        long abandoned = now - 2 * XheAudio.limits.workMs - 60_000;
+        File sound = new File(folder.getRoot(), "orca_share_media12.mp4" + XheAudio.BESIDE + "1.sound.mp4");
+        File joined = new File(folder.getRoot(), "orca_share_media12.mp4" + XheAudio.BESIDE + "2.joined.mp4");
+        File working = new File(folder.getRoot(), "orca_share_media13.mp4" + XheAudio.BESIDE + "3.joined.mp4");
+        File messengers = new File(folder.getRoot(), "orca_share_media12.mp4");
+        for (File file : new File[] {sound, joined, working, messengers}) Files.write(file.toPath(), new byte[] {1});
+        for (File file : new File[] {sound, joined, messengers}) assertTrue(file.setLastModified(abandoned));
+        assertTrue(working.setLastModified(now - 60_000));
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+
+        fromCopyThread(shared);
+        assertFalse(sound.exists());
+        assertFalse(joined.exists());
+        assertTrue("a conversion still running keeps its files", working.exists());
+        assertTrue("Messenger's own copies are never touched", messengers.exists());
+        assertArrayEquals(plain, Files.readAllBytes(shared.toPath()));
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
     @Test public void aVideoBiggerThanAConversionTakesIsSentAsItIs() throws Exception {
         byte[] bytes = samsungRecording(11);
         String path = pickedRecording("VID_big.mp4", bytes);

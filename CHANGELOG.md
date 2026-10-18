@@ -30,6 +30,7 @@
 - A video with more than one xHE-AAC sound track, like a film with two languages, is now left for Messenger to handle as it is. **Fix videos that won't send** keeps only one sound track when it converts, so it used to drop the others.
 - **Fix videos that won't send** has limits now. A video over 1 GB, a phone with less than 256 MB free, a conversion that runs past 10 minutes or a send you cancel goes out as it is, without a conversion. Two videos convert at a time at most, and the converted copies stay within 3 GB of Messenger's cache, clearing copies no send has used in the last hour when it needs room. Two conversions running together count the space the other one needs and keep checking what's free while they work, so between them they still stop at 256 MB.
 - **Fix videos that won't send** checks that the converted copy is as long as the video before sending it. A conversion that stopped partway, or a picked video that only came through in part, used to go out shorter than the original.
+- Messenger closing partway through a shared video's conversion no longer leaves the half-made files behind in its storage. The next shared video clears them once they're old enough that no conversion could still be using them, and a send you cancel while a file is being read isn't counted as a failure anymore.
 
 ## 0.24.0 (2026-10-14)
 
