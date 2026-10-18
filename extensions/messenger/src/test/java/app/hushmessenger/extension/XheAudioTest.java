@@ -16,6 +16,7 @@ import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import org.junit.After;
@@ -29,6 +30,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowMediaExtractor;
+import org.robolectric.shadows.ShadowSystemClock;
 import org.robolectric.shadows.util.DataSource;
 import static org.junit.Assert.*;
 
@@ -417,7 +419,9 @@ public class XheAudioTest {
         File picked = folder.newFile("VID_two_sounds.mp4");
         byte[] bytes = "two sounds".getBytes(StandardCharsets.US_ASCII);
         Files.write(picked.toPath(), bytes);
-        readAsXhe(picked, 2);
+        // The path Messenger passes, and the file the transcoder's first look reads for it.
+        String path = picked.toURI().getPath();
+        readAsXhe(new File(path).getAbsoluteFile(), 2);
         File copy = folder.newFile("orca_share_media44.mp4");
         Files.write(copy.toPath(), bytes);
         readAsXhe(copy, 2);
@@ -427,7 +431,7 @@ public class XheAudioTest {
         readAsXhe(tagged, 2);
         Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
 
-        assertEquals(picked.getPath(), fromTranscoder(picked.getPath()));
+        assertEquals(path, fromTranscoder(path));
         fromCopyThread(copy);
         fromCopyThread(tagged);
         assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
@@ -436,6 +440,48 @@ public class XheAudioTest {
         assertArrayEquals("the Samsung box is still renamed, which keeps every track", renamed(recording), Files.readAllBytes(tagged.toPath()));
         File cache = new File(RuntimeEnvironment.getApplication().getCacheDir(), XheAudio.PICKED);
         assertFalse("nothing was converted", cache.exists());
+
+        // The same first look at a video with one xHE sound goes on to convert it, so the one above was really read.
+        File one = folder.newFile("VID_one_sound.mp4");
+        Files.write(one.toPath(), bytes);
+        String onePath = one.toURI().getPath();
+        readAsXhe(new File(onePath).getAbsoluteFile(), 1);
+        assertEquals("its snapshot isn't readable here, so it still goes as it is", onePath, fromTranscoder(onePath));
+        assertTrue("but its conversion started", cache.isDirectory());
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
+    private interface Step {
+        void run() throws Exception;
+    }
+
+    private static void expectOutOfTime(Step step) throws Exception {
+        try {
+            step.run();
+            fail("the time was up");
+        } catch (XheAudio.OverBudget expected) {
+            assertEquals("the conversion ran out of time", expected.getMessage());
+        }
+    }
+
+    @Test public void aConversionStopsWhereverItsTimeRunsOut() throws Exception {
+        XheAudio.Work work = new XheAudio.Work(1_000);
+        work.check();
+        ShadowSystemClock.advanceBy(Duration.ofMillis(999));
+        work.check();
+        ShadowSystemClock.advanceBy(Duration.ofMillis(1));
+        expectOutOfTime(work::check);
+
+        // The re-encode and the join check it every round, not only the copy before them.
+        File video = folder.newFile("VID_late.mp4");
+        File sound = folder.newFile("late.sound.mp4");
+        readAsXhe(video, 1);
+        readAs(sound, 0, 1);
+        expectOutOfTime(() -> XheAudio.reencode(video, folder.newFile("late.out.mp4"), work));
+        expectOutOfTime(() -> XheAudio.join(video, sound, folder.newFile("late.joined.mp4"), work));
+        File joined = folder.newFile("on-time.joined.mp4");
+        XheAudio.join(video, sound, joined, new XheAudio.Work(1_000));
+        assertTrue("with time left the join runs to the end", joined.length() > 0);
     }
 
     @Test public void aSamsungRecordingWhoseSoundCantBeConvertedKeepsItsCopyAsItWas() throws Exception {
