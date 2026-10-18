@@ -452,7 +452,7 @@ val systemCameraPatch = controlPatch("system_camera", "Use the phone's camera ap
 @Suppress("unused")
 val externalGalleryPatch = controlPatch("external_gallery", "Open your gallery app",
     "The gallery button in a chat opens your phone's own gallery app. What you pick then opens in Messenger's editor for that chat, ready to send.", "Conversations",
-    manifest = { addGalleryQueries() })
+    manifest = { addExternalGallery() })
 @Suppress("unused")
 val stopAnalyticsUploadsPatch = controlPatch("analytics_uploads", "Stop analytics uploads",
     "Stops the background services Messenger uses to upload usage statistics. It still records them on your phone, and they can upload after you turn this off.", "Privacy")

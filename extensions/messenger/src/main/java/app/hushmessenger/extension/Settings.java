@@ -461,7 +461,7 @@ public final class Settings {
     }
     /** The chat reads a photo from another app back under its own request code, so the capture screen starts with that one. */
     public static int cameraRequestCode(android.content.Intent intent, int requestCode) {
-        return GalleryPicker.isPick(intent) || CameraActivity.isCapture(appContext, intent)
+        return GalleryPicker.isPick(appContext, intent) || CameraActivity.isCapture(appContext, intent)
             ? CameraActivity.EXTERNAL_MEDIA_REQUEST : requestCode;
     }
     /** Set on the extras the chat screen copies into its camera launcher. Edit opens its editor through that launcher too. */
@@ -494,7 +494,7 @@ public final class Settings {
             intent.removeExtra(CHAT_CAMERA_MARK);
             intent.removeExtra(CHAT_CAPTURE_MARK);
             if (gallery) {
-                android.content.Intent pick = GalleryPicker.pickIntent(appContext);
+                android.content.Intent pick = GalleryPicker.screenIntent(appContext);
                 if (pick != null) return pick;
             }
             if (!capture) return intent;
@@ -513,7 +513,7 @@ public final class Settings {
     public static android.os.Bundle chatGallery() {
         try {
             Context context = appContext;
-            if (context == null || !wouldUse(GalleryPicker.KEY) || GalleryPicker.pickIntent(context) == null ||
+            if (context == null || !wouldUse(GalleryPicker.KEY) || GalleryPicker.screenIntent(context) == null ||
                 !enabled(GalleryPicker.KEY)) return null;
             android.os.Bundle extras = new android.os.Bundle();
             extras.putBoolean(CHAT_GALLERY_MARK, true);
@@ -573,10 +573,10 @@ public final class Settings {
             Context context = appContext;
             return context == null || CameraActivity.captureIntent(context) != null;
         }
-        // A Root Mount install keeps the stock manifest, which may not let Messenger see any gallery app.
+        // A Root Mount install keeps the stock manifest, with no pick screen and maybe no gallery app Messenger can see.
         if (GalleryPicker.KEY.equals(key)) {
             Context context = appContext;
-            return context == null || GalleryPicker.pickIntent(context) != null;
+            return context == null || GalleryPicker.screenIntent(context) != null;
         }
         if (TextStyleActivity.KEY.equals(key)) {
             Context context = appContext;

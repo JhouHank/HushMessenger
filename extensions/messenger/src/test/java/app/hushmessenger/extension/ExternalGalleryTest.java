@@ -2,6 +2,7 @@ package app.hushmessenger.extension;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.ComponentName;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -17,7 +18,10 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowActivity;
+import org.robolectric.shadows.ShadowToast;
 import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -62,14 +66,18 @@ public class ExternalGalleryTest {
         assertTrue(Settings.lastActive(GalleryPicker.KEY) > 0);
         Intent marked = launch(handed);
         marked.putExtra(Settings.CHAT_CAMERA_MARK, true);
-        Intent pick = Settings.chatCamera(marked);
+        Intent screen = Settings.chatCamera(marked);
+        // Messenger's launcher refuses an intent for another app's screen, so the button starts the pick screen inside it.
+        assertEquals(new ComponentName(app.getPackageName(), GalleryActivity.class.getName()), screen.getComponent());
+        assertNull(screen.getAction());
+        assertEquals("The chat reads the pick back the way it reads a photo picked in another app", 1112, Settings.cameraRequestCode(screen, 7376));
+        assertFalse(marked.hasExtra(Settings.CHAT_GALLERY_MARK));
+        assertFalse(marked.hasExtra(Settings.CHAT_CAMERA_MARK));
+        Intent pick = GalleryPicker.pickIntent(app);
         assertEquals(Intent.ACTION_PICK, pick.getAction());
         assertEquals("image/*", pick.getType());
         assertNull("The pick goes to whichever gallery app the person uses", pick.getComponent());
         assertEquals(Arrays.asList("image/*", "video/*"), Arrays.asList(pick.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
-        assertEquals("The chat reads the pick back the way it reads a photo picked in another app", 1112, Settings.cameraRequestCode(pick, 7376));
-        assertFalse(marked.hasExtra(Settings.CHAT_GALLERY_MARK));
-        assertFalse(marked.hasExtra(Settings.CHAT_CAMERA_MARK));
 
         // The camera button's next launch is built fresh, without the gallery's extras, and stays Messenger's camera.
         Intent camera = launch(null);
@@ -150,11 +158,73 @@ public class ExternalGalleryTest {
         assertTrue(Settings.hookErrors.isEmpty());
     }
 
-    @Test public void onlyThePickTheSwitchMadeGetsThePickedPhotoRequestCode() {
+    @Test public void onlyThePickScreenGetsThePickedPhotoRequestCode() {
         Intent someoneElses = new Intent(Intent.ACTION_PICK).setType("image/*");
-        assertFalse(GalleryPicker.isPick(someoneElses));
+        assertFalse(GalleryPicker.isPick(app, someoneElses));
         assertEquals(7376, Settings.cameraRequestCode(someoneElses, 7376));
-        assertFalse(GalleryPicker.isPick(null));
+        Intent copied = new Intent().setClassName("com.facebook.orca.other", GalleryActivity.class.getName());
+        assertFalse(GalleryPicker.isPick(app, copied));
+        assertFalse(GalleryPicker.isPick(app, null));
+        assertFalse(GalleryPicker.isPick(null, new Intent().setClassName(app, GalleryActivity.class.getName())));
         assertEquals(7376, Settings.cameraRequestCode(null, 7376));
+    }
+
+    @Test public void thePickScreenHandsWhatThePersonPickedBackToTheChatWithItsTypeAndReadGrant() {
+        installGallery();
+        String authority = "com.example.gallery.picked";
+        Robolectric.setupContentProvider(PickedProvider.class, authority);
+        for (String path : new String[] {"/image/7", "/video/8"}) {
+            Uri item = Uri.parse("content://" + authority + path);
+            try (ActivityController<GalleryActivity> controller = Robolectric.buildActivity(GalleryActivity.class).setup()) {
+                ShadowActivity screen = shadowOf(controller.get());
+                Intent pick = screen.getNextStartedActivityForResult().intent;
+                assertEquals(Intent.ACTION_PICK, pick.getAction());
+                assertEquals(Arrays.asList("image/*", "video/*"), Arrays.asList(pick.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
+                screen.receiveResult(pick, Activity.RESULT_OK, new Intent().setData(item).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+                assertTrue(controller.get().isFinishing());
+                assertEquals(Activity.RESULT_OK, screen.getResultCode());
+                Intent result = screen.getResultIntent();
+                assertEquals(item, result.getData());
+                assertEquals(path.startsWith("/video") ? "video/mp4" : "image/jpeg", result.getType());
+                // The chat gets its own read grant, so the photo still opens after this screen is gone.
+                assertNotEquals(0, result.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
+        // A type the gallery app sent stays.
+        Uri photo = Uri.parse("content://" + authority + "/image/9");
+        Intent typed = GalleryPicker.handBack(app, new Intent().setDataAndType(photo, "image/png"));
+        assertEquals("image/png", typed.getType());
+        assertNull(GalleryPicker.handBack(app, new Intent()));
+        assertNull(GalleryPicker.handBack(app, null));
+        assertTrue(Settings.hookErrors.isEmpty());
+    }
+
+    @Test public void aCancelledPickLeavesTheChatAsItWas() {
+        installGallery();
+        try (ActivityController<GalleryActivity> controller = Robolectric.buildActivity(GalleryActivity.class).setup()) {
+            ShadowActivity screen = shadowOf(controller.get());
+            Intent pick = screen.getNextStartedActivityForResult().intent;
+            screen.receiveResult(pick, Activity.RESULT_CANCELED, null);
+            assertTrue(controller.get().isFinishing());
+            assertEquals(Activity.RESULT_CANCELED, screen.getResultCode());
+            assertNull(screen.getResultIntent());
+        }
+        // A gallery app that says OK but hands nothing back is a cancel too.
+        try (ActivityController<GalleryActivity> controller = Robolectric.buildActivity(GalleryActivity.class).setup()) {
+            ShadowActivity screen = shadowOf(controller.get());
+            screen.receiveResult(screen.getNextStartedActivityForResult().intent, Activity.RESULT_OK, new Intent());
+            assertEquals(Activity.RESULT_CANCELED, screen.getResultCode());
+        }
+        assertTrue(Settings.hookErrors.isEmpty());
+    }
+
+    @Test public void withTheGalleryAppGoneThePickScreenSaysSoAndCloses() {
+        try (ActivityController<GalleryActivity> controller = Robolectric.buildActivity(GalleryActivity.class).setup()) {
+            ShadowActivity screen = shadowOf(controller.get());
+            assertNull(screen.getNextStartedActivityForResult());
+            assertTrue(controller.get().isFinishing());
+            assertEquals(Activity.RESULT_CANCELED, screen.getResultCode());
+            assertEquals(new SettingsText(app).get("gallery_missing"), ShadowToast.getTextOfLatestToast());
+        }
     }
 }

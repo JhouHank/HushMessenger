@@ -27,6 +27,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 internal const val EXTERNAL_GALLERY = "external_gallery"
+internal const val GALLERY_ACTIVITY = "app.hushmessenger.extension.GalleryActivity"
 internal const val ACTIVATE_GALLERY = "Lcom/facebook/xapp/messaging/composer/gallery/event/ActivateGalleryEvent;"
 internal const val EDIT_GALLERY_ITEM = "Lcom/facebook/xapp/messaging/composer/gallery/event/EditGalleryItemEvent;"
 internal const val COMPOSER_EVENT = "Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;"
@@ -362,9 +363,20 @@ internal fun MutableMethod.injectExternalGallery() {
     """.trimIndent(), ExternalLabel("stock_gallery", getInstruction(at)))
 }
 
-/** Android hides other apps from Messenger unless its manifest says what it looks for, here a photo or video pick. */
-internal fun Document.addGalleryQueries() {
+/**
+ * Declares the pick screen, since Messenger's launcher only starts Messenger's own screens, and what it looks for in
+ * other apps: Android hides them from Messenger unless its manifest names a photo or video pick.
+ */
+internal fun Document.addExternalGallery() {
     val root = documentElement ?: throw PatchException("Messenger controls: the manifest has no root")
+    val application = getElementsByTagName("application").item(0) as? Element
+        ?: throw PatchException("Messenger controls: expected one application")
+    application.appendChild(createElement("activity").also { screen ->
+        listOf("name" to GALLERY_ACTIVITY, "exported" to "false", "excludeFromRecents" to "true",
+            "theme" to "@android:style/Theme.Translucent.NoTitleBar",
+            "configChanges" to "orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden")
+            .forEach { (name, value) -> screen.setAttribute("android:$name", value) }
+    })
     val children = root.childNodes
     val queries = (0 until children.length).map { children.item(it) }.filterIsInstance<Element>().firstOrNull { it.tagName == "queries" }
         ?: createElement("queries").also { root.appendChild(it) }

@@ -337,12 +337,19 @@ class ExternalGalleryTest {
         assertTrue(findExternalGallery(galleryClasses().filterNot { it.type == "LX/5qL;" }).isEmpty())
     }
 
-    @Test fun theManifestAsksToSeeGalleryAppsOnce() {
+    @Test fun theManifestDeclaresThePickScreenAndAsksToSeeGalleryAppsOnce() {
         val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
         for (manifest in listOf("<manifest package=\"com.facebook.orca\"><application/></manifest>",
             "<manifest package=\"com.facebook.orca\"><queries><package android:name=\"com.whatsapp\"/></queries><application/></manifest>")) {
             val document = builder.parse(manifest.byteInputStream())
-            document.addGalleryQueries()
+            document.addExternalGallery()
+            // Messenger's launcher refuses a screen outside its own package, so the pick screen has to be one of its own.
+            val screens = (document.getElementsByTagName("application").item(0) as Element).getElementsByTagName("activity")
+            assertEquals(1, screens.length, manifest)
+            val screen = screens.item(0) as Element
+            assertEquals(GALLERY_ACTIVITY, screen.getAttribute("android:name"), manifest)
+            assertEquals("false", screen.getAttribute("android:exported"), manifest)
+            assertEquals("@android:style/Theme.Translucent.NoTitleBar", screen.getAttribute("android:theme"), manifest)
             assertEquals(1, document.getElementsByTagName("queries").length, manifest)
             val intents = (document.getElementsByTagName("queries").item(0) as Element).getElementsByTagName("intent")
             assertEquals(2, intents.length, manifest)

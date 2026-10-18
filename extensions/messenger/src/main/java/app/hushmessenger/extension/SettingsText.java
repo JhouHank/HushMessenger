@@ -297,6 +297,8 @@ final class SettingsText {
         ENGLISH.put("camera_missing", "No camera app is installed that can take a photo for Messenger.");
         ENGLISH.put("camera_failed", "Can't open your camera app. Try again, or turn off Use the phone's camera app.");
         ENGLISH.put("camera_permission", "Messenger needs camera permission to open your camera app. You can allow it in Android's app settings.");
+        ENGLISH.put("gallery_missing", "No gallery app is installed that can pick a photo for Messenger.");
+        ENGLISH.put("gallery_failed", "Can't open your gallery app. Try again, or turn off Open your gallery app.");
         ENGLISH.put("message_log_clear", "Clear log");
         ENGLISH.put("message_log_close", "Close");
         ENGLISH.put("message_log_title", "Message log");
