@@ -118,6 +118,7 @@ internal val BASE_PROFILE = ControlProfile(
         "emoji_typeface" to setOf("LX/1OE;->A00()Landroid/graphics/Typeface;"),
         "event_prompts" to setOf("LX/HVB;->A08()Z", "LX/HVB;->A09()Z"),
         "external_gallery" to setOf(
+            "LX/5SC;->BkE(Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/5uL;LX/5WP;Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;)V",
             "LX/5ws;->C0d(Landroid/os/Bundle;)Z", "LX/6CC;->BpW(LX/5IZ;Ljava/lang/String;)V",
             "LX/7Om;->onActivityResult(IILandroid/content/Intent;)V",
         ),
@@ -318,6 +319,7 @@ internal val PROFILE_346611351 = ControlProfile(
         "emoji_typeface" to setOf("LX/1OE;->A00()Landroid/graphics/Typeface;"),
         "event_prompts" to setOf("LX/HRb;->A08()Z", "LX/HRb;->A09()Z"),
         "external_gallery" to setOf(
+            "LX/5PQ;->Bk8(Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/5rZ;LX/5Td;Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;)V",
             "LX/5u6;->C0W(Landroid/os/Bundle;)Z", "LX/69K;->BpP(LX/5Fn;Ljava/lang/String;)V",
             "LX/7Li;->onActivityResult(IILandroid/content/Intent;)V",
         ),

@@ -29,17 +29,19 @@ import org.w3c.dom.Element
 internal const val EXTERNAL_GALLERY = "external_gallery"
 internal const val ACTIVATE_GALLERY = "Lcom/facebook/xapp/messaging/composer/gallery/event/ActivateGalleryEvent;"
 internal const val EDIT_GALLERY_ITEM = "Lcom/facebook/xapp/messaging/composer/gallery/event/EditGalleryItemEvent;"
+internal const val COMPOSER_EVENT = "Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;"
 private const val CHAT_GALLERY_CALL = "$SETTINGS->chatGallery()Landroid/os/Bundle;"
 private const val MEDIA_RESULT_CALL = "$SETTINGS->externalMediaResult(IILandroid/content/Intent;)V"
 private const val PROVIDER_GET = "get()Ljava/lang/Object;"
 
+/** A gallery event handler, its field holding the chat camera launcher's provider, and that provider's interface. */
+internal data class GalleryHandler(val id: String, val provider: String, val providerType: String)
+
 /**
- * How the chat's gallery button reaches the chat camera's launcher, read at discovery: the handler, its field holding
- * the launcher's provider and that provider's interface, then the launcher class that runs the start, the start, and
- * the chat's result reader.
+ * How the chat's gallery button reaches the chat camera's launcher, read at discovery: the handlers, then the launcher
+ * class that runs the start, the start, and the chat's result reader.
  */
-internal data class GalleryRoute(val handler: String, val provider: String, val providerType: String, val launcher: String, val start: String,
-    val reader: String)
+internal data class GalleryRoute(val handlers: List<GalleryHandler>, val launcher: String, val start: String, val reader: String)
 
 /** Set by [findExternalGallery] and cleared once the controls are in. */
 internal var galleryRoute: GalleryRoute? = null
@@ -74,7 +76,9 @@ private fun Instruction.galleryWrites(register: Int): Boolean {
  * too unless the instruction only writes it.
  */
 private fun Instruction.galleryReads(): Set<Int> {
-    val onlyWrites = opcode.setsRegister() && opcode != Opcode.CHECK_CAST && !opcode.name.endsWith("_2ADDR")
+    // The enum constant's name. Opcode.name is the smali mnemonic ("add-int/2addr").
+    val op = opcode.toString()
+    val onlyWrites = opcode.setsRegister() && opcode != Opcode.CHECK_CAST && !op.endsWith("_2ADDR")
     val read = when (this) {
         is FiveRegisterInstruction, is RegisterRangeInstruction -> galleryArguments()
         is ThreeRegisterInstruction -> listOfNotNull(registerA.takeUnless { onlyWrites }, registerB, registerC)
@@ -82,15 +86,47 @@ private fun Instruction.galleryReads(): Set<Int> {
         is OneRegisterInstruction -> listOfNotNull(registerA.takeUnless { onlyWrites })
         else -> emptyList()
     }
-    val wide = listOf("WIDE", "LONG", "DOUBLE").any { it in opcode.name }
+    val wide = listOf("WIDE", "LONG", "DOUBLE").any { it in op }
     return read.flatMap { if (wide) listOf(it, it + 1) else listOf(it) }.toSet()
 }
 
-/** Whether a run of straight code that ends returning nothing writes [register] before it reads it, or never touches it. */
-private fun List<Instruction>.galleryFree(register: Int): Boolean {
-    for (instruction in this) {
-        if (register in instruction.galleryReads()) return false
-        if (instruction.galleryWrites(register)) return true
+private val GALLERY_ENDS = setOf(Opcode.RETURN_VOID, Opcode.RETURN, Opcode.RETURN_WIDE, Opcode.RETURN_OBJECT, Opcode.THROW)
+private val GALLERY_GOTOS = setOf(Opcode.GOTO, Opcode.GOTO_16, Opcode.GOTO_32)
+
+/** What can run right after instruction [i]: none after a return or throw, null after a switch, which isn't followed. */
+private fun List<Instruction>.galleryNext(i: Int): List<Int>? {
+    val instruction = this[i]
+    return when {
+        instruction.opcode in GALLERY_ENDS -> emptyList()
+        instruction.opcode == Opcode.PACKED_SWITCH || instruction.opcode == Opcode.SPARSE_SWITCH -> null
+        instruction is OffsetInstruction -> branchTarget(i).takeIf { it >= 0 }?.let { target ->
+            if (instruction.opcode in GALLERY_GOTOS) listOf(target) else listOf(i + 1, target)
+        }
+        else -> listOf(i + 1)
+    }
+}
+
+/** Every instruction the code can run from [start] on, or null when that takes a switch or runs off the end. */
+private fun List<Instruction>.galleryReach(start: Int): Set<Int>? {
+    val reach = mutableSetOf<Int>()
+    val pending = ArrayDeque(listOf(start))
+    while (pending.isNotEmpty()) {
+        val i = pending.removeFirst()
+        if (i !in indices) return null
+        if (reach.add(i)) pending.addAll(galleryNext(i) ?: return null)
+    }
+    return reach
+}
+
+/** Whether every way on from [start] writes [register] before it reads it, or ends without touching it. */
+private fun List<Instruction>.galleryFree(start: Int, register: Int): Boolean {
+    val seen = mutableSetOf<Int>()
+    val pending = ArrayDeque(listOf(start))
+    while (pending.isNotEmpty()) {
+        val i = pending.removeFirst()
+        if (!seen.add(i)) continue
+        if (register in this[i].galleryReads()) return false
+        if (!this[i].galleryWrites(register)) pending.addAll(galleryNext(i)!!)
     }
     return true
 }
@@ -118,16 +154,33 @@ private fun List<ClassDef>.galleryTarget(launcher: ClassDef, start: Method, byTy
 }
 
 /**
- * The chat composer's event handler. It opens Messenger's own gallery on ActivateGalleryEvent and Messenger's editor on
- * EditGalleryItemEvent, both by the event's class name.
+ * Which of the chat composer's two kinds of event handler this signature is: the older one, handed the event and its
+ * class name, or the composer plugin, handed the event to check its class. 583 has one of each, and a chat's gallery
+ * button goes through the plugin.
+ */
+private fun Method.galleryHandlerKind(): String? {
+    val params = parameterTypes.map { it.toString() }
+    return when {
+        params.size == 2 && params.last() == "Ljava/lang/String;" -> "by name"
+        params.size == 4 && params.last() == COMPOSER_EVENT -> "plugin"
+        else -> null
+    }
+}
+
+/**
+ * A chat composer event handler that opens Messenger's own gallery on ActivateGalleryEvent and Messenger's editor on
+ * EditGalleryItemEvent, by the event's class name or by checking its class.
  */
 internal fun Method.isGalleryHandler(): Boolean {
-    if (AccessFlags.STATIC.isSet(accessFlags) || returnType != "V" || parameterTypes.size != 2 ||
-        parameterTypes.last().toString() != "Ljava/lang/String;") return false
+    if (AccessFlags.STATIC.isSet(accessFlags) || returnType != "V") return false
     val code = implementation?.instructions ?: return false
-    val strings = galleryStrings()
-    return dotted(ACTIVATE_GALLERY) in strings && dotted(EDIT_GALLERY_ITEM) in strings &&
-        code.count { it.opcode == Opcode.CHECK_CAST && it.galleryType() == ACTIVATE_GALLERY } == 1
+    val events = listOf(ACTIVATE_GALLERY, EDIT_GALLERY_ITEM)
+    val handles = when (galleryHandlerKind()) {
+        "by name" -> galleryStrings().let { strings -> events.all { dotted(it) in strings } }
+        "plugin" -> events.all { event -> code.any { it.opcode == Opcode.INSTANCE_OF && it.galleryType() == event } }
+        else -> false
+    }
+    return handles && code.count { it.opcode == Opcode.CHECK_CAST && it.galleryType() == ACTIVATE_GALLERY } == 1
 }
 
 /**
@@ -136,6 +189,8 @@ internal fun Method.isGalleryHandler(): Boolean {
  *     iget-object vProvider, p0, <handler>->field:<Provider>
  *     ...
  *     invoke-static {..., vEvent, vProvider}, <editor>(..., EditGalleryItemEvent, <Provider>)V
+ *
+ * Code between the two may branch, as the plugin's does on a cached value, but only the read leads in.
  *
  * and in the editor, on its last parameter:
  *
@@ -156,8 +211,9 @@ private fun Method.galleryProvider(iface: String, startName: String, byType: Map
     val load = (e - 1 downTo 0).firstOrNull { code[it].galleryWrites(provider) } ?: return null
     val field = code[load].takeIf { it.opcode == Opcode.IGET_OBJECT }?.galleryField() ?: return null
     if (field.definingClass != definingClass || field.type != providerType) return null
-    val jumps = jumpTargets()
-    if ((load + 1..e).any { it in jumps || code[it] is OffsetInstruction }) return null
+    val inside = load + 1..e
+    if (jumpTargets(branches = false).any { it in inside }) return null
+    if (code.indices.any { it !in load until e && code[it] is OffsetInstruction && code.branchTarget(it) in inside }) return null
     byType[definingClass]?.fields?.singleOrNull { it.name == field.name && it.type == field.type && !AccessFlags.STATIC.isSet(it.accessFlags) }
         ?: return null
     val editor = byType[edit.definingClass]?.methods?.singleOrNull { it.hookId() == edit.toString() } ?: return null
@@ -189,12 +245,13 @@ private fun Method.startsFromProvider(providerType: String, start: String): Bool
 }
 
 /**
- * The chat's gallery event handler, the chat camera launcher's start and the chat's result reader, or none. The handler
+ * The chat's gallery event handlers, the chat camera launcher's start and the chat's result reader, or none. A handler
  * hands the launcher a marked bundle, and the start swaps that launch for the phone's gallery app, so a pick comes back
  * to the chat that asked under the request code Messenger reads a photo from another app under. The reader takes the
  * pick's type from the result, and a gallery app often sends none, so the hook there fills it in first. That needs the
- * chat camera's launcher exactly as the camera switch finds it, the one way the Edit branch reaches it, and both
- * reachable from the handler.
+ * chat camera's launcher exactly as the camera switch finds it, the one way each handler's Edit branch reaches it, and
+ * both reachable from that handler. There's at most one handler of each kind, and every one found must route, or a
+ * gallery button would still open Messenger's gallery with the switch on.
  */
 internal fun findExternalGallery(classes: Iterable<ClassDef>): List<Method> {
     galleryRoute = null
@@ -211,41 +268,44 @@ internal fun findExternalGallery(classes: Iterable<ClassDef>): List<Method> {
     if (!launcherClass.galleryImplements(factory.returnType, byType)) return emptyList()
     val start = launcherClass.methods.filter { it.isLauncherStart() }.singleOrNull() ?: return emptyList()
     val target = all.galleryTarget(launcherClass, start, byType) ?: return emptyList()
-    val handler = methods.filter { it.isGalleryHandler() }.singleOrNull() ?: return emptyList()
-    val provider = handler.galleryProvider(factory.returnType, start.name, byType) ?: return emptyList()
-    val providerClass = byType[provider.type] ?: return emptyList()
-    val home = handler.definingClass.galleryPackage()
-    fun reachable(cls: ClassDef) = AccessFlags.PUBLIC.isSet(cls.accessFlags) || cls.type.galleryPackage() == home
-    if (!AccessFlags.INTERFACE.isSet(providerClass.accessFlags) || !reachable(providerClass) || !reachable(launcherClass) ||
-        !reachable(target) || AccessFlags.PRIVATE.isSet(start.accessFlags) ||
-        (!AccessFlags.PUBLIC.isSet(start.accessFlags) && launcher.galleryPackage() != home)) return emptyList()
-    galleryRoute = GalleryRoute(handler.hookId(), provider.toString(), provider.type, target.type, start.hookId(), reader.hookId())
-    return listOf(handler, start, reader)
+    val handlers = methods.filter { it.isGalleryHandler() }
+    if (handlers.isEmpty() || handlers.groupingBy { it.galleryHandlerKind() }.eachCount().values.any { it > 1 }) return emptyList()
+    val routed = handlers.map { handler ->
+        val provider = handler.galleryProvider(factory.returnType, start.name, byType) ?: return emptyList()
+        val providerClass = byType[provider.type] ?: return emptyList()
+        val home = handler.definingClass.galleryPackage()
+        fun reachable(cls: ClassDef) = AccessFlags.PUBLIC.isSet(cls.accessFlags) || cls.type.galleryPackage() == home
+        if (!AccessFlags.INTERFACE.isSet(providerClass.accessFlags) || !reachable(providerClass) || !reachable(launcherClass) ||
+            !reachable(target) || AccessFlags.PRIVATE.isSet(start.accessFlags) ||
+            (!AccessFlags.PUBLIC.isSet(start.accessFlags) && launcher.galleryPackage() != home)) return emptyList()
+        GalleryHandler(handler.hookId(), provider.toString(), provider.type)
+    }
+    galleryRoute = GalleryRoute(routed.sortedBy { it.id }, target.type, start.hookId(), reader.hookId())
+    return handlers + listOf(start, reader)
 }
 
-/** Where the handler's gallery branch starts, and three locals that branch writes before it reads them. */
+/** Where a handler's gallery branch starts, and three locals that branch writes before it reads them. */
 internal class GallerySite(val at: Int, val extras: Int, val launcher: Int, val started: Int)
 
 /**
- * Right after the handler casts its ActivateGalleryEvent. From there the branch runs straight to its return-void, outside
- * any try, so a register it writes before reading is free for the hook on its way in.
+ * Right after the handler casts its ActivateGalleryEvent. Every way on from there, through the branch's own branches to
+ * its returns and throws, stays outside any try, so a register each of them writes before reading is free for the hook
+ * on its way in.
  */
 internal fun Method.gallerySite(): GallerySite {
     val code = implementation?.instructions?.toList() ?: galleryChanged("no code")
     val casts = code.indices.filter { code[it].opcode == Opcode.CHECK_CAST && code[it].galleryType() == ACTIVATE_GALLERY }
     val at = (casts.singleOrNull() ?: galleryChanged("${casts.size} gallery events")) + 1
-    val end = (at until code.size).firstOrNull { code[it].opcode == Opcode.RETURN_VOID } ?: galleryChanged("no return after the gallery event")
-    val run = code.subList(at, end + 1)
-    if (run.any { it is OffsetInstruction }) galleryChanged("a branch in the gallery branch")
     if (at in jumpTargets()) galleryChanged("a branch lands on the gallery branch")
+    val reach = code.galleryReach(at) ?: galleryChanged("a switch or no return in the gallery branch")
     // A catch handler could read what the hook writes.
-    val addresses = code.take(end + 1).runningFold(0) { address, instruction -> address + instruction.codeUnits }
-    if (implementation!!.tryBlocks.any { it.startCodeAddress < addresses[end + 1] && it.startCodeAddress + it.codeUnitCount > addresses[at] })
+    val addresses = code.runningFold(0) { address, instruction -> address + instruction.codeUnits }
+    if (implementation!!.tryBlocks.any { block -> reach.any { addresses[it] - block.startCodeAddress in 0 until block.codeUnitCount } })
         galleryChanged("the gallery branch is inside a try")
     val self = parameterRegister(0)
     if (code.any { it.galleryWrites(self) }) galleryChanged("the handler's own register is reused")
     // The hook's plain invokes and branches take registers up to v15, and only locals sit below the parameters.
-    val free = (0 until minOf(16, self)).filter { run.galleryFree(it) }
+    val free = (0 until minOf(16, self)).filter { code.galleryFree(at, it) }
     if (free.size < 3) galleryChanged("no free registers")
     return GallerySite(at, free[0], free[1], free[2])
 }
@@ -255,7 +315,7 @@ internal fun MutableMethod.validateExternalGallery(): Int {
     return when (hookId()) {
         // The camera switch hooks the same start the same way, so whichever comes second leaves it as it is.
         route.start -> if (chatStartRouted()) -1 else chatCameraLaunchSite()
-        route.handler -> gallerySite().at
+        in route.handlers.map { it.id } -> gallerySite().at
         // The result reader's own parameters, before anything in it runs.
         route.reader -> if (!AccessFlags.STATIC.isSet(accessFlags) && implementation != null) 0 else galleryChanged("the result reader")
         else -> throw PatchException("Messenger controls: unexpected gallery hook ${hookId()}")
@@ -278,6 +338,7 @@ internal fun MutableMethod.injectExternalGallery() {
         addInstructions(at, "invoke-static/range {p1 .. p3}, $MEDIA_RESULT_CALL")
         return
     }
+    val handler = route.handlers.single { it.id == hookId() }
     val site = gallerySite()
     val extras = "v${site.extras}"
     val launcher = "v${site.launcher}"
@@ -287,9 +348,9 @@ internal fun MutableMethod.injectExternalGallery() {
         move-result-object $extras
         if-eqz $extras, :stock_gallery
         move-object/from16 $launcher, p0
-        iget-object $launcher, $launcher, ${route.provider}
+        iget-object $launcher, $launcher, ${handler.provider}
         if-eqz $launcher, :stock_gallery
-        invoke-interface {$launcher}, ${route.providerType}->$PROVIDER_GET
+        invoke-interface {$launcher}, ${handler.providerType}->$PROVIDER_GET
         move-result-object $launcher
         instance-of $started, $launcher, ${route.launcher}
         if-eqz $started, :stock_gallery

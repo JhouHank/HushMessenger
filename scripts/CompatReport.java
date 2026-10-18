@@ -2811,16 +2811,36 @@ public class CompatReport {
             strings.contains("ComposeFragment:montageMessageActivityResultNullData");
     }
 
-    /** The chat composer's event handler, opening Messenger's gallery and its editor by event name. Mirrors ExternalGallery.kt. */
+    static final String COMPOSER_EVENT = "Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;";
+
+    /** The older handler given the event's class name, or the composer plugin given the event. Mirrors galleryHandlerKind. */
+    static String galleryHandlerKind(Method m) {
+        var params = m.getParameterTypes().stream().map(Object::toString).toList();
+        if (params.size() == 2 && "Ljava/lang/String;".equals(params.get(1))) return "by name";
+        if (params.size() == 4 && COMPOSER_EVENT.equals(params.get(3))) return "plugin";
+        return null;
+    }
+
+    static boolean typeIs(Instruction i, Opcode opcode, String type) {
+        return i.getOpcode() == opcode && i instanceof ReferenceInstruction r && r.getReference() instanceof TypeReference t && type.equals(t.getType());
+    }
+
+    /** A chat composer event handler, opening Messenger's gallery and its editor by event name or class. Mirrors ExternalGallery.kt. */
     static boolean isGalleryHandler(Method m) {
-        if (AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType()) || m.getParameterTypes().size() != 2 ||
-            !"Ljava/lang/String;".equals(m.getParameterTypes().get(1).toString())) return false;
-        var strings = stringsOf(m);
-        if (!strings.contains(dotted(ACTIVATE_GALLERY)) || !strings.contains(dotted(EDIT_GALLERY_ITEM))) return false;
+        if (AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType())) return false;
+        var kind = galleryHandlerKind(m);
+        if ("by name".equals(kind)) {
+            var strings = stringsOf(m);
+            if (!strings.contains(dotted(ACTIVATE_GALLERY)) || !strings.contains(dotted(EDIT_GALLERY_ITEM))) return false;
+        } else if ("plugin".equals(kind)) {
+            for (var event : List.of(ACTIVATE_GALLERY, EDIT_GALLERY_ITEM)) {
+                boolean checked = false;
+                for (var i : m.getImplementation().getInstructions()) if (typeIs(i, Opcode.INSTANCE_OF, event)) checked = true;
+                if (!checked) return false;
+            }
+        } else return false;
         int casts = 0;
-        for (var i : m.getImplementation().getInstructions())
-            if (i.getOpcode() == Opcode.CHECK_CAST && i instanceof ReferenceInstruction r && r.getReference() instanceof TypeReference t &&
-                ACTIVATE_GALLERY.equals(t.getType())) casts++;
+        for (var i : m.getImplementation().getInstructions()) if (typeIs(i, Opcode.CHECK_CAST, ACTIVATE_GALLERY)) casts++;
         return casts == 1;
     }
 
@@ -2924,9 +2944,13 @@ public class CompatReport {
         if (!field.getDefiningClass().equals(handler.getDefiningClass()) || !field.getType().equals(providerType)) return null;
         var edges = edges(handler);
         if (edges == null) return null;
-        var jumps = new HashSet<Integer>();
-        for (var edge : edges) jumps.add(edge[1]);
-        for (int i = load + 1; i <= e; i++) if (jumps.contains(i) || code.get(i) instanceof OffsetInstruction) return null;
+        // Branches may run between the read and the call, but only the read leads in: no catch, no switch case, and no
+        // branch from outside lands there.
+        for (var edge : edges) {
+            if (edge[1] <= load || edge[1] > e) continue;
+            var from = edge[0] < 0 ? null : code.get(edge[0]).getOpcode();
+            if (from == null || from == Opcode.PACKED_SWITCH || from == Opcode.SPARSE_SWITCH || edge[0] < load || edge[0] >= e) return null;
+        }
         var home = byType.get(handler.getDefiningClass());
         if (home == null) return null;
         int fields = 0;
@@ -2945,10 +2969,11 @@ public class CompatReport {
     }
 
     /**
-     * external_gallery: the chat's gallery event handler, the chat camera launcher's start (the one way the handler's
-     * Edit branch reaches that launcher) and the chat's result reader, counted only while the reader is an instance
-     * method that reads the chat camera's request code and the launcher is the camera switch's own. Mirrors
-     * findExternalGallery in ExternalGallery.kt. The handler needs three locals for its scratch registers.
+     * external_gallery: the chat's gallery event handlers (at most one of each kind, every one routing), the chat camera
+     * launcher's start (the one way each handler's Edit branch reaches that launcher) and the chat's result reader,
+     * counted only while the reader is an instance method that reads the chat camera's request code and the launcher is
+     * the camera switch's own. Mirrors findExternalGallery in ExternalGallery.kt. Each handler needs three locals for its
+     * scratch registers.
      */
     static List<Method> externalGalleryHooks(List<ClassDef> classes) {
         var readers = new ArrayList<Method>();
@@ -2965,7 +2990,9 @@ public class CompatReport {
             }
         }
         if (readers.size() != 1 || !hasLiteral(readers.get(0), 7376) || AccessFlags.STATIC.isSet(readers.get(0).getAccessFlags()) ||
-            factories.size() != 1 || handlers.size() != 1) return List.of();
+            factories.size() != 1 || handlers.isEmpty()) return List.of();
+        var kinds = new HashSet<String>();
+        for (var handler : handlers) if (!kinds.add(galleryHandlerKind(handler))) return List.of();
         var factory = factories.get(0);
         String launcher = chatCameraLauncherType(factory);
         var launcherClass = launcher == null ? null : byType.get(launcher);
@@ -2977,19 +3004,23 @@ public class CompatReport {
         }
         var target = start == null ? null : galleryTarget(classes, launcherClass, start, byType);
         if (target == null) return List.of();
-        var handler = handlers.get(0);
-        var provider = galleryProvider(handler, factory.getReturnType(), start.getName(), byType);
-        var providerClass = provider == null ? null : byType.get(provider.getType());
-        if (providerClass == null || !AccessFlags.INTERFACE.isSet(providerClass.getAccessFlags())) return List.of();
-        String home = packageOf(handler.getDefiningClass());
-        for (var cls : List.of(providerClass, launcherClass, target))
-            if (!AccessFlags.PUBLIC.isSet(cls.getAccessFlags()) && !packageOf(cls.getType()).equals(home)) return List.of();
-        if (AccessFlags.PRIVATE.isSet(start.getAccessFlags()) ||
-            (!AccessFlags.PUBLIC.isSet(start.getAccessFlags()) && !packageOf(launcher).equals(home))) return List.of();
-        int words = 1;
-        for (var type : handler.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
-        if (handler.getImplementation().getRegisterCount() - words < 3) return List.of();
-        return List.of(handler, start, readers.get(0));
+        for (var handler : handlers) {
+            var provider = galleryProvider(handler, factory.getReturnType(), start.getName(), byType);
+            var providerClass = provider == null ? null : byType.get(provider.getType());
+            if (providerClass == null || !AccessFlags.INTERFACE.isSet(providerClass.getAccessFlags())) return List.of();
+            String home = packageOf(handler.getDefiningClass());
+            for (var cls : List.of(providerClass, launcherClass, target))
+                if (!AccessFlags.PUBLIC.isSet(cls.getAccessFlags()) && !packageOf(cls.getType()).equals(home)) return List.of();
+            if (AccessFlags.PRIVATE.isSet(start.getAccessFlags()) ||
+                (!AccessFlags.PUBLIC.isSet(start.getAccessFlags()) && !packageOf(launcher).equals(home))) return List.of();
+            int words = 1;
+            for (var type : handler.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
+            if (handler.getImplementation().getRegisterCount() - words < 3) return List.of();
+        }
+        var hooks = new ArrayList<Method>(handlers);
+        hooks.add(start);
+        hooks.add(readers.get(0));
+        return hooks;
     }
 
     static final String FONT_LAYOUT_ANCHOR = "Hit OEM font NPE in Paint.setTypeface, keeping previous typeface";
