@@ -350,7 +350,7 @@ public class XheAudioTest {
             thread.join(10_000);
             assertFalse(thread.isAlive());
         }
-        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        assertEquals("not a hook failure: " + Settings.hookErrors.get(XheAudio.KEY), 0, Settings.hookErrorAt(XheAudio.KEY));
         for (int i = 0; i < sends; i++) assertArrayEquals("send " + i, renamed(bytes[i % 2]), sentBytes(sent[i]));
         for (int i = 0; i < 2; i++) assertArrayEquals(bytes[i], Files.readAllBytes(picked[i].toPath()));
         onlyFinishedCopies(2);

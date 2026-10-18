@@ -259,7 +259,8 @@ public final class XheAudio {
     }
 
     private static File convertPicked(Context context, Uri uri, File input, File folder, Limits limits, Work work) throws IOException {
-        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("the cache has no room for the converted video");
+        // Made first and checked after, since the other conversion can make it in between and its mkdirs answers false.
+        if (!folder.mkdirs() && !folder.isDirectory()) throw new IOException("the cache has no room for the converted video");
         long now = System.currentTimeMillis();
         prune(folder, now);
         if (folder.getUsableSpace() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
