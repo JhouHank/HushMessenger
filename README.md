@@ -30,7 +30,7 @@ Every switch starts off, so a freshly patched Messenger behaves like stock until
 
 ## Install
 
-1. **Get the APK.** HushMessenger patches arm64 Messenger 583.0.0.29.95 only. Download one from [APKMirror's 583.0.0.29.95 page](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). Every arm64 build there is one of the [supported builds](#supported-messenger-builds). A 32-bit build shares the version name and won't work.
+1. **Get the APK.** HushMessenger patches arm64 Messenger 583.0.0.29.95 only. Download one from [APKMirror's 583.0.0.29.95 page](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). With v0.24.0, pick an arm64 build whose version code is in the [supported builds](#supported-messenger-builds), since the one Morphe Manager's download button opens isn't there yet. A 32-bit build shares the version name and won't work.
 2. **Add the source.** Open the link above on your phone with Morphe Manager (1.34.0 or newer) installed. Or in Manager open **Sources**, tap **+**, choose **Remote** and enter `github.com/SysAdminDoc/HushMessenger`. The card should show **57 patches**. If it shows an older version, tap its refresh button.
 3. **Patch Messenger.** The default selection includes every switch. Three patches start unselected because they change the app package itself: **Clone install under another package name**, **Spoof package version** and **Custom new-message sound**. To add one, turn on **Settings → Advanced → Expert mode** in Manager and use **Choose patches**.
 4. **Keep one source.** Don't add the remote source and a local copy together, and don't mix in Messenger patches from other sources.
@@ -152,12 +152,13 @@ With **Hide read receipts** on, a chat you open stays unread on your phone, beca
 | --- | --- |
 | Package | `com.facebook.orca` |
 | Version | `583.0.0.29.95` |
-| Version codes | `346611350`, `346611351`, `346611353`, `346611369`, `346611386`, `346611418`, `346611420`, `346611422`, `346611423`, `346611435`, `346611436`, `346611438`, `346611439`, `346611440` |
+| Version codes in v0.24.0 | `346611351`, `346611369`, `346611423`, `346611438`, `346611439`, `346611440` |
+| Added in the next release | `346611350`, `346611353`, `346611386`, `346611418`, `346611420`, `346611422`, `346611435`, `346611436` |
 | Architecture | `arm64-v8a` |
 | Minimum Android version | Android 9 (API 28) |
-| APKMirror downloads | [All variants of 583.0.0.29.95](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). Every arm64 one works. |
+| APKMirror downloads | [All variants of 583.0.0.29.95](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/). With v0.24.0, pick one whose version code is in its row above. |
 
-All 13 arm64 builds APKMirror lists for 583.0.0.29.95 work, the nodpi ones Morphe Manager's download button opens included, and so does build 346611440, which isn't on APKMirror. The patch checks the version code before it changes anything and stops on a build that isn't listed. Older Messenger versions aren't supported by current bundles. v0.23.0 still takes 582.0.0.61.92.
+v0.24.0 takes five of the 13 arm64 builds APKMirror lists for 583.0.0.29.95, plus build 346611440, which isn't on APKMirror. The two nodpi ones Morphe Manager's download button opens (346611418 and 346611435) aren't among them, so for now open the variants page and pick a build from the v0.24.0 row by hand. The next release takes all 13. The patch checks the version code before it changes anything and stops on a build that isn't listed. Older Messenger versions aren't supported by current bundles. v0.23.0 still takes 582.0.0.61.92.
 
 SHA-256 of the stock APKs the checks ran against:
 
