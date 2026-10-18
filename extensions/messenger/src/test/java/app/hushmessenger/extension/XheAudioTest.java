@@ -1,16 +1,24 @@
 package app.hushmessenger.extension;
 
+import android.content.ContentProvider;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
@@ -161,9 +169,169 @@ public class XheAudioTest {
 
     /** Shaped like the #58 recording: ftyp, the picture data, moov with Samsung's udta records, then sefd at the end. */
     private static byte[] samsungRecording() {
-        return join(FILE_TYPE, box("mdat", new byte[64]),
+        return samsungRecording(0);
+    }
+
+    /** [samsungRecording] with its picture data filled with [fill], so two recordings differ only there. */
+    private static byte[] samsungRecording(int fill) {
+        byte[] picture = new byte[64];
+        Arrays.fill(picture, (byte) fill);
+        return join(FILE_TYPE, box("mdat", picture),
             box("moov", join(box("mvhd", new byte[100]), box("udta", box("smta", new byte[12])))),
             box("sefd", "\0\0\u0080\0Samsung_Capture_Info\0Screen recording".getBytes(StandardCharsets.ISO_8859_1)));
+    }
+
+    /** What [samsungRecording] looks like once its sefd is renamed. */
+    private static byte[] renamed(byte[] recording) {
+        return renamedAt(recording, recording.length - 8 - 41);
+    }
+
+    /** The bytes of the file a transcoder answer names, a path or a file Uri. */
+    private static byte[] sentBytes(String sent) throws Exception {
+        String path = sent;
+        if (sent.startsWith("file:")) {
+            // SDK 28 on a Windows host builds file://C%3A%5C... from the backslash path, with the path in the authority.
+            path = Uri.parse(sent).getPath();
+            if (path == null || path.isEmpty()) path = Uri.decode(sent.substring("file://".length()));
+        }
+        File file = new File(path);
+        assertTrue(sent, file.isFile());
+        return Files.readAllBytes(file.toPath());
+    }
+
+    private static File pickedCache() {
+        return new File(RuntimeEnvironment.getApplication().getCacheDir(), XheAudio.PICKED);
+    }
+
+    /** Every file the cache holds is a finished copy, named by its bytes, with nothing half-made left beside it. */
+    private static void onlyFinishedCopies(int count) {
+        String[] names = pickedCache().list();
+        assertNotNull(names);
+        assertEquals(Arrays.toString(names), count, names.length);
+        for (String name : names) assertTrue(name, name.matches("[0-9a-f]{64}\\.mp4"));
+    }
+
+    /** The cache name convertPicked used before 2026-10-18: a 32-bit hash of the Uri, size and time. */
+    private static String oldKey(File file) {
+        return Integer.toHexString((Uri.fromFile(file) + ":" + file.length() + ":" + file.lastModified()).hashCode());
+    }
+
+    @Test public void twoVideosWhoseOldCacheNamesMatchEachSendTheirOwn() throws Exception {
+        File movies = folder.newFolder("Movies");
+        File first = new File(movies, "Aa.mp4");
+        File second = new File(movies, "BB.mp4");
+        byte[] a = samsungRecording(1);
+        byte[] b = samsungRecording(2);
+        Files.write(first.toPath(), a);
+        Files.write(second.toPath(), b);
+        assertTrue(first.setLastModified(1_792_108_800_000L));
+        assertTrue(second.setLastModified(1_792_108_800_000L));
+        // "Aa" and "BB" hash alike in Java, so the same size and time gave both one cache name.
+        assertEquals("the old names collide", oldKey(first), oldKey(second));
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        String sentA = fromTranscoder(first.toURI().getPath());
+        String sentB = fromTranscoder(second.toURI().getPath());
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        assertNotEquals(sentA, sentB);
+        assertArrayEquals("Aa sends Aa", renamed(a), sentBytes(sentA));
+        assertArrayEquals("BB sends BB", renamed(b), sentBytes(sentB));
+        assertArrayEquals(a, Files.readAllBytes(first.toPath()));
+        assertArrayEquals(b, Files.readAllBytes(second.toPath()));
+        onlyFinishedCopies(2);
+    }
+
+    @Test public void aVideoChangedUnderTheSameNameSizeAndTimeIsConvertedAgain() throws Exception {
+        File picked = new File(folder.newFolder("DCIM"), "VID_20261018.mp4");
+        byte[] before = samsungRecording(3);
+        byte[] after = samsungRecording(4);
+        Files.write(picked.toPath(), before);
+        assertTrue(picked.setLastModified(1_792_108_800_000L));
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        String path = picked.toURI().getPath();
+        String first = fromTranscoder(path);
+        Files.write(picked.toPath(), after);
+        assertTrue(picked.setLastModified(1_792_108_800_000L));
+        String second = fromTranscoder(path);
+        assertNotEquals("new bytes, new copy", first, second);
+        assertArrayEquals(renamed(after), sentBytes(second));
+        assertArrayEquals("the first copy is still whole for a send that's using it", renamed(before), sentBytes(first));
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
+    static final String VIDEOS = "app.hushmessenger.test.videos";
+
+    /** Serves one file at any Uri, the way a gallery hands a picked video over. */
+    public static final class Videos extends ContentProvider {
+        static volatile File served;
+
+        @Override public boolean onCreate() { return true; }
+        @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+            return ParcelFileDescriptor.open(served, ParcelFileDescriptor.MODE_READ_ONLY);
+        }
+        @Override public String getType(Uri uri) { return "video/mp4"; }
+        @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) { return null; }
+        @Override public Uri insert(Uri uri, ContentValues values) { return null; }
+        @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+        @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { return 0; }
+    }
+
+    @Test public void aContentUriWhoseVideoChangedIsConvertedAgain() throws Exception {
+        Videos.served = folder.newFile("gallery.mp4");
+        byte[] before = samsungRecording(5);
+        byte[] after = samsungRecording(6);
+        Files.write(Videos.served.toPath(), before);
+        Robolectric.setupContentProvider(Videos.class, VIDEOS);
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        String uri = "content://" + VIDEOS + "/video/7";
+        String first = fromTranscoder(uri);
+        assertTrue(first, first.startsWith("file:"));
+        assertArrayEquals(renamed(before), sentBytes(first));
+        // The provider now hands over other bytes for the same Uri. A new file stands in for an edit in place, since
+        // the SDK 28 runtime keeps the first one open and Windows won't let it be written then.
+        Videos.served = folder.newFile("gallery-edited.mp4");
+        Files.write(Videos.served.toPath(), after);
+        String second = fromTranscoder(uri);
+        assertNotEquals("the same Uri with new bytes gets a new copy", first, second);
+        assertArrayEquals(renamed(after), sentBytes(second));
+        assertEquals("the same bytes again reuse their copy", second, fromTranscoder(uri));
+        assertArrayEquals(after, Files.readAllBytes(Videos.served.toPath()));
+        onlyFinishedCopies(2);
+    }
+
+    @Test public void conversionsRunningAtOnceEachKeepTheirOwnFiles() throws Exception {
+        File movies = folder.newFolder("Movies");
+        File[] picked = {new File(movies, "Aa.mp4"), new File(movies, "BB.mp4")};
+        byte[][] bytes = {samsungRecording(7), samsungRecording(8)};
+        for (int i = 0; i < 2; i++) {
+            Files.write(picked[i].toPath(), bytes[i]);
+            assertTrue(picked[i].setLastModified(1_792_108_800_000L));
+        }
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        int sends = 8;
+        String[] sent = new String[sends];
+        CountDownLatch go = new CountDownLatch(1);
+        Thread[] threads = new Thread[sends];
+        for (int i = 0; i < sends; i++) {
+            int send = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    go.await();
+                } catch (InterruptedException stop) {
+                    return;
+                }
+                sent[send] = XheAudio.transcodeSource(picked[send % 2].toURI().getPath());
+            });
+            threads[i].start();
+        }
+        go.countDown();
+        for (Thread thread : threads) {
+            thread.join(10_000);
+            assertFalse(thread.isAlive());
+        }
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        for (int i = 0; i < sends; i++) assertArrayEquals("send " + i, renamed(bytes[i % 2]), sentBytes(sent[i]));
+        for (int i = 0; i < 2; i++) assertArrayEquals(bytes[i], Files.readAllBytes(picked[i].toPath()));
+        onlyFinishedCopies(2);
     }
 
     /** [bytes] with the box type at [offset] swapped for free. */

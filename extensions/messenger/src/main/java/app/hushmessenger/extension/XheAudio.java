@@ -25,6 +25,9 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -82,6 +85,15 @@ public final class XheAudio {
     /** How long a converted copy is kept. A send still going after a day has failed anyway. */
     static final long KEEP_MS = 24L * 60 * 60 * 1000;
 
+    /**
+     * Goes into the name of every converted copy along with the picked video's bytes. Bump it when what a conversion
+     * makes changes, so a copy made the old way is never handed out again.
+     */
+    static final String CONVERSION = "2";
+
+    /** How the files one conversion works in start. Each gets a name of its own, so two conversions never share one. */
+    static final String SCRATCH = "pick-";
+
     private XheAudio() {}
 
     /**
@@ -121,50 +133,94 @@ public final class XheAudio {
 
     /**
      * The converted copy of [source] in the cache's {@link #PICKED} folder, made now or kept from an earlier try at
-     * the same video, or null when the video doesn't need one. Copies older than {@link #KEEP_MS} are cleared first.
+     * the same bytes, or null when the video doesn't need one. Copies older than {@link #KEEP_MS} are cleared first.
+     *
+     * <p>The picked video is copied once into a file only this call uses, and everything after reads that copy. The
+     * result is kept under a name made from those bytes and {@link #CONVERSION}, so another video, or the same name
+     * holding different bytes, never gets this one's copy. It's moved into place only once it's whole.
      */
     static File convertPicked(Context context, String source) throws IOException {
         Uri uri = source.startsWith("/") ? Uri.fromFile(new File(source)) : Uri.parse(source);
         boolean isFile = "file".equals(uri.getScheme());
         if (!isFile && !"content".equals(uri.getScheme())) return null;
         File input = isFile ? new File(uri.getPath()) : null;
-        boolean xhe = isFile ? needsFix(input) : needsFix(context, uri);
-        if (!xhe && !(isFile ? hasSamsungBox(input) : hasSamsungBox(context, uri))) return null;
+        // A first look at the picked video itself, so one that needs nothing is never copied.
+        boolean wanted = isFile ? needsFix(input) || hasSamsungBox(input) : needsFix(context, uri) || hasSamsungBox(context, uri);
+        if (!wanted) return null;
         File folder = new File(context.getCacheDir(), PICKED);
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("the cache has no room for the converted video");
-        prune(folder, System.currentTimeMillis());
-        String key = Integer.toHexString((uri + (isFile ? ":" + input.length() + ":" + input.lastModified() : "")).hashCode());
-        File done = new File(folder, key + ".mp4");
-        if (done.length() > 0) return done;
-        File copied = new File(folder, key + ".source");
-        File sound = new File(folder, key + ".sound.mp4");
-        File joined = new File(folder, key + ".joined.mp4");
+        long now = System.currentTimeMillis();
+        prune(folder, now);
+        File copied = File.createTempFile(SCRATCH, ".source", folder);
+        File sound = null;
+        File joined = null;
         try {
-            // A content Uri is read through a copy, and a Samsung box is renamed in one, never in the picked file.
-            if (!isFile || !xhe) {
-                try (InputStream in = isFile ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri);
-                     OutputStream out = new FileOutputStream(copied)) {
-                    if (in == null) throw new IOException("the picked video could not be opened");
-                    byte[] buffer = new byte[1 << 16];
-                    for (int read; (read = in.read(buffer)) != -1; ) out.write(buffer, 0, read);
-                }
-                input = copied;
+            String name;
+            try (InputStream in = isFile ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new IOException("the picked video could not be opened");
+                name = copyAndName(in, copied);
             }
+            File done = new File(folder, name + ".mp4");
+            if (done.length() > 0) {
+                done.setLastModified(now);
+                return done;
+            }
+            boolean xhe = needsFix(copied);
+            // The video changed after the first look, and what was copied needs nothing.
+            if (!xhe && !hasSamsungBox(copied)) return null;
             if (xhe) {
+                sound = File.createTempFile(SCRATCH, ".sound.mp4", folder);
+                joined = File.createTempFile(SCRATCH, ".joined.mp4", folder);
                 // The muxer writes only the tracks, so a Samsung box doesn't come along.
-                reencode(input, sound);
-                join(input, sound, joined);
+                reencode(copied, sound);
+                join(copied, sound, joined);
+                if (!repaired(joined, copied)) throw new IOException("the converted video came out incomplete");
             } else {
+                long size = copied.length();
                 dropSamsungBoxes(copied);
-                if (!copied.renameTo(joined)) throw new IOException("the renamed video could not be kept");
+                if (copied.length() != size || hasSamsungBox(copied)) throw new IOException("the renamed video came out wrong");
+                joined = copied;
             }
-            if (!joined.renameTo(done)) throw new IOException("the converted video could not be kept");
-            return done;
+            return publish(joined, done);
         } finally {
             copied.delete();
-            sound.delete();
-            joined.delete();
+            if (sound != null) sound.delete();
+            if (joined != null) joined.delete();
         }
+    }
+
+    /**
+     * Copies [in] to [out] and answers the name its converted copy is kept under: the SHA-256 of {@link #CONVERSION}
+     * and every byte copied, in hex.
+     */
+    static String copyAndName(InputStream in, File out) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException missing) {
+            throw new IOException("SHA-256 is missing", missing);
+        }
+        digest.update(CONVERSION.getBytes(StandardCharsets.US_ASCII));
+        try (OutputStream to = new FileOutputStream(out)) {
+            byte[] buffer = new byte[1 << 16];
+            for (int read; (read = in.read(buffer)) != -1; ) {
+                to.write(buffer, 0, read);
+                digest.update(buffer, 0, read);
+            }
+        }
+        StringBuilder name = new StringBuilder(64);
+        for (byte b : digest.digest()) name.append(Character.forDigit((b >> 4) & 0xf, 16)).append(Character.forDigit(b & 0xf, 16));
+        return name.toString();
+    }
+
+    /**
+     * Moves the finished [made] to [done] and answers [done]. When another send of the same bytes got there first,
+     * its copy is kept and [made] is left for the caller to delete. A rename puts the whole file in place at once, so
+     * a reader never sees half of one.
+     */
+    static File publish(File made, File done) throws IOException {
+        if (done.length() > 0 || made.renameTo(done) || done.length() > 0) return done;
+        throw new IOException("the converted video could not be kept");
     }
 
     /** Deletes what's in [folder] from more than {@link #KEEP_MS} before [now]. */
@@ -213,29 +269,51 @@ public final class XheAudio {
     }
 
     private static boolean needsFix(Opener opener) {
-        MediaExtractor source = new MediaExtractor();
-        try {
+        Tracks tracks = Tracks.of(opener);
+        return tracks != null && tracks.pictures > 0 && tracks.sounds > 0 && tracks.xhe == tracks.sounds;
+    }
+
+    /**
+     * Whether the converted [made] is whole: every picture track [from] has, its sound, and no xHE-AAC left. A muxer
+     * that stopped early, or a file the platform can't parse, isn't.
+     */
+    static boolean repaired(File made, File from) {
+        Tracks out = Tracks.of(source -> source.setDataSource(made.getPath()));
+        Tracks in = Tracks.of(source -> source.setDataSource(from.getPath()));
+        return out != null && in != null && out.pictures == in.pictures && out.pictures > 0 && out.sounds == 1 && out.xhe == 0;
+    }
+
+    /** How many picture and sound tracks a video holds, and how many of the sounds are xHE-AAC. */
+    static final class Tracks {
+        int pictures;
+        int sounds;
+        int xhe;
+
+        /** The tracks of what [opener] opens, or null when the platform can't read it. */
+        static Tracks of(Opener opener) {
+            MediaExtractor source = new MediaExtractor();
             try {
-                opener.open(source);
-            } catch (IOException | IllegalArgumentException unreadable) {
-                return false;
-            }
-            boolean picture = false;
-            int sounds = 0;
-            for (int i = 0; i < source.getTrackCount(); i++) {
-                MediaFormat format = source.getTrackFormat(i);
-                String mime = format.getString(MediaFormat.KEY_MIME);
-                if (mime == null) continue;
-                if (mime.startsWith("video/")) picture = true;
-                if (!mime.startsWith("audio/")) continue;
-                if (!MediaFormat.MIMETYPE_AUDIO_AAC.equalsIgnoreCase(mime) || objectType(format.getByteBuffer("csd-0")) != XHE_OBJECT_TYPE) {
-                    return false;
+                try {
+                    opener.open(source);
+                } catch (IOException | IllegalArgumentException unreadable) {
+                    return null;
                 }
-                sounds++;
+                Tracks tracks = new Tracks();
+                for (int i = 0; i < source.getTrackCount(); i++) {
+                    MediaFormat format = source.getTrackFormat(i);
+                    String mime = format.getString(MediaFormat.KEY_MIME);
+                    if (mime == null) continue;
+                    if (mime.startsWith("video/")) tracks.pictures++;
+                    if (!mime.startsWith("audio/")) continue;
+                    tracks.sounds++;
+                    if (MediaFormat.MIMETYPE_AUDIO_AAC.equalsIgnoreCase(mime) && objectType(format.getByteBuffer("csd-0")) == XHE_OBJECT_TYPE) {
+                        tracks.xhe++;
+                    }
+                }
+                return tracks;
+            } finally {
+                source.release();
             }
-            return picture && sounds > 0;
-        } finally {
-            source.release();
         }
     }
 
