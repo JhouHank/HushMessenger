@@ -80,6 +80,9 @@ hook emoji_search LX/7NT;->A8x(Landroid/text/Editable;Z)V
 hook emoji_typeface LX/1OE;->A00()Landroid/graphics/Typeface;
 hook event_prompts LX/HRb;->A08()Z
 hook event_prompts LX/HRb;->A09()Z
+hook external_gallery LX/5u6;->C0W(Landroid/os/Bundle;)Z
+hook external_gallery LX/69K;->BpP(LX/5Fn;Ljava/lang/String;)V
+hook external_gallery LX/7Li;->onActivityResult(IILandroid/content/Intent;)V
 hook facebook LX/2Q7;->A0D()Z
 hook facebook LX/3FF;->A00()Z
 hook facebook LX/3GJ;->A02()Z

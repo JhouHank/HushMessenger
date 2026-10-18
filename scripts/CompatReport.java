@@ -200,6 +200,7 @@ public class CompatReport {
         PATCHES.put("Fix videos that won't send", List.of("xhe_audio", "xhe_transcode"));
         PATCHES.put("Turn off the swipe up for disappearing messages", List.of("disappearing_swipe"));
         PATCHES.put("Use the phone's camera app", List.of("system_camera"));
+        PATCHES.put("Open your gallery app", List.of("external_gallery"));
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));
         PATCHES.put("Stop ad attribution uploads", List.of("attribution_uploads"));
         PATCHES.put("Stop inbox and ad link logging", List.of("ad_events"));
@@ -2790,6 +2791,207 @@ public class CompatReport {
         return launches;
     }
 
+    static final String ACTIVATE_GALLERY = "Lcom/facebook/xapp/messaging/composer/gallery/event/ActivateGalleryEvent;";
+    static final String EDIT_GALLERY_ITEM = "Lcom/facebook/xapp/messaging/composer/gallery/event/EditGalleryItemEvent;";
+
+    static String dotted(String type) {
+        return type.substring(1, type.length() - 1).replace('/', '.');
+    }
+
+    static String packageOf(String type) {
+        int slash = type.lastIndexOf('/');
+        return slash < 0 ? "" : type.substring(0, slash);
+    }
+
+    static boolean isComposerResult(Method m) {
+        if (!"onActivityResult".equals(m.getName()) || !"V".equals(m.getReturnType()) ||
+            !List.of("I", "I", "Landroid/content/Intent;").equals(m.getParameterTypes().stream().map(Object::toString).toList())) return false;
+        var strings = stringsOf(m);
+        return hasLiteral(m, 7377) && hasLiteral(m, 1112) && strings.contains("ComposeFragment:externalMediaGalleryActivityResultNullData") &&
+            strings.contains("ComposeFragment:montageMessageActivityResultNullData");
+    }
+
+    /** The chat composer's event handler, opening Messenger's gallery and its editor by event name. Mirrors ExternalGallery.kt. */
+    static boolean isGalleryHandler(Method m) {
+        if (AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType()) || m.getParameterTypes().size() != 2 ||
+            !"Ljava/lang/String;".equals(m.getParameterTypes().get(1).toString())) return false;
+        var strings = stringsOf(m);
+        if (!strings.contains(dotted(ACTIVATE_GALLERY)) || !strings.contains(dotted(EDIT_GALLERY_ITEM))) return false;
+        int casts = 0;
+        for (var i : m.getImplementation().getInstructions())
+            if (i.getOpcode() == Opcode.CHECK_CAST && i instanceof ReferenceInstruction r && r.getReference() instanceof TypeReference t &&
+                ACTIVATE_GALLERY.equals(t.getType())) casts++;
+        return casts == 1;
+    }
+
+    static boolean implementsThrough(ClassDef cls, String iface, Map<String, ClassDef> byType) {
+        for (int depth = 0; cls != null && depth < 16; depth++, cls = cls.getSuperclass() == null ? null : byType.get(cls.getSuperclass()))
+            if (cls.getInterfaces().contains(iface)) return true;
+        return false;
+    }
+
+    /** A class and the classes above it, as far as the dex has them. */
+    static List<ClassDef> lineage(ClassDef cls, Map<String, ClassDef> byType) {
+        var up = new ArrayList<ClassDef>();
+        for (int depth = 0; cls != null && depth < 16; depth++, cls = cls.getSuperclass() == null ? null : byType.get(cls.getSuperclass())) up.add(cls);
+        return up;
+    }
+
+    static boolean declaresStart(ClassDef cls, Method start) {
+        var signature = start.getParameterTypes().stream().map(CharSequence::toString).toList();
+        for (var m : cls.getMethods())
+            if (m.getName().equals(start.getName()) && m.getReturnType().equals(start.getReturnType()) &&
+                m.getParameterTypes().stream().map(CharSequence::toString).toList().equals(signature)) return true;
+        return false;
+    }
+
+    /** The one concrete class that runs the launcher's own start, with nothing below it bringing another. Mirrors galleryTarget. */
+    static ClassDef galleryTarget(List<ClassDef> classes, ClassDef launcher, Method start, Map<String, ClassDef> byType) {
+        var below = new ArrayList<ClassDef>();
+        for (var cls : classes)
+            if (!cls.getType().equals(launcher.getType()) && lineage(cls, byType).stream().anyMatch(up -> up.getType().equals(launcher.getType()))) below.add(cls);
+        var candidates = new ArrayList<ClassDef>(below);
+        candidates.add(0, launcher);
+        ClassDef target = null;
+        for (var cls : candidates) {
+            if (AccessFlags.ABSTRACT.isSet(cls.getAccessFlags())) continue;
+            boolean runs = true;
+            for (var up : lineage(cls, byType)) {
+                if (up.getType().equals(launcher.getType())) break;
+                if (declaresStart(up, start)) runs = false;
+            }
+            if (!runs) continue;
+            boolean replaced = false;
+            for (var other : below)
+                if (declaresStart(other, start) && lineage(other, byType).stream().anyMatch(up -> up.getType().equals(cls.getType()))) replaced = true;
+            if (replaced) continue;
+            if (target != null) return null;
+            target = cls;
+        }
+        return target;
+    }
+
+    /** The editor gets the launcher from its last parameter and starts it straight away. Mirrors startsFromProvider. */
+    static boolean startsFromProvider(Method editor, String providerType, String start) {
+        var code = instructions(editor);
+        var params = editor.getParameterTypes();
+        if (params.isEmpty() || !providerType.equals(params.get(params.size() - 1).toString())) return false;
+        int provider = editor.getImplementation().getRegisterCount() - 1;
+        int get = -1;
+        for (int i = 0; i < code.size(); i++) {
+            if (writesRegister(code.get(i), provider)) return false;
+            if (code.get(i).getOpcode() == Opcode.INVOKE_INTERFACE && callArgs(code.get(i)).equals(List.of(provider)) &&
+                (providerType + "->get()Ljava/lang/Object;").equals(ref(code.get(i)))) {
+                if (get >= 0) return false;
+                get = i;
+            }
+        }
+        if (get < 0 || get + 2 >= code.size() || code.get(get + 1).getOpcode() != Opcode.MOVE_RESULT_OBJECT) return false;
+        int launcher = ((OneRegisterInstruction) code.get(get + 1)).getRegisterA();
+        var cast = code.get(get + 2);
+        if (cast.getOpcode() != Opcode.CHECK_CAST || ((OneRegisterInstruction) cast).getRegisterA() != launcher ||
+            !(((ReferenceInstruction) cast).getReference() instanceof TypeReference t) || !start.startsWith(t.getType() + "->")) return false;
+        for (int i = get + 3; i < code.size(); i++) {
+            var instruction = code.get(i);
+            if (instruction.getOpcode() == Opcode.INVOKE_INTERFACE && start.equals(ref(instruction)))
+                return !callArgs(instruction).isEmpty() && callArgs(instruction).get(0) == launcher;
+            if (writesRegister(instruction, launcher) || instruction instanceof OffsetInstruction) return false;
+        }
+        return false;
+    }
+
+    /** The handler's field its Edit branch hands the editor, the chat camera launcher's provider. Mirrors galleryProvider. */
+    static FieldReference galleryProvider(Method handler, String iface, String startName, Map<String, ClassDef> byType) {
+        var code = instructions(handler);
+        int e = -1;
+        for (int i = 0; i < code.size(); i++)
+            if (code.get(i).getOpcode() == Opcode.INVOKE_STATIC && code.get(i) instanceof ReferenceInstruction r &&
+                r.getReference() instanceof MethodReference mr && refParams(mr).contains(EDIT_GALLERY_ITEM)) {
+                if (e >= 0) return null;
+                e = i;
+            }
+        if (e < 0) return null;
+        var edit = (MethodReference) ((ReferenceInstruction) code.get(e)).getReference();
+        var editParams = refParams(edit);
+        var args = callArgs(code.get(e));
+        if (editParams.isEmpty() || args.isEmpty()) return null;
+        String providerType = editParams.get(editParams.size() - 1);
+        int provider = args.get(args.size() - 1);
+        int load = -1;
+        for (int i = e - 1; i >= 0 && load < 0; i--) if (writesRegister(code.get(i), provider)) load = i;
+        if (load < 0 || code.get(load).getOpcode() != Opcode.IGET_OBJECT ||
+            !(((ReferenceInstruction) code.get(load)).getReference() instanceof FieldReference field)) return null;
+        if (!field.getDefiningClass().equals(handler.getDefiningClass()) || !field.getType().equals(providerType)) return null;
+        var edges = edges(handler);
+        if (edges == null) return null;
+        var jumps = new HashSet<Integer>();
+        for (var edge : edges) jumps.add(edge[1]);
+        for (int i = load + 1; i <= e; i++) if (jumps.contains(i) || code.get(i) instanceof OffsetInstruction) return null;
+        var home = byType.get(handler.getDefiningClass());
+        if (home == null) return null;
+        int fields = 0;
+        for (var f : home.getFields())
+            if (f.getName().equals(field.getName()) && f.getType().equals(field.getType()) && !AccessFlags.STATIC.isSet(f.getAccessFlags())) fields++;
+        if (fields != 1) return null;
+        var editorClass = byType.get(edit.getDefiningClass());
+        if (editorClass == null) return null;
+        Method editor = null;
+        for (var m : editorClass.getMethods()) if (hookId(m).equals(edit.toString())) {
+            if (editor != null) return null;
+            editor = m;
+        }
+        if (editor == null || editor.getImplementation() == null) return null;
+        return startsFromProvider(editor, providerType, iface + "->" + startName + "(Landroid/os/Bundle;)Z") ? field : null;
+    }
+
+    /**
+     * external_gallery: the chat's gallery event handler, the chat camera launcher's start (the one way the handler's
+     * Edit branch reaches that launcher) and the chat's result reader, counted only while the reader is an instance
+     * method that reads the chat camera's request code and the launcher is the camera switch's own. Mirrors
+     * findExternalGallery in ExternalGallery.kt. The handler needs three locals for its scratch registers.
+     */
+    static List<Method> externalGalleryHooks(List<ClassDef> classes) {
+        var readers = new ArrayList<Method>();
+        var factories = new ArrayList<Method>();
+        var handlers = new ArrayList<Method>();
+        var byType = new HashMap<String, ClassDef>();
+        for (var cls : classes) {
+            byType.put(cls.getType(), cls);
+            for (var m : cls.getMethods()) {
+                if (m.getImplementation() == null) continue;
+                if (isComposerResult(m)) readers.add(m);
+                if (isChatCameraFactory(m)) factories.add(m);
+                if (isGalleryHandler(m)) handlers.add(m);
+            }
+        }
+        if (readers.size() != 1 || !hasLiteral(readers.get(0), 7376) || AccessFlags.STATIC.isSet(readers.get(0).getAccessFlags()) ||
+            factories.size() != 1 || handlers.size() != 1) return List.of();
+        var factory = factories.get(0);
+        String launcher = chatCameraLauncherType(factory);
+        var launcherClass = launcher == null ? null : byType.get(launcher);
+        if (launcherClass == null || !implementsThrough(launcherClass, factory.getReturnType(), byType)) return List.of();
+        Method start = null;
+        for (var m : launcherClass.getMethods()) if (m.getImplementation() != null && isLauncherStart(m)) {
+            if (start != null) return List.of();
+            start = m;
+        }
+        var target = start == null ? null : galleryTarget(classes, launcherClass, start, byType);
+        if (target == null) return List.of();
+        var handler = handlers.get(0);
+        var provider = galleryProvider(handler, factory.getReturnType(), start.getName(), byType);
+        var providerClass = provider == null ? null : byType.get(provider.getType());
+        if (providerClass == null || !AccessFlags.INTERFACE.isSet(providerClass.getAccessFlags())) return List.of();
+        String home = packageOf(handler.getDefiningClass());
+        for (var cls : List.of(providerClass, launcherClass, target))
+            if (!AccessFlags.PUBLIC.isSet(cls.getAccessFlags()) && !packageOf(cls.getType()).equals(home)) return List.of();
+        if (AccessFlags.PRIVATE.isSet(start.getAccessFlags()) ||
+            (!AccessFlags.PUBLIC.isSet(start.getAccessFlags()) && !packageOf(launcher).equals(home))) return List.of();
+        int words = 1;
+        for (var type : handler.getParameterTypes()) words += "J".contentEquals(type) || "D".contentEquals(type) ? 2 : 1;
+        if (handler.getImplementation().getRegisterCount() - words < 3) return List.of();
+        return List.of(handler, start, readers.get(0));
+    }
+
     static final String FONT_LAYOUT_ANCHOR = "Hit OEM font NPE in Paint.setTypeface, keeping previous typeface";
     static final String FONT_REPOSITORY_ANCHOR = "The requested font, %s, does not have a backing source. " +
         "You need to provide either a systemFontName, assetFontName, or a fileDescriptor.";
@@ -4171,6 +4373,7 @@ public class CompatReport {
         found.get("message_log").addAll(messageLogHooks(classes));
         found.get("auto_reply").addAll(messageLogHooks(classes));
         found.get("system_camera").addAll(systemCameraLaunches(classes));
+        found.get("external_gallery").addAll(externalGalleryHooks(classes));
         customFontHooks(classes).forEach((key, methods) -> found.get(key).addAll(methods));
         // Every viewer method with an entry point's name is checked, whatever its signature, and one that doesn't match
         // leaves the control unresolved, as findControls in ControlHooks.kt clears it then.
@@ -4747,7 +4950,7 @@ public class CompatReport {
      */
     static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
         "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
-        "disappearing_swipe", "facebook", "facebook_profile", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
+        "disappearing_swipe", "external_gallery", "facebook", "facebook_profile", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
         "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "stories", "system_camera", "typing",
         "unsent_indicator");
 

@@ -117,6 +117,10 @@ internal val BASE_PROFILE = ControlProfile(
         "emoji_search" to setOf("LX/7QX;->A8x(Landroid/text/Editable;Z)V"),
         "emoji_typeface" to setOf("LX/1OE;->A00()Landroid/graphics/Typeface;"),
         "event_prompts" to setOf("LX/HVB;->A08()Z", "LX/HVB;->A09()Z"),
+        "external_gallery" to setOf(
+            "LX/5ws;->C0d(Landroid/os/Bundle;)Z", "LX/6CC;->BpW(LX/5IZ;Ljava/lang/String;)V",
+            "LX/7Om;->onActivityResult(IILandroid/content/Intent;)V",
+        ),
         "facebook" to setOf(
             "LX/2Q7;->A0D()Z", "LX/3FS;->A00()Z", "LX/3Gb;->A02()Z", "LX/3qW;->A00()Z", "LX/ET9;->A06()Z",
             "LX/HUx;->A02()Z", "LX/HUx;->A05()Z", "LX/VOv;->A04()Z", "LX/VP7;->A07()Z",
@@ -313,6 +317,10 @@ internal val PROFILE_346611351 = ControlProfile(
         "emoji_search" to setOf("LX/7NT;->A8x(Landroid/text/Editable;Z)V"),
         "emoji_typeface" to setOf("LX/1OE;->A00()Landroid/graphics/Typeface;"),
         "event_prompts" to setOf("LX/HRb;->A08()Z", "LX/HRb;->A09()Z"),
+        "external_gallery" to setOf(
+            "LX/5u6;->C0W(Landroid/os/Bundle;)Z", "LX/69K;->BpP(LX/5Fn;Ljava/lang/String;)V",
+            "LX/7Li;->onActivityResult(IILandroid/content/Intent;)V",
+        ),
         "facebook" to setOf(
             "LX/2Q7;->A0D()Z", "LX/3FF;->A00()Z", "LX/3GJ;->A02()Z", "LX/3oU;->A00()Z", "LX/EPj;->A06()Z",
             "LX/HRP;->A02()Z", "LX/HRP;->A05()Z", "LX/Pdx;->A04()Z", "LX/Pe4;->A06()Z",

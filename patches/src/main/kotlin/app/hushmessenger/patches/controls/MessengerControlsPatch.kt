@@ -110,6 +110,7 @@ internal val settingsExtension = bytecodePatch(description = "Load HushMessenger
         messageLogContract = null
         readReceiptThreadFields = emptyMap()
         markReadRecipe = null
+        galleryRoute = null
     }
 }
 
@@ -176,6 +177,7 @@ internal fun MutableMethod.validateHook(hook: String) {
         "original_photo" -> validateOriginalPhoto()
         ORIGINAL_VIDEO -> validateOriginalVideo()
         SYSTEM_CAMERA -> validateSystemCamera()
+        EXTERNAL_GALLERY -> validateExternalGallery()
         in CUSTOM_FONT_HOOKS -> validateCustomFont(hook)
         "avatar_tabs" -> validateKeyboardTabsInline()
         "typing_mailbox" -> validateOutgoingTyping()
@@ -247,6 +249,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             "original_photo" -> method.injectOriginalPhoto()
             ORIGINAL_VIDEO -> method.injectOriginalVideo()
             SYSTEM_CAMERA -> method.injectSystemCamera()
+            EXTERNAL_GALLERY -> method.injectExternalGallery()
             in CUSTOM_FONT_HOOKS -> method.injectCustomFont(hook)
             "avatar_tabs" -> method.injectKeyboardTabsInline()
             "typing_mailbox" -> method.injectOutgoingTyping()
@@ -446,6 +449,10 @@ val autoReplyPatch = controlPatch("auto_reply", "Auto reply",
 val systemCameraPatch = controlPatch("system_camera", "Use the phone's camera app",
     "The camera button in a chat opens your phone's own camera app. The photo then opens in Messenger's editor, ready to send. Photos only.", "Conversations",
     manifest = { addSystemCamera() })
+@Suppress("unused")
+val externalGalleryPatch = controlPatch("external_gallery", "Open your gallery app",
+    "The gallery button in a chat opens your phone's own gallery app. What you pick then opens in Messenger's editor for that chat, ready to send.", "Conversations",
+    manifest = { addGalleryQueries() })
 @Suppress("unused")
 val stopAnalyticsUploadsPatch = controlPatch("analytics_uploads", "Stop analytics uploads",
     "Stops the background services Messenger uses to upload usage statistics. It still records them on your phone, and they can upload after you turn this off.", "Privacy")
