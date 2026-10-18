@@ -3,6 +3,7 @@ package app.hushmessenger.extension;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import java.io.ByteArrayOutputStream;
@@ -22,6 +23,8 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowMediaExtractor;
+import org.robolectric.shadows.util.DataSource;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
@@ -33,6 +36,7 @@ public class XheAudioTest {
         Settings.initialize(RuntimeEnvironment.getApplication());
         Settings.preferences.edit().clear().commit();
         Settings.activeAt.clear();
+        Settings.hookErrors.clear();
         CrashGuard.resetForTests();
     }
 
@@ -352,6 +356,36 @@ public class XheAudioTest {
         assertArrayEquals("only the top-level sefd's type changes, so every offset stays", renamedAt(bytes, sefd), Files.readAllBytes(copy.toPath()));
         assertEquals(Arrays.asList("orca_share_media42.mp4"), Arrays.asList(folder.getRoot().list()));
         assertFalse("nothing is left to rename", XheAudio.dropSamsungBoxes(copy));
+    }
+
+    /** Has the platform read [file] as one picture, [xhe] xHE-AAC sound tracks and [plain] AAC-LC ones. */
+    private static void readAs(File file, int xhe, int plain) {
+        DataSource source = DataSource.toDataSource(file.getPath());
+        ShadowMediaExtractor.addTrack(source, MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 320, 240), new byte[16]);
+        for (int i = 0; i < xhe + plain; i++) {
+            MediaFormat sound = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48_000, 2);
+            sound.setByteBuffer("csd-0", i < xhe ? config(0xF9, 0x40) : config(0x12, 0x10));
+            ShadowMediaExtractor.addTrack(source, sound, new byte[16]);
+        }
+    }
+
+    private static void readAsXhe(File file, int sounds) {
+        readAs(file, sounds, 0);
+    }
+
+    @Test public void aSamsungRecordingWhoseSoundCantBeConvertedKeepsItsCopyAsItWas() throws Exception {
+        File copy = folder.newFile("orca_share_media43.mp4");
+        byte[] bytes = samsungRecording();
+        Files.write(copy.toPath(), bytes);
+        // Robolectric's codecs give back no sound, so the conversion fails after the copy is known to need both fixes.
+        readAsXhe(copy, 1);
+        assertTrue(XheAudio.needsFix(copy));
+        assertTrue(XheAudio.hasSamsungBox(copy));
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        fromCopyThread(copy);
+        assertTrue("the failure is recorded", Settings.hookErrorAt(XheAudio.KEY) > 0);
+        assertArrayEquals("not even the Samsung box is renamed", bytes, Files.readAllBytes(copy.toPath()));
+        assertEquals("its own scratch files are gone", Arrays.asList("orca_share_media43.mp4"), Arrays.asList(folder.getRoot().list()));
     }
 
     @Test public void onlyTopLevelSamsungBoxesInAnMp4AreRenamed() throws Exception {

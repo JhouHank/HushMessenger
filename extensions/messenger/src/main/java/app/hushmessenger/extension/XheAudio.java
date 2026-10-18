@@ -230,19 +230,24 @@ public final class XheAudio {
     }
 
     /**
-     * Renames [file]'s Samsung box and re-encodes its sound in place, each when it needs it. Answers whether the file
+     * Re-encodes [file]'s sound when it's xHE-AAC, else renames its Samsung box in place. Answers whether the file
      * changed. Only MP4 copies, since the result is an MP4 and Messenger keeps the type it read before the copy.
+     *
+     * <p>A conversion is written beside the copy and replaces it only once it's whole, and its muxer writes only the
+     * tracks, so a Samsung box doesn't come along. Until then the copy isn't touched, and a conversion that fails
+     * leaves it exactly as it was.
      */
     static boolean fix(File file) throws IOException {
         String name = file.getName().toLowerCase(java.util.Locale.ROOT);
         if (!name.endsWith(".mp4") && !name.endsWith(".m4v")) return false;
-        boolean renamed = dropSamsungBoxes(file);
-        if (!needsFix(file)) return renamed;
-        File sound = new File(file.getPath() + ".hush-sound.mp4");
-        File joined = new File(file.getPath() + ".hush-joined.mp4");
+        if (!needsFix(file)) return dropSamsungBoxes(file);
+        File folder = file.getAbsoluteFile().getParentFile();
+        File sound = File.createTempFile(file.getName() + ".hush-", ".sound.mp4", folder);
+        File joined = File.createTempFile(file.getName() + ".hush-", ".joined.mp4", folder);
         try {
             reencode(file, sound);
             join(file, sound, joined);
+            if (!repaired(joined, file)) throw new IOException("the converted video came out incomplete");
             if (!joined.renameTo(file)) throw new IOException("the converted video could not replace the copy");
             return true;
         } finally {
@@ -622,22 +627,25 @@ public final class XheAudio {
         try {
             pictures.setDataSource(picture.getPath());
             sounds.setDataSource(sound.getPath());
-            muxer = new MediaMuxer(out.getPath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            muxer.setOrientationHint(rotation(picture));
-
             List<Integer> pictureTracks = new ArrayList<>();
-            List<Integer> pictureOut = new ArrayList<>();
+            List<MediaFormat> pictureFormats = new ArrayList<>();
             for (int i = 0; i < pictures.getTrackCount(); i++) {
                 MediaFormat format = pictures.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 if (mime == null || !mime.startsWith("video/")) continue;
                 pictures.selectTrack(i);
                 pictureTracks.add(i);
-                pictureOut.add(muxer.addTrack(format));
+                pictureFormats.add(format);
             }
             if (pictureTracks.isEmpty()) throw new IOException("the video holds no picture track");
             MediaFormat soundFormat = soundTrack(sounds);
             if (soundFormat == null) throw new IOException("the converted sound holds no track");
+
+            // Opened only once both halves are known to be there, so a missing one leaves [out] as it was.
+            muxer = new MediaMuxer(out.getPath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            muxer.setOrientationHint(rotation(picture));
+            List<Integer> pictureOut = new ArrayList<>();
+            for (MediaFormat format : pictureFormats) pictureOut.add(muxer.addTrack(format));
             int soundOut = muxer.addTrack(soundFormat);
             muxer.start();
             muxing = true;
