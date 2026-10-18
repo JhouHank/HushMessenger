@@ -6,14 +6,19 @@ import android.database.Cursor;
 import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -38,6 +43,11 @@ public class XheAudioTest {
         Settings.activeAt.clear();
         Settings.hookErrors.clear();
         CrashGuard.resetForTests();
+    }
+
+    @After public void restoreLimits() {
+        XheAudio.limits = new XheAudio.Limits();
+        assertEquals("every conversion slot is given back", XheAudio.SLOTS, XheAudio.WORKERS.availablePermits());
     }
 
     private static ByteBuffer config(int... bytes) {
@@ -498,6 +508,214 @@ public class XheAudioTest {
         assertTrue(fresh.setLastModified(now - 60_000));
         XheAudio.prune(cache, now);
         assertEquals(Arrays.asList("3c4d.mp4"), Arrays.asList(cache.list()));
+    }
+
+    /** A finished copy's name, all [c]. */
+    private static String finishedName(char c) {
+        char[] name = new char[64];
+        Arrays.fill(name, c);
+        return new String(name) + ".mp4";
+    }
+
+    private static void noCopies() {
+        String[] left = pickedCache().list();
+        assertTrue(Arrays.toString(left), left == null || left.length == 0);
+    }
+
+    /** A picked Samsung recording, ready for the transcoder with the switch on, answering the path Messenger passes. */
+    private String pickedRecording(String name, byte[] bytes) throws Exception {
+        File picked = folder.newFile(name);
+        Files.write(picked.toPath(), bytes);
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        return picked.toURI().getPath();
+    }
+
+    @Test public void scratchFilesAConversionLeftBehindAreCleared() throws Exception {
+        File cache = folder.newFolder(XheAudio.PICKED);
+        long now = System.currentTimeMillis();
+        long abandoned = now - 2 * XheAudio.limits.workMs - 60_000;
+        File left = new File(cache, XheAudio.SCRATCH + "1.source");
+        File working = new File(cache, XheAudio.SCRATCH + "2.source");
+        File copy = new File(cache, finishedName('c'));
+        for (File file : new File[] {left, working, copy}) Files.write(file.toPath(), new byte[] {1});
+        assertTrue(left.setLastModified(abandoned));
+        assertTrue(working.setLastModified(now - 60_000));
+        assertTrue("a finished copy keeps its day", copy.setLastModified(abandoned));
+        XheAudio.prune(cache, now);
+        String[] names = cache.list();
+        Arrays.sort(names);
+        assertEquals(Arrays.asList(copy.getName(), working.getName()), Arrays.asList(names));
+    }
+
+    @Test public void aVideoBiggerThanAConversionTakesIsSentAsItIs() throws Exception {
+        byte[] bytes = samsungRecording(11);
+        String path = pickedRecording("VID_big.mp4", bytes);
+        XheAudio.limits.inputBytes = bytes.length - 1;
+        assertEquals(path, fromTranscoder(path));
+        // A provider doesn't say how much is coming, so its copy stops once it's past the limit.
+        Videos.served = new File(folder.getRoot(), "VID_big.mp4");
+        Robolectric.setupContentProvider(Videos.class, VIDEOS);
+        String uri = "content://" + VIDEOS + "/video/11";
+        assertEquals(uri, fromTranscoder(uri));
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        assertArrayEquals(bytes, Files.readAllBytes(Videos.served.toPath()));
+        noCopies();
+    }
+
+    @Test public void aStreamThatNeverEndsIsCutOffAtTheLimit() throws Exception {
+        XheAudio.Limits limits = new XheAudio.Limits();
+        limits.inputBytes = 1 << 20;
+        InputStream endless = new InputStream() {
+            @Override public int read() { return 7; }
+            @Override public int read(byte[] b, int off, int len) {
+                Arrays.fill(b, off, off + len, (byte) 7);
+                return len;
+            }
+        };
+        File out = folder.newFile("endless.source");
+        try {
+            XheAudio.copyAndName(endless, out, limits, new XheAudio.Work(limits.workMs));
+            fail("the copy has no end");
+        } catch (XheAudio.OverBudget expected) {
+            assertTrue(out.length() + " bytes", out.length() <= limits.inputBytes);
+        }
+    }
+
+    @Test public void aStreamThatKeepsAnsweringWithNothingStops() throws Exception {
+        XheAudio.Limits limits = new XheAudio.Limits();
+        InputStream silent = new InputStream() {
+            @Override public int read() { return 0; }
+            @Override public int read(byte[] b, int off, int len) { return 0; }
+        };
+        try {
+            XheAudio.copyAndName(silent, folder.newFile("silent.source"), limits, new XheAudio.Work(limits.workMs));
+            fail("the copy never ends");
+        } catch (XheAudio.OverBudget wrong) {
+            fail("a stalled provider is a failure, not a limit: " + wrong.getMessage());
+        } catch (IOException expected) {
+            assertEquals("the picked video stopped coming", expected.getMessage());
+        }
+    }
+
+    @Test public void aNearlyFullPhoneLeavesVideosAsTheyAre() throws Exception {
+        byte[] bytes = samsungRecording(12);
+        String path = pickedRecording("VID_full.mp4", bytes);
+        File copy = folder.newFile("orca_share_media46.mp4");
+        byte[] shared = "xhe sound".getBytes(StandardCharsets.US_ASCII);
+        Files.write(copy.toPath(), shared);
+        readAsXhe(copy, 1);
+        XheAudio.limits.reserveBytes = Long.MAX_VALUE;
+        assertEquals(path, fromTranscoder(path));
+        fromCopyThread(copy);
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        assertArrayEquals(bytes, Files.readAllBytes(new File(folder.getRoot(), "VID_full.mp4").toPath()));
+        assertArrayEquals(shared, Files.readAllBytes(copy.toPath()));
+        String[] names = folder.getRoot().list();
+        Arrays.sort(names);
+        assertEquals(Arrays.asList("VID_full.mp4", "orca_share_media46.mp4"), Arrays.asList(names));
+        noCopies();
+    }
+
+    @Test public void aConversionThatRunsOutOfTimeKeepsNoCopy() throws Exception {
+        byte[] bytes = samsungRecording(13);
+        String path = pickedRecording("VID_slow.mp4", bytes);
+        XheAudio.limits.workMs = 0;
+        assertEquals(path, fromTranscoder(path));
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+        noCopies();
+    }
+
+    @Test public void aSendThatFindsBothSlotsBusyGoesAsItIs() throws Exception {
+        byte[] bytes = samsungRecording(14);
+        String path = pickedRecording("VID_busy.mp4", bytes);
+        XheAudio.limits.slotWaitMs = 0;
+        assertTrue(XheAudio.WORKERS.tryAcquire(XheAudio.SLOTS));
+        try {
+            assertEquals(path, fromTranscoder(path));
+        } finally {
+            XheAudio.WORKERS.release(XheAudio.SLOTS);
+        }
+        noCopies();
+        String sent = fromTranscoder(path);
+        assertNotEquals("a free slot converts again", path, sent);
+        assertArrayEquals(renamed(bytes), sentBytes(sent));
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
+    @Test public void aCancelledSendGoesAsItIsAndStaysCancelled() throws Exception {
+        byte[] bytes = samsungRecording(15);
+        String path = pickedRecording("VID_cancel.mp4", bytes);
+        XheAudio.limits.slotWaitMs = 10_000;
+        String[] answer = new String[1];
+        boolean[] cancelled = new boolean[1];
+        Thread send = new Thread(() -> {
+            answer[0] = XheAudio.transcodeSource(path);
+            cancelled[0] = Thread.currentThread().isInterrupted();
+        });
+        assertTrue(XheAudio.WORKERS.tryAcquire(XheAudio.SLOTS));
+        try {
+            send.start();
+            long until = System.currentTimeMillis() + 10_000;
+            while (!XheAudio.WORKERS.hasQueuedThreads() && System.currentTimeMillis() < until) Thread.sleep(10);
+            assertTrue("the send waits for a slot", XheAudio.WORKERS.hasQueuedThreads());
+            send.interrupt();
+            send.join(10_000);
+            assertFalse(send.isAlive());
+        } finally {
+            XheAudio.WORKERS.release(XheAudio.SLOTS);
+        }
+        assertEquals(path, answer[0]);
+        assertTrue("Messenger still sees its cancel", cancelled[0]);
+        noCopies();
+
+        // A copy under way stops at its next read once the send is cancelled.
+        File out = folder.newFile("cancelled.source");
+        Thread copy = new Thread(() -> {
+            Thread.currentThread().interrupt();
+            try {
+                XheAudio.copyAndName(new ByteArrayInputStream(bytes), out, XheAudio.limits, new XheAudio.Work(XheAudio.limits.workMs));
+                answer[0] = "copied";
+            } catch (InterruptedIOException expected) {
+                answer[0] = "stopped";
+            } catch (IOException other) {
+                answer[0] = other.toString();
+            }
+        });
+        copy.start();
+        copy.join(10_000);
+        assertFalse(copy.isAlive());
+        assertEquals("stopped", answer[0]);
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
+    @Test public void aFullCacheClearsOnlyCopiesNoSendIsUsing() throws Exception {
+        File cache = pickedCache();
+        assertTrue(cache.isDirectory() || cache.mkdirs());
+        byte[] bytes = samsungRecording(16);
+        long now = System.currentTimeMillis();
+        File old = new File(cache, finishedName('a'));
+        File recent = new File(cache, finishedName('b'));
+        Files.write(old.toPath(), new byte[bytes.length]);
+        Files.write(recent.toPath(), new byte[bytes.length]);
+        assertTrue(old.setLastModified(now - XheAudio.ACTIVE_MS - 60_000));
+        assertTrue(recent.setLastModified(now - 60_000));
+        // Room for two copies and a half: the new one fits once the copy nobody used in an hour is gone.
+        XheAudio.limits.cacheBytes = 2L * bytes.length + bytes.length / 2;
+        String path = pickedRecording("VID_room.mp4", bytes);
+        String sent = fromTranscoder(path);
+        assertNotEquals(path, sent);
+        assertArrayEquals(renamed(bytes), sentBytes(sent));
+        assertFalse("the copy no send used in an hour made room", old.exists());
+        assertTrue("a copy a send may still be reading stays", recent.exists());
+
+        // Every copy left is recent now, so the next video has no room and goes as it is.
+        byte[] other = samsungRecording(17);
+        String otherPath = pickedRecording("VID_no_room.mp4", other);
+        assertEquals(otherPath, fromTranscoder(otherPath));
+        assertTrue(recent.exists());
+        assertArrayEquals(renamed(bytes), sentBytes(sent));
+        onlyFinishedCopies(2);
+        assertEquals("not a hook failure", 0, Settings.hookErrorAt(XheAudio.KEY));
     }
 
     @Test public void theSwitchSitsUnderConversationsAndStartsOff() {

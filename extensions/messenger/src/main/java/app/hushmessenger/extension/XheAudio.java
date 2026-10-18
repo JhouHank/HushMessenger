@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -29,7 +30,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Makes two kinds of video sendable that Messenger, stock included, refuses with "Unable to send", because Meta's
@@ -94,6 +99,68 @@ public final class XheAudio {
     /** How the files one conversion works in start. Each gets a name of its own, so two conversions never share one. */
     static final String SCRATCH = "pick-";
 
+    /** How many conversions run at once. A send that finds both busy waits {@link Limits#slotWaitMs}, then goes as is. */
+    static final int SLOTS = 2;
+    static final Semaphore WORKERS = new Semaphore(SLOTS, true);
+
+    /** A converted copy sent or reused this recently may still be read by its send, so it's never cleared for room. */
+    static final long ACTIVE_MS = 60L * 60 * 1000;
+
+    /**
+     * What one conversion may take on. Past any of these the video goes to Messenger as it is, which isn't a hook
+     * failure. Tests swap in smaller ones.
+     */
+    static final class Limits {
+        /** The most a video can hold for a conversion to start. */
+        long inputBytes = 1L << 30;
+        /** What the converted copies in the cache may hold together, the conversion in progress included. */
+        long cacheBytes = 3L << 30;
+        /** Space the disk keeps after a conversion, so one never fills the phone. */
+        long reserveBytes = 256L << 20;
+        /** How long one conversion may run, its copy of the picked video included. */
+        long workMs = 10L * 60 * 1000;
+        /** How long a send waits for a free conversion slot. */
+        long slotWaitMs = 30_000;
+    }
+
+    static volatile Limits limits = new Limits();
+
+    /** A video beyond what a conversion takes on. It goes to Messenger as it is, and isn't a hook failure. */
+    static final class OverBudget extends IOException {
+        OverBudget(String why) {
+            super(why);
+        }
+    }
+
+    /**
+     * One conversion's time, checked between reads and between codec rounds and once more before its copy is kept,
+     * so work that ran too long or was cancelled never puts a copy in place later. A read that the platform or a
+     * provider blocks in can't be stopped from here: it holds its slot until it returns, and other sends go ahead
+     * without a conversion once {@link Limits#slotWaitMs} is up.
+     */
+    static final class Work {
+        final long deadline;
+
+        Work(long budgetMs) {
+            deadline = SystemClock.elapsedRealtime() + budgetMs;
+        }
+
+        void check() throws IOException {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("the conversion was cancelled");
+            if (SystemClock.elapsedRealtime() >= deadline) throw new OverBudget("the conversion ran out of time");
+        }
+    }
+
+    /** Takes a conversion slot, or throws when both stay busy for {@link Limits#slotWaitMs}. */
+    private static void takeSlot() throws IOException {
+        try {
+            if (!WORKERS.tryAcquire(limits.slotWaitMs, TimeUnit.MILLISECONDS)) throw new OverBudget("both conversion slots stayed busy");
+        } catch (InterruptedException stop) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedIOException("the send was cancelled while it waited to convert");
+        }
+    }
+
     private XheAudio() {}
 
     /**
@@ -104,6 +171,8 @@ public final class XheAudio {
         try {
             if (file == null || Looper.myLooper() == Looper.getMainLooper() || !Settings.enabled(KEY)) return;
             fix(file);
+        } catch (OverBudget | InterruptedIOException skipped) {
+            android.util.Log.w("HushMessenger", "Left the shared video as it is: " + skipped.getMessage());
         } catch (Throwable error) {
             Settings.hookFailedPrivately(KEY, "Can't convert the shared video's sound", error);
         }
@@ -125,6 +194,9 @@ public final class XheAudio {
             File copy = context == null ? null : convertPicked(context, source);
             if (copy == null) return source;
             return source.startsWith("/") ? copy.getPath() : Uri.fromFile(copy).toString();
+        } catch (OverBudget | InterruptedIOException skipped) {
+            android.util.Log.w("HushMessenger", "Sent the picked video as it is: " + skipped.getMessage());
+            return source;
         } catch (Throwable error) {
             Settings.hookFailedPrivately(KEY, "Can't convert the picked video's sound", error);
             return source;
@@ -138,6 +210,9 @@ public final class XheAudio {
      * <p>The picked video is copied once into a file only this call uses, and everything after reads that copy. The
      * result is kept under a name made from those bytes and {@link #CONVERSION}, so another video, or the same name
      * holding different bytes, never gets this one's copy. It's moved into place only once it's whole.
+     *
+     * <p>Each conversion holds one of {@link #SLOTS} slots and stays inside {@link #limits}: a bigger video, a full
+     * cache or disk, a busy wait for a slot or a run past its time sends the video as it is.
      */
     static File convertPicked(Context context, String source) throws IOException {
         Uri uri = source.startsWith("/") ? Uri.fromFile(new File(source)) : Uri.parse(source);
@@ -147,18 +222,30 @@ public final class XheAudio {
         // A first look at the picked video itself, so one that needs nothing is never copied.
         boolean wanted = isFile ? needsFix(input) || hasSamsungBox(input) : needsFix(context, uri) || hasSamsungBox(context, uri);
         if (!wanted) return null;
+        Limits limits = XheAudio.limits;
+        if (isFile && input.length() > limits.inputBytes) throw new OverBudget("the picked video is bigger than a conversion takes");
+        takeSlot();
+        try {
+            return convertPicked(context, uri, input, limits, new Work(limits.workMs));
+        } finally {
+            WORKERS.release();
+        }
+    }
+
+    private static File convertPicked(Context context, Uri uri, File input, Limits limits, Work work) throws IOException {
         File folder = new File(context.getCacheDir(), PICKED);
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("the cache has no room for the converted video");
         long now = System.currentTimeMillis();
         prune(folder, now);
+        if (folder.getUsableSpace() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
         File copied = File.createTempFile(SCRATCH, ".source", folder);
         File sound = null;
         File joined = null;
         try {
             String name;
-            try (InputStream in = isFile ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri)) {
+            try (InputStream in = input != null ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri)) {
                 if (in == null) throw new IOException("the picked video could not be opened");
-                name = copyAndName(in, copied);
+                name = copyAndName(in, copied, limits, work);
             }
             File done = new File(folder, name + ".mp4");
             if (done.length() > 0) {
@@ -168,12 +255,14 @@ public final class XheAudio {
             boolean xhe = needsFix(copied);
             // The video changed after the first look, and what was copied needs nothing.
             if (!xhe && !hasSamsungBox(copied)) return null;
+            // A conversion writes a second copy beside the first; a renamed Samsung box only moves the first.
+            makeRoom(folder, xhe ? copied.length() : 0, now, limits);
             if (xhe) {
                 sound = File.createTempFile(SCRATCH, ".sound.mp4", folder);
                 joined = File.createTempFile(SCRATCH, ".joined.mp4", folder);
                 // The muxer writes only the tracks, so a Samsung box doesn't come along.
-                reencode(copied, sound);
-                join(copied, sound, joined);
+                reencode(copied, sound, work);
+                join(copied, sound, joined, work);
                 if (!repaired(joined, copied)) throw new IOException("the converted video came out incomplete");
             } else {
                 long size = copied.length();
@@ -181,6 +270,7 @@ public final class XheAudio {
                 if (copied.length() != size || hasSamsungBox(copied)) throw new IOException("the renamed video came out wrong");
                 joined = copied;
             }
+            work.check();
             return publish(joined, done);
         } finally {
             copied.delete();
@@ -191,9 +281,10 @@ public final class XheAudio {
 
     /**
      * Copies [in] to [out] and answers the name its converted copy is kept under: the SHA-256 of {@link #CONVERSION}
-     * and every byte copied, in hex.
+     * and every byte copied, in hex. Stops past {@link Limits#inputBytes}, when the disk gets down to its reserve,
+     * when [work] runs out, and when the stream keeps answering with nothing.
      */
-    static String copyAndName(InputStream in, File out) throws IOException {
+    static String copyAndName(InputStream in, File out, Limits limits, Work work) throws IOException {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -203,7 +294,22 @@ public final class XheAudio {
         digest.update(CONVERSION.getBytes(StandardCharsets.US_ASCII));
         try (OutputStream to = new FileOutputStream(out)) {
             byte[] buffer = new byte[1 << 16];
+            long copied = 0;
+            long roomCheckAt = 0;
+            int empty = 0;
             for (int read; (read = in.read(buffer)) != -1; ) {
+                work.check();
+                if (read == 0) {
+                    if (++empty >= STALL_ROUNDS) throw new IOException("the picked video stopped coming");
+                    continue;
+                }
+                empty = 0;
+                copied += read;
+                if (copied > limits.inputBytes) throw new OverBudget("the picked video is bigger than a conversion takes");
+                if (copied >= roomCheckAt) {
+                    if (out.getUsableSpace() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+                    roomCheckAt = copied + (16 << 20);
+                }
                 to.write(buffer, 0, read);
                 digest.update(buffer, 0, read);
             }
@@ -223,10 +329,44 @@ public final class XheAudio {
         throw new IOException("the converted video could not be kept");
     }
 
-    /** Deletes what's in [folder] from more than {@link #KEEP_MS} before [now]. */
+    /**
+     * Deletes what's in [folder] from more than {@link #KEEP_MS} before [now], and scratch files from more than twice a
+     * conversion's time, which a conversion that's still running can't have left.
+     */
     static void prune(File folder, long now) {
         File[] old = folder.listFiles();
-        if (old != null) for (File file : old) if (now - file.lastModified() > KEEP_MS) file.delete();
+        if (old == null) return;
+        long scratch = 2 * limits.workMs;
+        for (File file : old) {
+            long age = now - file.lastModified();
+            if (age > KEEP_MS || (file.getName().startsWith(SCRATCH) && age > scratch)) file.delete();
+        }
+    }
+
+    /** Whether [name] is a finished converted copy's, as {@link #copyAndName} names them. */
+    static boolean finished(String name) {
+        return name.length() == 64 + 4 && name.endsWith(".mp4") && name.substring(0, 64).matches("[0-9a-f]+");
+    }
+
+    /**
+     * Makes room in [folder] for [need] more bytes inside {@link Limits#cacheBytes} by clearing the oldest finished
+     * copies that no send has used in {@link #ACTIVE_MS}, and throws when that isn't enough or the disk would drop
+     * below its reserve. Copies a send may still be reading, and other conversions' files, are never cleared.
+     */
+    static void makeRoom(File folder, long need, long now, Limits limits) throws IOException {
+        if (folder.getUsableSpace() - need < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+        File[] files = folder.listFiles();
+        if (files == null) throw new IOException("the converted copies could not be listed");
+        long used = 0;
+        for (File file : files) used += file.length();
+        Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+        for (File file : files) {
+            if (used + need <= limits.cacheBytes) return;
+            if (!finished(file.getName()) || now - file.lastModified() < ACTIVE_MS) continue;
+            long size = file.length();
+            if (file.delete()) used -= size;
+        }
+        if (used + need > limits.cacheBytes) throw new OverBudget("the converted copies fill their share of the cache");
     }
 
     /**
@@ -235,24 +375,33 @@ public final class XheAudio {
      *
      * <p>A conversion is written beside the copy and replaces it only once it's whole, and its muxer writes only the
      * tracks, so a Samsung box doesn't come along. Until then the copy isn't touched, and a conversion that fails
-     * leaves it exactly as it was.
+     * leaves it exactly as it was. The conversion takes a slot and stays inside {@link #limits} like a picked one.
      */
     static boolean fix(File file) throws IOException {
         String name = file.getName().toLowerCase(java.util.Locale.ROOT);
         if (!name.endsWith(".mp4") && !name.endsWith(".m4v")) return false;
         if (!needsFix(file)) return dropSamsungBoxes(file);
+        Limits limits = XheAudio.limits;
+        if (file.length() > limits.inputBytes) throw new OverBudget("the shared video is bigger than a conversion takes");
         File folder = file.getAbsoluteFile().getParentFile();
-        File sound = File.createTempFile(file.getName() + ".hush-", ".sound.mp4", folder);
-        File joined = File.createTempFile(file.getName() + ".hush-", ".joined.mp4", folder);
+        if (folder.getUsableSpace() - file.length() < limits.reserveBytes) throw new OverBudget("the phone is nearly full");
+        takeSlot();
+        File sound = null;
+        File joined = null;
         try {
-            reencode(file, sound);
-            join(file, sound, joined);
+            Work work = new Work(limits.workMs);
+            sound = File.createTempFile(file.getName() + ".hush-", ".sound.mp4", folder);
+            joined = File.createTempFile(file.getName() + ".hush-", ".joined.mp4", folder);
+            reencode(file, sound, work);
+            join(file, sound, joined, work);
             if (!repaired(joined, file)) throw new IOException("the converted video came out incomplete");
+            work.check();
             if (!joined.renameTo(file)) throw new IOException("the converted video could not replace the copy");
             return true;
         } finally {
-            sound.delete();
-            joined.delete();
+            WORKERS.release();
+            if (sound != null) sound.delete();
+            if (joined != null) joined.delete();
         }
     }
 
@@ -413,9 +562,10 @@ public final class XheAudio {
 
     /**
      * Writes the first sound track of [in] to [out] as AAC-LC, each block stamped from the decoder's own time for it
-     * so the sound still lines up with the picture. Throws when a codec can't be had, stalls or fails.
+     * so the sound still lines up with the picture. Throws when a codec can't be had, stalls or fails, or [work] runs
+     * out.
      */
-    static void reencode(File in, File out) throws IOException {
+    static void reencode(File in, File out, Work work) throws IOException {
         MediaExtractor source = null;
         MediaCodec decoder = null;
         MediaCodec encoder = null;
@@ -457,6 +607,7 @@ public final class XheAudio {
             int written = 0;
 
             while (!encoderDone) {
+                work.check();
                 boolean worked = false;
 
                 // 1. The file's next sample into the decoder.
@@ -618,9 +769,10 @@ public final class XheAudio {
 
     /**
      * Writes [picture]'s picture tracks and [sound]'s one sound track into [out], each sample as it was, taking the
-     * earlier of the two next samples each time so the file stays interleaved. Keeps the picture's rotation.
+     * earlier of the two next samples each time so the file stays interleaved. Keeps the picture's rotation. Throws
+     * when [work] runs out.
      */
-    static void join(File picture, File sound, File out) throws IOException {
+    static void join(File picture, File sound, File out, Work work) throws IOException {
         MediaExtractor pictures = new MediaExtractor();
         MediaExtractor sounds = new MediaExtractor();
         MediaMuxer muxer = null;
@@ -657,6 +809,7 @@ public final class XheAudio {
             long shift = startShift(pictures.getSampleTrackIndex() >= 0, pictures.getSampleTime(),
                 sounds.getSampleTrackIndex() >= 0, sounds.getSampleTime());
             while (true) {
+                work.check();
                 // A sample time can be below zero (an encoder-delay edit list), so only the track index marks the end.
                 boolean pictureLeft = pictures.getSampleTrackIndex() >= 0;
                 boolean soundLeft = sounds.getSampleTrackIndex() >= 0;
