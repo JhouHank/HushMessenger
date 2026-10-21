@@ -2616,28 +2616,24 @@ public class CompatReport {
     static boolean videoPassthroughSite(Method method) {
         var code = instructions(method);
         var sites = new ArrayList<Integer>();
-        for (int c = 11; c < code.size() - 1; c++)
-            if (code.get(c).getOpcode() == Opcode.CMP_LONG && code.get(c + 1).getOpcode() == Opcode.IF_LTZ &&
-                code.get(c - 6).getOpcode() == Opcode.CONST_WIDE_16 && Long.valueOf(8000L).equals(wide(code.get(c - 6))) &&
-                code.get(c - 3).getOpcode() == Opcode.MUL_INT_LIT16 && Long.valueOf(1000L).equals(wide(code.get(c - 3)))) sites.add(c);
+        for (int c = 9; c < code.size() - 1; c++)
+            if (code.get(c).getOpcode() == Opcode.CMP_LONG && code.get(c + 1).getOpcode() == Opcode.IF_GEZ &&
+                code.get(c - 4).getOpcode() == Opcode.CONST_WIDE_16 && Long.valueOf(8000L).equals(wide(code.get(c - 4))) &&
+                code.get(c - 2).getOpcode() == Opcode.CONST_WIDE_32 && Long.valueOf(5_000_000L).equals(wide(code.get(c - 2)))) sites.add(c);
         if (sites.size() != 1) return false;
         int c = sites.get(0);
         var cmp = (ThreeRegisterInstruction) code.get(c);
         int limit = cmp.getRegisterC(), size = cmp.getRegisterB(), result = cmp.getRegisterA();
         var add = twoRegister(code, c - 1, Opcode.ADD_LONG_2ADDR);
-        var widenMargin = twoRegister(code, c - 2, Opcode.INT_TO_LONG);
-        var margin = twoRegister(code, c - 3, Opcode.MUL_INT_LIT16);
-        var div = twoRegister(code, c - 5, Opcode.DIV_LONG_2ADDR);
-        var mul = twoRegister(code, c - 7, Opcode.MUL_LONG_2ADDR);
-        var duration = twoRegister(code, c - 8, Opcode.IGET_WIDE);
-        var widen = twoRegister(code, c - 9, Opcode.INT_TO_LONG);
-        var bytes = twoRegister(code, c - 11, Opcode.IGET_WIDE);
-        if (add == null || widenMargin == null || margin == null || div == null || mul == null || duration == null || widen == null || bytes == null)
-            return false;
-        int temp = register(code.get(c - 6));
-        boolean marginInTemp = widenMargin.getRegisterA() == temp && widenMargin.getRegisterB() == temp &&
-            margin.getRegisterA() == temp && margin.getRegisterB() == temp;
-        if (add.getRegisterA() != limit || add.getRegisterB() != temp || !marginInTemp || div.getRegisterA() != limit ||
+        var div = twoRegister(code, c - 3, Opcode.DIV_LONG_2ADDR);
+        var mul = twoRegister(code, c - 5, Opcode.MUL_LONG_2ADDR);
+        var duration = twoRegister(code, c - 6, Opcode.IGET_WIDE);
+        var widen = twoRegister(code, c - 7, Opcode.INT_TO_LONG);
+        var bytes = twoRegister(code, c - 9, Opcode.IGET_WIDE);
+        if (add == null || div == null || mul == null || duration == null || widen == null || bytes == null) return false;
+        int temp = register(code.get(c - 4));
+        if (register(code.get(c - 2)) != temp) return false;
+        if (add.getRegisterA() != limit || add.getRegisterB() != temp || div.getRegisterA() != limit ||
             div.getRegisterB() != temp || mul.getRegisterA() != limit || mul.getRegisterB() != duration.getRegisterA() ||
             widen.getRegisterA() != limit || widen.getRegisterB() != limit) return false;
         var bytesField = (FieldReference) ((ReferenceInstruction) bytes).getReference();
@@ -2646,7 +2642,7 @@ public class CompatReport {
             !bytesField.getDefiningClass().equals(durationField.getDefiningClass()) || bytesField.getName().equals(durationField.getName()) ||
             bytes.getRegisterB() != duration.getRegisterB()) return false;
         // Nothing between the size read and the compare may write the size pair.
-        for (int at = c - 10; at < c; at++) {
+        for (int at = c - 8; at < c; at++) {
             if (!(code.get(at) instanceof OneRegisterInstruction one)) continue;
             int written = one.getRegisterA();
             if (written == size || written == size + 1 || written + 1 == size) return false;
