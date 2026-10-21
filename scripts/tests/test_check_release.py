@@ -366,6 +366,22 @@ class ReleaseChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "v1.2.2 is missing"):
             check(held)
 
+    def test_a_bundle_and_source_both_without_a_timestamp_fail(self):
+        evidence = self.root / "patches/build/reports/catalog-evidence.json"
+        held = self.hold()
+        self.write("gradle.properties", "version=1.2.3\n")
+        with zipfile.ZipFile(self.bundle, "w") as archive:
+            archive.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\r\nVersion: 1.2.3\r\n\r\n")
+            archive.writestr("classes.dex", b"fixture")
+            archive.writestr("extensions/messenger.mpe", b"fixture")
+        # Missing on both sides is no match, so the freshness check can't pass by comparing nothing.
+        for name, check in (
+            ("development", lambda: release.verify_development(self.root, self.bundle, evidence, held)),
+            ("release", lambda: release.verify(self.root)),
+        ):
+            with self.subTest(name), self.assertRaisesRegex(ValueError, "no bundle timestamp"):
+                check()
+
     @unittest.skipIf(GIT is None, "git isn't installed")
     def test_tagged_feed_is_read_from_the_release_tag_with_git(self):
         repository = self.root / "repository"
