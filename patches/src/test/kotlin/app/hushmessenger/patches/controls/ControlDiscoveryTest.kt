@@ -76,7 +76,8 @@ class ControlDiscoveryTest {
                         new-instance v1, Ljava/util/ArrayList;
                         invoke-static {}, $IMMUTABLE_LIST->builder()$LIST_BUILDER
                         move-result-object v2
-                        invoke-static {v2, v1}, LX/34B;->A0l(${LIST_BUILDER}Ljava/lang/Iterable;)$IMMUTABLE_LIST
+                        invoke-virtual {v2, v1}, $LIST_BUILDER->addAll(Ljava/lang/Iterable;)$LIST_BUILDER
+                        invoke-static {v2}, LX/32c;->A00($LIST_BUILDER)$IMMUTABLE_LIST
                         move-result-object v3
                         return-void
                     """.trimIndent()

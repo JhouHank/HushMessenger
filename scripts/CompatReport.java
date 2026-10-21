@@ -352,18 +352,32 @@ public class CompatReport {
     }
 
     /**
-     * True when a method copies a list into an ImmutableList.Builder exactly once through 583's static
-     * (ImmutableList.Builder, Iterable) -> ImmutableList call, made with invoke-static and not its range form, and no
-     * branch, switch case or catch lands on that call, since the patch's hook goes just before it. Mirrors
-     * validateKeyboardTabsInline in ControlHooks.kt.
+     * True when a method copies a list into a fresh ImmutableList.Builder exactly once, through 584's plain
+     * invoke-virtual addAll(Iterable) straight after ImmutableList.builder() and followed at once by the static
+     * (Builder) -> ImmutableList build on the same builder, and no branch, switch case or catch lands on the addAll,
+     * since the patch's hook goes just before it. Mirrors validateKeyboardTabsInline in ControlHooks.kt.
      */
     static boolean keyboardTabCopy(Method method) {
-        String builder = "Lcom/google/common/collect/ImmutableList$Builder;", iterable = "Ljava/lang/Iterable;";
+        String builder = "Lcom/google/common/collect/ImmutableList$Builder;";
         var c = instructions(method); var copies = new ArrayList<Integer>();
-        for (int i = 0; i < c.size(); i++) if (c.get(i).getOpcode() == Opcode.INVOKE_STATIC && c.get(i) instanceof ReferenceInstruction r &&
-            r.getReference() instanceof MethodReference m && IMMUTABLE_LIST.equals(m.getReturnType()) &&
-            m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder, iterable))) copies.add(i);
-        return copies.size() == 1 && !mediaTargets(method).contains(copies.get(0));
+        for (int i = 0; i < c.size(); i++) if (c.get(i).getOpcode() == Opcode.INVOKE_VIRTUAL && c.get(i) instanceof ReferenceInstruction r &&
+            r.getReference() instanceof MethodReference m && builder.equals(m.getDefiningClass()) && "addAll".equals(m.getName()) &&
+            builder.equals(m.getReturnType()) &&
+            m.getParameterTypes().stream().map(Object::toString).toList().equals(List.of("Ljava/lang/Iterable;"))) copies.add(i);
+        if (copies.size() != 1) return false;
+        int at = copies.get(0);
+        if (at < 2 || at + 1 >= c.size() || mediaTargets(method).contains(at)) return false;
+        if (c.get(at - 1).getOpcode() != Opcode.MOVE_RESULT_OBJECT || c.get(at - 2).getOpcode() != Opcode.INVOKE_STATIC ||
+            !(c.get(at - 2) instanceof ReferenceInstruction made) ||
+            !(IMMUTABLE_LIST + "->builder()" + builder).equals(made.getReference().toString())) return false;
+        int made1 = ((OneRegisterInstruction) c.get(at - 1)).getRegisterA();
+        var add = (FiveRegisterInstruction) c.get(at);
+        if (add.getRegisterCount() != 2 || add.getRegisterC() != made1 || add.getRegisterD() == made1) return false;
+        if (c.get(at + 1).getOpcode() != Opcode.INVOKE_STATIC || !(c.get(at + 1) instanceof ReferenceInstruction next) ||
+            !(next.getReference() instanceof MethodReference build) || !IMMUTABLE_LIST.equals(build.getReturnType()) ||
+            !build.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(builder))) return false;
+        var buildCall = (FiveRegisterInstruction) c.get(at + 1);
+        return buildCall.getRegisterCount() == 1 && buildCall.getRegisterC() == made1;
     }
 
     /** "583.0.0.29.95 (version code 346611351 or 346611369)", joined with " or " across version names. */
