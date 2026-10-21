@@ -283,7 +283,7 @@ class NativeMediaControlsTest {
             val base = SYNTHETIC_PROFILE
             activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,
                 base.peopleKey, base.peopleFlagCheck, base.subtabsSupplier, base.browserPreferenceKey, base.browserPreferenceIndex,
-                base.adFilterSize, base.adFilterExits, base.bubbleCapabilityGetter, base.bubbleRolloutGetter, base.nativeBubbleRoutes,
+                base.bubbleCapabilityGetter, base.bubbleRolloutGetter, base.nativeBubbleRoutes,
                 base.nativeCommunityInbox)
             val method = findAiStickerCells(aiStickerCellFixture(cell.render)).single() as MutableMethod
             val before = method.implementation!!.instructions.toList()

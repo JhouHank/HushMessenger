@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed and fixed
+
+- **Hide inbox ads** is gone. Meta stopped selling Messenger inbox ads in November 2025, and Messenger 584 took out the ad cards the switch used to filter, so there's nothing left for it to hide. If you pick patches by hand in Morphe, it just won't be in the list anymore.
+
 ### Docs
 
 - The README's troubleshooting list now covers a cloned Messenger showing the settings icon again, chats and calls notifying twice because of the Facebook app, and restoring chats with a PIN when the Google Drive restore errors out.

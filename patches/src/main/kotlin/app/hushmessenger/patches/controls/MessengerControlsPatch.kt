@@ -140,7 +140,6 @@ internal fun MutableMethod.validateHook(hook: String) {
         "screenshot_viewers" -> validateScreenshotViewer()
         "subtabs" -> validateSubtabs()
         "browser" -> validateBrowserPreference()
-        "ads" -> validateAdFilter()
         "people_jewel" -> validatePeopleSection()
         "people_tab" -> validatePeopleTab()
         "people_search" -> validatePeopleSearch()
@@ -199,7 +198,6 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             "screenshot_viewers" -> method.injectScreenshotViewer()
             "subtabs" -> method.injectSubtabs()
             "browser" -> method.injectBrowserPreference()
-            "ads" -> method.injectAdFilter()
             "people_jewel" -> method.injectPeopleSection()
             "people_tab" -> method.injectPeopleTab()
             "people_search" -> method.injectPeopleSearch()
@@ -363,8 +361,6 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
     }
 }
 
-@Suppress("unused")
-val hideInboxAdsPatch = controlPatch("ads", "Hide inbox ads", "Hides ad cards in your chat list. Meta stopped selling Messenger inbox ads in November 2025, so this is only a safeguard in case they come back.", "Inbox")
 @Suppress("unused")
 val hidePeoplePatch = controlPatch("people", "Hide People You May Know", "Hides suggested people in chats, search and stories, and on the People and Notifications tabs, so you only see people you know.", "Inbox", "people", "people_list_end", "people_jewel", "people_tab", "people_search", "people_story", INBOX_REFRESH_HOOK)
 @Suppress("unused")

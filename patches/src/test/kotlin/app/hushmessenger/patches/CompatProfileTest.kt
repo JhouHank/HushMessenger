@@ -45,8 +45,6 @@ class CompatProfileTest {
         "subtabsSupplier $subtabsSupplier",
         "browserPreferenceKey $browserPreferenceKey",
         "browserPreferenceIndex $browserPreferenceIndex",
-        "adFilterSize $adFilterSize",
-        "adFilterExits ${adFilterExits.joinToString(" ")}",
         "bubbleCapabilityGetter $bubbleCapabilityGetter",
         "bubbleRolloutGetter $bubbleRolloutGetter",
         "nativeBubbleRoutes $nativeBubbleRoutes",
@@ -124,12 +122,12 @@ class CompatProfileTest {
     @Test fun aRecordWithUnresolvedControlsListsThemAndGeneratesNothing(@TempDir dir: Path) {
         val broken = dir.resolve("346999999.txt")
         broken.writeLines(profiles.resolve("346611351.txt").readLines()
-            .filterNot { it.startsWith("hook ads ") || it.startsWith("browserPreferenceIndex ") }
+            .filterNot { it.startsWith("hook ai_fab ") || it.startsWith("browserPreferenceIndex ") }
             .map { if (it == "code 346611351") "code 346999999" else it } + "hook people LX/Extra;->A00()Z")
         val (exit, output) = compatReport("--kotlin", broken.toString())
         assertEquals(1, exit, output)
         assertContains(output, "No profile generated. These controls did not resolve:")
-        assertContains(output, "ads: expected 1 hooks, found 0")
+        assertContains(output, "ai_fab: expected 1 hooks, found 0")
         assertContains(output, "people: expected 2 hooks, found 3")
         assertContains(output, "browser: browserPreferenceIndex not found")
         assertFalse("internal val" in output, output)
@@ -142,7 +140,7 @@ class CompatProfileTest {
         val (exit, output) = compatReport(apk.toString(), "--save", saved.toString())
         assertEquals(1, exit, output)
         assertContains(output, "PROFILE: not written. These controls did not resolve:")
-        for (key in listOf("ads", "stories", "menu_settings")) assertContains(output, "       $key: expected")
+        for (key in listOf("ai_fab", "stories", "menu_settings")) assertContains(output, "       $key: expected")
         assertContains(output, "Install beside Meta apps: expected 6 permission loads, found 0")
         assertEquals(emptyList(), saved.listDirectoryEntries())
     }

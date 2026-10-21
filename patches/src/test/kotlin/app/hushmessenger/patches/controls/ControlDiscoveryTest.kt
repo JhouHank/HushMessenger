@@ -100,13 +100,6 @@ class ControlDiscoveryTest {
                         else -> "const-string v0, \"Unknown ViewHolder\"\nreturn-void"
                     }
                     "browser" -> "const/4 v0, 0x0\nreturn v0"
-                    "ads" -> """
-                        const-string v0, "messaging.inbox.itemlistprocessor.ItemListProcessorInterfaceSpec"
-                        const-string v0, "processItems"
-                        const-string v0, "new_friend_bump_threads"
-                        const/4 v0, 0x0
-                        return-object v0
-                    """.trimIndent()
                     else -> error("Missing synthetic resolver fixture for $key")
                 }
                 val staticGate = (key in pluginGates || key == "ai_search" || key == "growth_story_card" || key == APP_ICONS) &&
@@ -125,7 +118,7 @@ class ControlDiscoveryTest {
             }
             fixtureClass(type, grouped + extra, originals[type],
                 if (type == "LX/8xp;") listOf(SCREEN_CAPTURE_CALLBACK) else emptyList())
-        } + listOf(fixtureClass(AD_ITEM), fixtureClass(IMMUTABLE_LIST, listOf(
+        } + listOf(fixtureClass(IMMUTABLE_LIST, listOf(
             fixtureMethod("$IMMUTABLE_LIST->copyOf(Ljava/util/Collection;)$IMMUTABLE_LIST",
                 "const/4 v0, 0x0\nreturn-object v0", flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value),
         )), peopleJewelKeyHolder(), storyCardKeyHolder(), debugDumperFixture(), messageWrapperFixture(type = "LX/K1Y;"), searchFieldFixture()) +
@@ -270,17 +263,6 @@ class ControlDiscoveryTest {
         val missing = mirroredControls(fixture.filter { it !== peopleClass })
         assertFailsWith<PatchException> { validateControls(missing, setOf("people")) }
         validateControls(missing, setOf("moments"))
-    }
-
-    @Test fun adResolutionRequiresTheHostTypeAndThePublicStaticCopyMethod() {
-        for (missing in listOf(AD_ITEM, IMMUTABLE_LIST)) {
-            val found = mirroredControls(completeFixture().filter { it.type != missing })
-            assertFailsWith<PatchException> { validateControls(found, setOf("ads")) }
-            validateControls(found, setOf("people"))
-        }
-        val fixture = completeFixture()
-        fixture.single { it.type == IMMUTABLE_LIST }.methods.single().setAccessFlags(AccessFlags.PUBLIC.value)
-        assertTrue(mirroredControls(fixture).getValue("ads").isEmpty())
     }
 
     @Test fun misleadingPluginSignaturesAndChangedRunnableNamesDoNotMatch() {

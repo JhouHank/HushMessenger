@@ -74,7 +74,6 @@ public class CompatReport {
     static final String META_SIGNER =
         "911d604446084ca7f4760b775bfc160fa8702441240a7258645d7a72c4312d27";
 
-    static final String AD_ITEM = "Lcom/facebook/messaging/business/inboxads/common/InboxAdsItem;";
     static final String IMMUTABLE_LIST = "Lcom/google/common/collect/ImmutableList;";
     static final String PREFERENCES = "Lcom/facebook/prefs/shared/FbSharedPreferences;";
     static final String MONTAGE_CARD = "Lcom/facebook/messaging/montage/model/MontageCard;";
@@ -93,8 +92,6 @@ public class CompatReport {
     static final String EMOJI_DRAWER_ANCHOR = "Cannot render redesigned drawer with search icon ";
     // Controls whose hook count follows how Redex inlined one flag read, so it differs between releases
     static final Set<String> RELEASE_HOOK_COUNTS = Set.of("emoji_drawer");
-    // The inbox ad filter's exit registers in 583, in order
-    static final List<Integer> AD_FILTER_RESULTS = List.of(7, 2);
 
     // Material You theme finds its targets by shape when it patches (MaterialYouPatch.kt), so no profile records them
     static final String DARK_SCHEME = "Lcom/facebook/mig/scheme/schemes/DarkColorScheme;";
@@ -164,7 +161,6 @@ public class CompatReport {
     // Patch name -> hook keys
     static final Map<String, List<String>> PATCHES = new LinkedHashMap<>();
     static {
-        PATCHES.put("Hide inbox ads", List.of("ads"));
         PATCHES.put("Hide People You May Know", List.of("people", "people_list_end", "people_jewel", "people_tab", "people_search", "people_story",
             "people_inbox_refresh"));
         PATCHES.put("Hide friend request cards", List.of("friend_requests"));
@@ -252,14 +248,12 @@ public class CompatReport {
         FIELD_CONTROLS.put("subtabsSupplier", Set.of("subtabs"));
         FIELD_CONTROLS.put("browserPreferenceKey", Set.of("browser"));
         FIELD_CONTROLS.put("browserPreferenceIndex", Set.of("browser"));
-        FIELD_CONTROLS.put("adFilterSize", Set.of("ads"));
-        FIELD_CONTROLS.put("adFilterExits", Set.of("ads"));
         FIELD_CONTROLS.put("bubbleCapabilityGetter", Set.of("bubble_mode"));
         FIELD_CONTROLS.put("bubbleRolloutGetter", Set.of("bubble_mode"));
         FIELD_CONTROLS.put("nativeBubbleRoutes", Set.of("bubbles", "bubble_mode"));
         FIELD_CONTROLS.put("nativeCommunityInbox", Set.of("community_inbox"));
     }
-    static final Set<String> NUMBER_FIELDS = Set.of("browserPreferenceIndex", "adFilterSize");
+    static final Set<String> NUMBER_FIELDS = Set.of("browserPreferenceIndex");
     static final String PERMISSION_LOADS = "Install beside Meta apps";
 
     /**
@@ -642,22 +636,6 @@ public class CompatReport {
         }
         var community = communityInbox(classes);
         if (community != null) found.fields.put("nativeCommunityInbox", community.identity());
-        var ads = controls.get("ads");
-        if (ads.size() == 1) {
-            var code = instructions(ads.get(0));
-            var exits = new ArrayList<String>();
-            var results = new ArrayList<Integer>();
-            for (int i = 0; i < code.size(); i++) {
-                if (code.get(i).getOpcode() != Opcode.RETURN_OBJECT) continue;
-                exits.add(String.valueOf(i));
-                results.add(code.get(i) instanceof OneRegisterInstruction r ? r.getRegisterA() : -1);
-            }
-            // ControlHooks.kt wraps each exit's own result register, so only the pinned pair records
-            if (!exits.isEmpty() && ads.get(0).getImplementation().getRegisterCount() == 24 && AD_FILTER_RESULTS.equals(results)) {
-                found.fields.put("adFilterSize", String.valueOf(code.size()));
-                found.fields.put("adFilterExits", String.join(" ", exits));
-            }
-        }
         for (var site : findDexSites(classes)) found.dexSites.put(site.getKey(), site.getValue());
         return found;
     }
@@ -1335,9 +1313,7 @@ public class CompatReport {
         out.append("    ),\n");
         for (var name : FIELD_CONTROLS.keySet()) {
             var value = build.fields.get(name);
-            var kotlin = NUMBER_FIELDS.contains(name) ? value
-                : "adFilterExits".equals(name) ? "listOf(" + String.join(", ", value.split(" ")) + ")"
-                : kotlinString(value);
+            var kotlin = NUMBER_FIELDS.contains(name) ? value : kotlinString(value);
             out.append("    ").append(name).append(" = ").append(kotlin).append(",\n");
         }
         return out.append(")\n").toString();
@@ -4593,23 +4569,6 @@ public class CompatReport {
         if (changedViewer) found.get("screenshot_viewers").clear();
         var jewelCandidates = new ArrayList<Map.Entry<Method, Set<String>>>();
 
-        boolean hasAdItem = false, hasImmutableCopy = false;
-        for (var cls : classes) {
-            if (cls.getType().equals(AD_ITEM)) hasAdItem = true;
-            if (cls.getType().equals(IMMUTABLE_LIST)) {
-                for (var m : cls.getMethods()) {
-                    if ("copyOf".equals(m.getName()) &&
-                        m.getParameterTypes().equals(List.of("Ljava/util/Collection;")) &&
-                        m.getReturnType().equals(IMMUTABLE_LIST) &&
-                        AccessFlags.PUBLIC.isSet(m.getAccessFlags()) &&
-                        AccessFlags.STATIC.isSet(m.getAccessFlags())) {
-                        hasImmutableCopy = true;
-                    }
-                }
-            }
-        }
-        boolean adContract = hasAdItem && hasImmutableCopy;
-
         // Collect people jewel key fields
         var peopleJewelKeys = new HashSet<String>();
         for (var cls : classes) {
@@ -4765,15 +4724,6 @@ public class CompatReport {
                             }
                         }
                     }
-                }
-
-                // ads
-                if (adContract && IMMUTABLE_LIST.equals(method.getReturnType()) &&
-                    paramTypes.size() == 3 &&
-                    strings.contains("messaging.inbox.itemlistprocessor.ItemListProcessorInterfaceSpec") &&
-                    strings.contains("processItems") &&
-                    strings.contains("new_friend_bump_threads")) {
-                    found.get("ads").add(method);
                 }
 
                 // stories

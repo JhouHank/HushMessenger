@@ -20,9 +20,6 @@ internal class ControlProfile(
     /** The external-browser preference key and the index of the read that loads it. */
     val browserPreferenceKey: String,
     val browserPreferenceIndex: Int,
-    /** Instruction count and exits of the inbox item processor the ad filter edits. */
-    val adFilterSize: Int,
-    val adFilterExits: List<Int>,
     val bubbleCapabilityGetter: String,
     val bubbleRolloutGetter: String,
     /** Existing attachment, long-lived shortcut and conversation routes, separated by |. */
@@ -42,7 +39,6 @@ internal val BASE_PROFILE = ControlProfile(
             "LX/27U;->Dnw(LX/0Cn;Z)V",
             "LX/6Ma;->A00(LX/6FH;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
         ),
-        "ads" to setOf("LX/2I0;->DBC(LX/1jp;Lcom/google/common/collect/ImmutableList;Ljava/lang/String;)Lcom/google/common/collect/ImmutableList;"),
         "ai_commands" to setOf("LX/7Qe;->A06(LX/7Qe;Lcom/facebook/messaging/model/threadkey/ThreadKey;)Ljava/util/List;"),
         "ai_fab" to setOf("LX/6sF;->render(LX/2Cf;)LX/1Gu;"),
         "ai_mention_rows" to setOf(
@@ -224,8 +220,6 @@ internal val BASE_PROFILE = ControlProfile(
     subtabsSupplier = "LX/2HF;->A00:Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;",
     browserPreferenceKey = "LX/1GS;->A1U:LX/2vT;",
     browserPreferenceIndex = 40,
-    adFilterSize = 1460,
-    adFilterExits = listOf(1447, 1456),
     bubbleCapabilityGetter = "LX/1iw;->A03(Lcom/facebook/auth/usersession/FbUserSession;I)Z",
     bubbleRolloutGetter = "Lcom/facebook/mobileconfig/factory/MobileConfigUnsafeContext;->AjR(J)Z",
     nativeBubbleRoutes = "LX/8O9;->A02(Landroid/graphics/Bitmap;LX/0MV;Lcom/facebook/auth/usersession/FbUserSession;LX/8OD;Lcom/facebook/messaging/model/threads/ThreadSummary;LX/8L5;Lcom/facebook/push/constants/PushProperty;Z)V|LX/8OB;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/messaging/model/threadkey/ThreadKey;Ljava/lang/String;)LX/8OD;|LX/HXN;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/auth/usersession/FbUserSession;LX/HXN;Lcom/facebook/messaging/model/threads/ThreadSummary;)Z",
@@ -243,7 +237,6 @@ internal val PROFILE_346611351 = ControlProfile(
             "LX/27U;->Dnl(LX/0Cn;Z)V",
             "LX/6Js;->A00(LX/6CS;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
         ),
-        "ads" to setOf("LX/2I0;->DB1(LX/1jp;Lcom/google/common/collect/ImmutableList;Ljava/lang/String;)Lcom/google/common/collect/ImmutableList;"),
         "ai_commands" to setOf("LX/7Na;->A06(LX/7Na;Lcom/facebook/messaging/model/threadkey/ThreadKey;)Ljava/util/List;"),
         "ai_fab" to setOf("LX/6pB;->render(LX/2Cf;)LX/1Gu;"),
         "ai_mention_rows" to setOf(
@@ -425,8 +418,6 @@ internal val PROFILE_346611351 = ControlProfile(
     subtabsSupplier = "LX/2HF;->A00:Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;",
     browserPreferenceKey = "LX/1GS;->A1U:LX/2vT;",
     browserPreferenceIndex = 40,
-    adFilterSize = 1460,
-    adFilterExits = listOf(1447, 1456),
     bubbleCapabilityGetter = "LX/1iw;->A03(Lcom/facebook/auth/usersession/FbUserSession;I)Z",
     bubbleRolloutGetter = "Lcom/facebook/mobileconfig/factory/MobileConfigUnsafeContext;->AjS(J)Z",
     nativeBubbleRoutes = "LX/8L5;->A02(Landroid/graphics/Bitmap;LX/0MV;Lcom/facebook/auth/usersession/FbUserSession;LX/8L9;Lcom/facebook/messaging/model/threads/ThreadSummary;LX/8I1;Lcom/facebook/push/constants/PushProperty;Z)V|LX/8L7;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/messaging/model/threadkey/ThreadKey;Ljava/lang/String;)LX/8L9;|LX/HTo;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/auth/usersession/FbUserSession;LX/HTo;Lcom/facebook/messaging/model/threads/ThreadSummary;)Z",

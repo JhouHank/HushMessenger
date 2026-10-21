@@ -1159,22 +1159,6 @@ public final class Settings {
         view.setTypeface(chosen, style);
     }
 
-    /** Null means return the exact original list. Only typed ad rows are removed. */
-    public static List<?> filterInboxAds(List<?> items) {
-        if (!enabled("ads") || items == null || items.isEmpty()) return null;
-        List<Object> filtered = null;
-        for (int index = 0; index < items.size(); index++) {
-            Object item = items.get(index);
-            boolean ad = false;
-            for (Class<?> type = item == null ? null : item.getClass(); type != null; type = type.getSuperclass()) {
-                if ("com.facebook.messaging.business.inboxads.common.InboxAdsItem".equals(type.getName())) { ad = true; break; }
-            }
-            if (ad && filtered == null) filtered = new ArrayList<>(items.subList(0, index));
-            if (!ad && filtered != null) filtered.add(item);
-        }
-        return filtered;
-    }
-
     /** Only the section renderer receives a copy. The captured native snapshot is never changed. */
     public static List<?> filterJoinedCommunityInboxRows(List<?> items, Object callback, Object filter) {
         return filterJoinedCommunityInboxRows(items, () -> isAllChatsFilter(filter) && HostScreens.isMainInboxScope(callback, filter),

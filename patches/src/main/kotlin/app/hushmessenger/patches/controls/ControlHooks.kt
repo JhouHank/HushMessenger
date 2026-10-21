@@ -38,7 +38,6 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 
 internal const val SETTINGS = "Lapp/hushmessenger/extension/Settings;"
-internal const val AD_ITEM = "Lcom/facebook/messaging/business/inboxads/common/InboxAdsItem;"
 internal const val IMMUTABLE_LIST = "Lcom/google/common/collect/ImmutableList;"
 private const val PEOPLE_JEWEL_KEY = "pymk_jewel_section_hidden"
 /** Only the People tab's suggestion handler starts this coroutine; the handler itself is obfuscated. */
@@ -119,12 +118,6 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     val found = BASE_PROFILE.hooks.keys.associateWith { mutableListOf<Method>() }
     community?.let { found.getValue(COMMUNITY_INBOX).add(it.render) }
     found.getValue("ai_sticker_cell").addAll(findAiStickerCells(classes))
-    val adContract = classes.any { it.type == AD_ITEM } && classes.any { cls ->
-        cls.type == IMMUTABLE_LIST && cls.methods.any {
-            it.name == "copyOf" && it.parameterTypes == listOf("Ljava/util/Collection;") &&
-                it.returnType == IMMUTABLE_LIST && AccessFlags.PUBLIC.isSet(it.accessFlags) && AccessFlags.STATIC.isSet(it.accessFlags)
-        }
-    }
     // Static fields stored by any class initializer that mentions the Notifications tab's "hide suggestions" preference
     // key. validatePeopleSection checks the exact key before anything is edited.
     val peopleJewelKeys = classes.flatMap { cls ->
@@ -223,8 +216,6 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
                 val anchors = strings + method.tableStrings(stringTables)
                 for ((key, spec) in pluginGates) if (anchors.any { it in spec.anchors }) add(key)
             }
-            if (adContract && method.returnType == IMMUTABLE_LIST && method.parameterTypes.size == 3 &&
-                strings.containsAll(setOf("messaging.inbox.itemlistprocessor.ItemListProcessorInterfaceSpec", "processItems", "new_friend_bump_threads"))) add("ads")
             if (gate && "com.facebook.messaging.friendsinboxunit.plugins.inboxunit.FriendsInboxUnitKillSwitch" in strings) add("stories")
             if (cls.type in appIconManagers && method.isAppIconGate()) add(APP_ICONS)
             if (gate) {
@@ -523,36 +514,6 @@ internal fun MutableMethod.validatePluginGate() {
         (tail[3] as? OneRegisterInstruction)?.registerA != (enabled as? OneRegisterInstruction)?.registerA ||
         (tail[4] as? OneRegisterInstruction)?.registerA != (disabled as? OneRegisterInstruction)?.registerA) {
         throw PatchException("Messenger controls: plugin enable/disable behavior changed in ${hookId()}. Use an unmodified supported APK.")
-    }
-}
-
-/** The registers 583 returns from its two exits, in order. */
-private val AD_FILTER_RESULTS = listOf(7, 2)
-
-/** Wrap both exits, including direct branches to a return. The returned list stays intact on the inactive path. */
-internal fun MutableMethod.validateAdFilter(): List<Int> {
-    val code = implementation!!.instructions
-    val exits = code.indices.filter { code[it].opcode == Opcode.RETURN_OBJECT }
-    if (implementation!!.registerCount != 24 || code.size != activeProfile.adFilterSize || exits != activeProfile.adFilterExits ||
-        exits.map { (code[it] as? OneRegisterInstruction)?.registerA ?: -1 } != AD_FILTER_RESULTS) {
-        throw PatchException("Messenger controls: the inbox ad filter exits differ from the tested build")
-    }
-    return exits
-}
-
-internal fun MutableMethod.injectAdFilter() {
-    val exits = validateAdFilter()
-    for (index in exits.reversed()) {
-        val result = (implementation!!.instructions[index] as OneRegisterInstruction).registerA
-        replaceInstruction(index, "invoke-static {v$result}, $SETTINGS->filterInboxAds(Ljava/util/List;)Ljava/util/List;")
-        addInstructionsWithLabels(index + 1, """
-            move-result-object v0
-            if-eqz v0, :original_list
-            invoke-static {v0}, $IMMUTABLE_LIST->copyOf(Ljava/util/Collection;)$IMMUTABLE_LIST
-            move-result-object v$result
-            :original_list
-            return-object v$result
-        """.trimIndent())
     }
 }
 

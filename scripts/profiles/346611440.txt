@@ -5,7 +5,6 @@ sha256 cbb1b91799aba7a39afbd34f3daf3d325d1c715c8f41110cb95c44c45c7283bd
 hook ad_context_banner LX/HV9;->A00()Z
 hook ad_events LX/27U;->Dnw(LX/0Cn;Z)V
 hook ad_events LX/6Ma;->A00(LX/6FH;Lcom/facebook/auth/usersession/FbUserSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-hook ads LX/2I0;->DBC(LX/1jp;Lcom/google/common/collect/ImmutableList;Ljava/lang/String;)Lcom/google/common/collect/ImmutableList;
 hook ai_commands LX/7Qe;->A06(LX/7Qe;Lcom/facebook/messaging/model/threadkey/ThreadKey;)Ljava/util/List;
 hook ai_fab LX/6sF;->render(LX/2Cf;)LX/1Gu;
 hook ai_mention_rows LX/1yJ;->A0Q()Z
@@ -196,8 +195,6 @@ peopleFlagCheck LX/17v;->A1Z(Ljava/lang/Object;J)Z
 subtabsSupplier LX/2HF;->A00:Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;
 browserPreferenceKey LX/1GS;->A1U:LX/2vT;
 browserPreferenceIndex 40
-adFilterSize 1460
-adFilterExits 1447 1456
 bubbleCapabilityGetter LX/1iw;->A03(Lcom/facebook/auth/usersession/FbUserSession;I)Z
 bubbleRolloutGetter Lcom/facebook/mobileconfig/factory/MobileConfigUnsafeContext;->AjR(J)Z
 nativeBubbleRoutes LX/8O9;->A02(Landroid/graphics/Bitmap;LX/0MV;Lcom/facebook/auth/usersession/FbUserSession;LX/8OD;Lcom/facebook/messaging/model/threads/ThreadSummary;LX/8L5;Lcom/facebook/push/constants/PushProperty;Z)V|LX/8OB;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/messaging/model/threadkey/ThreadKey;Ljava/lang/String;)LX/8OD;|LX/HXN;->A04(Landroid/content/Context;Landroid/graphics/Bitmap;Lcom/facebook/auth/usersession/FbUserSession;LX/HXN;Lcom/facebook/messaging/model/threads/ThreadSummary;)Z

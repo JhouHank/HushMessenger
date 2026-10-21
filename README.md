@@ -56,7 +56,6 @@ The screenshots below show the settings in the current release, in the dark and 
 
 | Switch | What it does |
 | --- | --- |
-| Hide inbox ads | Filters Messenger's older inbox ad cards. Experimental, since no live inbox ad has shown up on the test accounts yet. |
 | Hide joined community chats | Takes joined channels and announcements out of the main Chats list. The other chips keep them. |
 | Hide People You May Know | Removes suggested people from the chat list, search, stories and the People and Notifications tabs. |
 | Hide friend request cards | Hides friend request cards in the chat list. Nobody gets accepted or declined. |

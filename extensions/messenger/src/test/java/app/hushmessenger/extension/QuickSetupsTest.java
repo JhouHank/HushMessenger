@@ -71,9 +71,9 @@ public class QuickSetupsTest {
 
     @Test public void onlyControlsItMaySetAndThatAreSavedAsSomethingElseChange() {
         SharedPreferences prefs = Settings.preferences;
-        prefs.edit().putBoolean("ads", true).commit();
+        prefs.edit().putBoolean("growth", true).commit();
         Map<String, Boolean> changes = QuickSetups.changes(QuickSetups.values("quiet"), prefs, key -> !"people".equals(key));
-        assertFalse(changes.containsKey("ads"));
+        assertFalse(changes.containsKey("growth"));
         assertFalse(changes.containsKey("people"));
         assertEquals(QuickSetups.QUIET.size() - 2, changes.size());
         assertFalse(changes.containsValue(false));
@@ -127,7 +127,7 @@ public class QuickSetupsTest {
     }
 
     @Test public void aChoiceWithNoneOfItsSwitchesInTheBundleSaysSoInsteadOfAlreadySet() throws Exception {
-        installedFeatures("ads", "bubbles");
+        installedFeatures("growth", "bubbles");
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             View root = screen.get().getWindow().getDecorView();
             root.findViewWithTag("tab_app").performClick();
@@ -145,7 +145,7 @@ public class QuickSetupsTest {
      * file, still goes off with the rest.
      */
     @Test public void backToDefaultsAlsoTurnsOffAControlThisPhoneCantRun() throws Exception {
-        installedFeatures("ads", "bubbles");
+        installedFeatures("growth", "bubbles");
         Settings.preferences.edit().putBoolean("bubbles", true).commit();
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             View root = screen.get().getWindow().getDecorView();
