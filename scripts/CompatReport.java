@@ -1712,8 +1712,8 @@ public class CompatReport {
     static final String WINDOW = "Landroid/view/Window;";
     static final String SET_FLAGS = WINDOW + "->setFlags(II)V", ADD_FLAGS = WINDOW + "->addFlags(I)V";
     static final int GENERATE_AI_LABEL = 0x7f140559;
-    // The viewer's onCreateDialog override, A1F in every 583 build
-    static final String EPHEMERAL_DIALOG = "A1F";
+    // The viewer's onCreateDialog override, A1K in 584
+    static final String EPHEMERAL_DIALOG = "A1K";
 
     static int mediaTarget(List<Instruction> code, int at) {
         if (!(code.get(at) instanceof OffsetInstruction jump)) return -1;
@@ -1786,7 +1786,7 @@ public class CompatReport {
         } else if (method.getDefiningClass().equals(QUICKSNAP_VIEWER) && method.getName().equals("onCreateView") &&
                 p.equals(List.of("Landroid/view/LayoutInflater;", "Landroid/view/ViewGroup;", "Landroid/os/Bundle;")) && method.getReturnType().equals("Landroid/view/View;")) {
             sites = List.of(32);
-            valid = impl.getRegisterCount() == 23 && Set.of(449, 450).contains(c.size()) && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
+            valid = impl.getRegisterCount() == 23 && c.size() == 451 && mediaResult(c, 26, "Landroid/app/Dialog;", 0) &&
                 mediaNull(c, 27, 0, 33) && mediaWindow(c, 28, "Landroid/app/Dialog;", 0, 1, 33) && mediaLiteral(c, 31, 0) && mediaCall(c, 32, ADD_FLAGS, 1, 0);
         } else return List.of();
         var setters = new ArrayList<Integer>();
