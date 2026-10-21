@@ -2747,11 +2747,33 @@ public class CompatReport {
     }
 
     static boolean isLauncherStart(Method m) {
-        if (!"Z".equals(m.getReturnType()) || AccessFlags.STATIC.isSet(m.getAccessFlags()) || m.getParameterTypes().size() != 1 ||
-            !"Landroid/os/Bundle;".equals(m.getParameterTypes().get(0).toString()) || !stringsOf(m).contains("ActivityLauncher")) return false;
+        if (!"Z".equals(m.getReturnType()) || AccessFlags.STATIC.isSet(m.getAccessFlags()) || m.getParameterTypes().size() != 2 ||
+            !"Landroid/os/Bundle;".equals(m.getParameterTypes().get(0).toString()) ||
+            !m.getParameterTypes().get(1).toString().startsWith("L") || !stringsOf(m).contains("ActivityLauncher")) return false;
         for (var i : m.getImplementation().getInstructions())
             if (i instanceof ReferenceInstruction r && r.getReference() instanceof MethodReference mr && isFragmentStart(mr)) return true;
         return false;
+    }
+
+    static boolean isLauncherCall(MethodReference mr) {
+        return "Z".equals(mr.getReturnType()) && mr.getParameterTypes().size() == 2 &&
+            "Landroid/os/Bundle;".equals(mr.getParameterTypes().get(0).toString()) && mr.getParameterTypes().get(1).toString().startsWith("L");
+    }
+
+    /**
+     * The launcher interface a capture handler starts the camera through, or null. An instance method that casts its event to
+     * ActivateCameraEvent and makes exactly one launcher call. Mirrors SystemCamera.kt captureLauncherType.
+     */
+    static String captureLauncherType(Method m) {
+        if (AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType())) return null;
+        boolean casts = false;
+        var calls = new ArrayList<MethodReference>();
+        for (var i : m.getImplementation().getInstructions()) {
+            if (i.getOpcode() == Opcode.CHECK_CAST && ((ReferenceInstruction) i).getReference() instanceof TypeReference t &&
+                "Lcom/facebook/xapp/messaging/composer/camera/event/ActivateCameraEvent;".equals(t.getType())) casts = true;
+            if (i.getOpcode() == Opcode.INVOKE_INTERFACE && ((ReferenceInstruction) i).getReference() instanceof MethodReference mr && isLauncherCall(mr)) calls.add(mr);
+        }
+        return casts && calls.size() == 1 ? calls.get(0).getDefiningClass() : null;
     }
 
     /**
@@ -2792,15 +2814,15 @@ public class CompatReport {
             if ("V".equals(m.getReturnType()) && params.equals(List.of(MONTAGE_PARAMS, NAVIGATION_TRIGGER)) &&
                 !AccessFlags.STATIC.isSet(m.getAccessFlags()) && buildsIntent && hasLiteral(m, 7377)) launches.add(m);
             if (isChatCameraFactory(m)) factories.add(m);
-            if (AccessFlags.STATIC.isSet(m.getAccessFlags()) && "V".equals(m.getReturnType()) && params.size() == 3 &&
-                "Lcom/facebook/xapp/messaging/composer/camera/event/ActivateCameraEvent;".equals(params.get(0))) captures.add(m);
+            if (captureLauncherType(m) != null) captures.add(m);
             if (isLauncherStart(m)) starts.add(m);
             if (isThirdPartyUriCheck(m) || isInternalFileOpen(m)) checks.add(m);
         }
         if (readers != 1) return List.of();
         if (!readsChatCamera) return launches;
         launches.addAll(factories);
-        launches.addAll(captures);
+        var launcherInterface = factories.size() == 1 ? factories.get(0).getReturnType() : null;
+        for (var m : captures) if (captureLauncherType(m).equals(launcherInterface)) launches.add(m);
         var launcher = factories.size() == 1 ? chatCameraLauncherType(factories.get(0)) : null;
         for (var m : starts) if (m.getDefiningClass().equals(launcher)) launches.add(m);
         launches.addAll(checks);
@@ -2937,7 +2959,7 @@ public class CompatReport {
     }
 
     /** The handler's field its Edit branch hands the editor, the chat camera launcher's provider. Mirrors galleryProvider. */
-    static FieldReference galleryProvider(Method handler, String iface, String startName, Map<String, ClassDef> byType) {
+    static FieldReference galleryProvider(Method handler, String iface, Method start, Map<String, ClassDef> byType) {
         var code = instructions(handler);
         int e = -1;
         for (int i = 0; i < code.size(); i++)
@@ -2981,7 +3003,9 @@ public class CompatReport {
             editor = m;
         }
         if (editor == null || editor.getImplementation() == null) return null;
-        return startsFromProvider(editor, providerType, iface + "->" + startName + "(Landroid/os/Bundle;)Z") ? field : null;
+        var startParams = new StringBuilder();
+        for (var type : start.getParameterTypes()) startParams.append(type);
+        return startsFromProvider(editor, providerType, iface + "->" + start.getName() + "(" + startParams + ")Z") ? field : null;
     }
 
     /**
@@ -3018,10 +3042,13 @@ public class CompatReport {
             if (start != null) return List.of();
             start = m;
         }
-        var target = start == null ? null : galleryTarget(classes, launcherClass, start, byType);
+        if (start == null) return List.of();
+        // The hook has no host to hand the start, so it passes null, which only works while the start never reads it.
+        for (var i : instructions(start)) if (mayRead(i, start.getImplementation().getRegisterCount() - 1)) return List.of();
+        var target = galleryTarget(classes, launcherClass, start, byType);
         if (target == null) return List.of();
         for (var handler : handlers) {
-            var provider = galleryProvider(handler, factory.getReturnType(), start.getName(), byType);
+            var provider = galleryProvider(handler, factory.getReturnType(), start, byType);
             var providerClass = provider == null ? null : byType.get(provider.getType());
             if (providerClass == null || !AccessFlags.INTERFACE.isSet(providerClass.getAccessFlags())) return List.of();
             String home = packageOf(handler.getDefiningClass());
@@ -4023,6 +4050,27 @@ public class CompatReport {
             for (int k = 0; k < r.getRegisterCount(); k++) out.add(r.getStartRegister() + k);
         }
         return out;
+    }
+
+    /** Whether this may read the register, erring toward yes. Mirrors galleryReads. */
+    static boolean mayRead(Instruction i, int register) {
+        var op = i.getOpcode().toString();
+        boolean onlyWrites = i.getOpcode().setsRegister() && i.getOpcode() != Opcode.CHECK_CAST && !op.endsWith("_2ADDR");
+        var read = new ArrayList<Integer>();
+        if (i instanceof FiveRegisterInstruction || i instanceof RegisterRangeInstruction) read.addAll(callArgs(i));
+        else if (i instanceof ThreeRegisterInstruction t) {
+            if (!onlyWrites) read.add(t.getRegisterA());
+            read.add(t.getRegisterB());
+            read.add(t.getRegisterC());
+        } else if (i instanceof TwoRegisterInstruction t) {
+            if (!onlyWrites) read.add(t.getRegisterA());
+            read.add(t.getRegisterB());
+        } else if (i instanceof OneRegisterInstruction o) {
+            if (!onlyWrites) read.add(o.getRegisterA());
+        }
+        boolean wide = op.contains("WIDE") || op.contains("LONG") || op.contains("DOUBLE");
+        for (int r : read) if (r == register || (wide && r + 1 == register)) return true;
+        return false;
     }
 
     static boolean writesRegister(Instruction i, int register) {

@@ -16,6 +16,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstructio
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OffsetInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.SwitchPayload
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -104,22 +105,51 @@ internal fun Method.isChatCameraFactory(): Boolean {
         code.any { it.literal() == CHAT_CAMERA_REQUEST } && code.any { it.isCameraClass() }
 }
 
-/** A capture event owns its fresh per-launch extras. Editor events share the launcher, but not this entry. */
-internal fun Method.isChatCapture(): Boolean = AccessFlags.STATIC.isSet(accessFlags) && returnType == "V" &&
-    parameterTypes.size == 3 && parameterTypes.first().toString() == ACTIVATE_CAMERA
+/** The launcher interface's start: it takes the extras and the composer host and answers whether it started. */
+private fun MethodReference.isLauncherCall() = returnType == "Z" && parameterTypes.size == 2 &&
+    parameterTypes[0].toString() == BUNDLE && parameterTypes[1].toString().startsWith("L")
+
+/**
+ * A capture event owns its fresh per-launch extras. Messenger 584 inlines its handler into two composer event
+ * dispatchers, each casting the event to [ACTIVATE_CAMERA] and making exactly one launcher call. Editor events share the
+ * launcher, but never cast to the capture event, so they don't match. The launcher interface comes back for the match
+ * against the chat camera factory's.
+ */
+internal fun Method.captureLauncherType(): String? {
+    if (AccessFlags.STATIC.isSet(accessFlags) || returnType != "V") return null
+    val code = implementation?.instructions ?: return null
+    if (code.none { it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as? TypeReference)?.type == ACTIVATE_CAMERA }) return null
+    return code.filter { it.opcode == Opcode.INVOKE_INTERFACE }.mapNotNull { it.methodRef()?.takeIf { ref -> ref.isLauncherCall() } }
+        .singleOrNull()?.definingClass
+}
+
+internal fun Method.isChatCapture(): Boolean = captureLauncherType() != null
+
+/** Whether a branch, switch case or handler outside [range] lands inside it. */
+private fun Method.entersRange(range: IntRange): Boolean {
+    val code = implementation!!.instructions.toList()
+    val addresses = IntArray(code.size + 1)
+    for (i in code.indices) addresses[i + 1] = addresses[i] + code[i].codeUnits
+    val indexAt = code.indices.associateBy { addresses[it] }
+    code.forEachIndexed { i, instruction ->
+        if (instruction !is OffsetInstruction || i in range) return@forEachIndexed
+        val landing = addresses[i] + instruction.codeOffset
+        if (instruction.opcode == Opcode.PACKED_SWITCH || instruction.opcode == Opcode.SPARSE_SWITCH) {
+            if ((indexAt[landing]?.let(code::get) as? SwitchPayload)?.switchElements
+                    ?.any { indexAt[addresses[i] + it.offset] in range } == true) return true
+        } else if (indexAt[landing] in range) return true
+    }
+    return implementation!!.tryBlocks.any { block -> block.exceptionHandlers.any { indexAt[it.handlerCodeAddress] in range } }
+}
 
 internal fun Method.chatCaptureMarkSite(): Int {
     val code = implementation?.instructions?.toList() ?: cameraChanged("no capture code")
-    val receiver = implementation!!.registerCount - 1
     val launches = code.indices.filter { at ->
-        code[at].opcode == Opcode.INVOKE_INTERFACE && code[at].methodRef()?.let {
-            it.definingClass == parameterTypes.last().toString() && it.returnType == "Z" &&
-                it.parameterTypes.map { p -> p.toString() } == listOf(BUNDLE)
-        } == true
+        code[at].opcode == Opcode.INVOKE_INTERFACE && code[at].methodRef()?.isLauncherCall() == true
     }
     val launch = launches.singleOrNull() ?: cameraChanged("${launches.size} capture launches")
     val call = code[launch] as FiveRegisterInstruction
-    if (call.registerCount != 2 || call.registerC != receiver) cameraChanged("capture receiver")
+    if (call.registerCount != 3) cameraChanged("capture arguments")
     val extras = call.registerD
     val builds = (0 until launch).filter { at ->
         code[at].opcode == Opcode.INVOKE_STATIC && code[at].methodRef()?.let {
@@ -130,16 +160,15 @@ internal fun Method.chatCaptureMarkSite(): Int {
     }
     val build = builds.singleOrNull() ?: cameraChanged("${builds.size} capture extras")
     val at = build + 2
-    if (extras > 15 || code.take(build).any { it is OffsetInstruction } ||
-        jumpTargets().any { it in build..at }) cameraChanged("capture extras entry")
+    // Nothing from outside may land between the extras and the launch, or it would skip the mark.
+    if (extras > 15 || entersRange(build + 1..launch)) cameraChanged("capture extras entry")
     for (i in at until launch) {
         val insn = code[i]
         if (insn.opcode.setsRegister() && (insn as? OneRegisterInstruction)?.registerA.let {
                 it == extras || (insn.opcode.setsWideRegister() && it != null && it + 1 == extras)
             }) cameraChanged("capture extras reused")
     }
-    if (code.getOrNull(launch + 1)?.opcode != Opcode.RETURN_VOID || launch + 2 != code.size)
-        cameraChanged("after capture launch")
+    if (code.getOrNull(launch + 1)?.opcode != Opcode.RETURN_VOID) cameraChanged("after capture launch")
     return at
 }
 
@@ -155,7 +184,8 @@ internal fun Method.chatCameraLauncherType(): String? {
 }
 
 /** The launcher's start for a result: it builds the intent from its class and extras and starts it on its fragment. */
-internal fun Method.isLauncherStart(): Boolean = returnType == "Z" && parameterTypes.map { it.toString() } == listOf(BUNDLE) &&
+internal fun Method.isLauncherStart(): Boolean = returnType == "Z" && parameterTypes.size == 2 &&
+    parameterTypes[0].toString() == BUNDLE && parameterTypes[1].toString().startsWith("L") &&
     !AccessFlags.STATIC.isSet(accessFlags) && "ActivityLauncher" in strings() &&
     implementation?.instructions?.any { it.methodRef()?.isFragmentLauncher() == true } == true
 
@@ -190,7 +220,8 @@ internal fun findSystemCamera(classes: Iterable<ClassDef>): List<Method> {
     if (readers.single().implementation!!.instructions.none { it.literal() == CHAT_CAMERA_REQUEST }) return listeners
     val factories = methods.filter { it.isChatCameraFactory() }
     val launcher = factories.singleOrNull()?.chatCameraLauncherType()
-    return listeners + factories + methods.filter { it.isChatCapture() } +
+    val launcherInterface = factories.singleOrNull()?.returnType
+    return listeners + factories + methods.filter { launcherInterface != null && it.captureLauncherType() == launcherInterface } +
         methods.filter { it.definingClass == launcher && it.isLauncherStart() } +
         methods.filter { it.isThirdPartyUriCheck() } + methods.filter { it.isInternalFileOpen() }
 }

@@ -198,9 +198,9 @@ internal fun Method.isGalleryHandler(): Boolean {
  *     invoke-interface {pProvider}, <Provider>->get()Ljava/lang/Object;
  *     move-result-object vLauncher
  *     check-cast vLauncher, <launcher interface>
- *     invoke-interface {vLauncher, vExtras}, <launcher interface>-><start>(Landroid/os/Bundle;)Z
+ *     invoke-interface {vLauncher, vExtras, vHost}, <launcher interface>-><start>(Landroid/os/Bundle;<Host>)Z
  */
-private fun Method.galleryProvider(iface: String, startName: String, byType: Map<String, ClassDef>): FieldReference? {
+private fun Method.galleryProvider(iface: String, start: Method, byType: Map<String, ClassDef>): FieldReference? {
     val code = implementation!!.instructions.toList()
     val edits = code.indices.filter { at ->
         code[at].opcode == Opcode.INVOKE_STATIC && code[at].galleryMethod()?.parameterTypes?.any { it.toString() == EDIT_GALLERY_ITEM } == true
@@ -218,7 +218,9 @@ private fun Method.galleryProvider(iface: String, startName: String, byType: Map
     byType[definingClass]?.fields?.singleOrNull { it.name == field.name && it.type == field.type && !AccessFlags.STATIC.isSet(it.accessFlags) }
         ?: return null
     val editor = byType[edit.definingClass]?.methods?.singleOrNull { it.hookId() == edit.toString() } ?: return null
-    return field.takeIf { editor.startsFromProvider(providerType, "$iface->$startName(Landroid/os/Bundle;)Z") }
+    return field.takeIf {
+        editor.startsFromProvider(providerType, "$iface->${start.name}(${start.parameterTypes.joinToString("")})Z")
+    }
 }
 
 private fun Method.startsFromProvider(providerType: String, start: String): Boolean {
@@ -268,11 +270,13 @@ internal fun findExternalGallery(classes: Iterable<ClassDef>): List<Method> {
     val launcherClass = byType[launcher] ?: return emptyList()
     if (!launcherClass.galleryImplements(factory.returnType, byType)) return emptyList()
     val start = launcherClass.methods.filter { it.isLauncherStart() }.singleOrNull() ?: return emptyList()
+    // The hook has no host to hand the start, so it passes null, which only works while the start never reads it.
+    if (start.implementation!!.instructions.any { start.implementation!!.registerCount - 1 in it.galleryReads() }) return emptyList()
     val target = all.galleryTarget(launcherClass, start, byType) ?: return emptyList()
     val handlers = methods.filter { it.isGalleryHandler() }
     if (handlers.isEmpty() || handlers.groupingBy { it.galleryHandlerKind() }.eachCount().values.any { it > 1 }) return emptyList()
     val routed = handlers.map { handler ->
-        val provider = handler.galleryProvider(factory.returnType, start.name, byType) ?: return emptyList()
+        val provider = handler.galleryProvider(factory.returnType, start, byType) ?: return emptyList()
         val providerClass = byType[provider.type] ?: return emptyList()
         val home = handler.definingClass.galleryPackage()
         fun reachable(cls: ClassDef) = AccessFlags.PUBLIC.isSet(cls.accessFlags) || cls.type.galleryPackage() == home
@@ -356,7 +360,8 @@ internal fun MutableMethod.injectExternalGallery() {
         instance-of $started, $launcher, ${route.launcher}
         if-eqz $started, :stock_gallery
         check-cast $launcher, ${route.launcher}
-        invoke-virtual {$launcher, $extras}, ${route.start}
+        const/4 $started, 0x0
+        invoke-virtual {$launcher, $extras, $started}, ${route.start}
         move-result $started
         if-eqz $started, :stock_gallery
         return-void
