@@ -1179,20 +1179,20 @@ internal fun MutableMethod.injectMenuFolderClick(folderItemType: String) {
 
 private val KEEP_UNSENT_PARAMETERS = listOf("Landroid/content/Intent;", BUBBLE_SESSION, "Ljava/lang/String;", "Ljava/util/Map;")
 
-/** The revoke handler is a static (Intent, session, String, Map) method. */
+/** The revoke handler is an instance (Intent, session, String, Map) method. */
 private fun Method.isKeepUnsentShape() =
-    AccessFlags.STATIC.isSet(accessFlags) && parameterTypes.map(CharSequence::toString) == KEEP_UNSENT_PARAMETERS
+    !AccessFlags.STATIC.isSet(accessFlags) && parameterTypes.map(CharSequence::toString) == KEEP_UNSENT_PARAMETERS
 
 /**
- * Returns the parameter register number of the Intent, p0 of the static handler. The hook reads it with a plain
- * invoke, so it has to be in reach.
+ * Returns the Intent's parameter number, p1 of the instance handler (p0 is its receiver). The hook reads it with a
+ * plain invoke, so it has to be in reach.
  */
 internal fun MutableMethod.validateKeepUnsent(): Int {
     validateScratch()
     if (returnType != "V") throw PatchException("Messenger controls: keep_unsent hook must return void")
     if (!isKeepUnsentShape())
-        throw PatchException("Messenger controls: keep_unsent hook must be the static (Intent, session, String, Map) handler")
-    val intent = 0
+        throw PatchException("Messenger controls: keep_unsent hook must be the instance (Intent, session, String, Map) handler")
+    val intent = 1
     if (parameterRegister(intent) > 15)
         throw PatchException("Messenger controls: keep_unsent hook must have its Intent at v15 or below")
     return intent

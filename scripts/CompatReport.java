@@ -4706,8 +4706,8 @@ public class CompatReport {
                     if (secureFlag && addFlags) found.get("allow_screenshot").add(method);
                 }
 
-                // keep_unsent: the static (Intent, session, String, Map) revoke handler
-                if ("V".equals(method.getReturnType()) && isStatic && paramTypes.equals(REVOKE_HANDLER) &&
+                // keep_unsent: the instance (Intent, session, String, Map) revoke handler
+                if ("V".equals(method.getReturnType()) && !isStatic && paramTypes.equals(REVOKE_HANDLER) &&
                     strings.stream().anyMatch(s -> s.contains("ACTION_REVOKE_MESSAGE"))) {
                     found.get("keep_unsent").add(method);
                 }

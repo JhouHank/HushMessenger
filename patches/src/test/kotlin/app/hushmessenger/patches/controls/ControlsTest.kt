@@ -153,39 +153,41 @@ class ControlsTest {
         assertFailsWith<PatchException> { flag(static, flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value).validateDeltaUnsent() }
     }
 
-    /** 582's instance (Intent, session, String) handler, with its Intent in p1, is refused. */
-    @Test fun a582InstanceRevokeHandlerIsRefused() {
+    /** 582's three-parameter instance handler and 583's static four-parameter one are refused. */
+    @Test fun anOlderRevokeHandlerIsRefused() {
+        val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
+        val map = "${SESSION}Ljava/lang/String;Ljava/util/Map;"
         fun revoke(registers: Int, flags: Int = AccessFlags.PUBLIC.value, types: String = "${SESSION}Ljava/lang/String;") = fixtureMethod(
             "Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", "return-void", registers, flags)
         assertFailsWith<PatchException> { revoke(5).validateKeepUnsent() }
-        assertFailsWith<PatchException> { revoke(5, AccessFlags.PUBLIC.value or AccessFlags.STATIC.value).validateKeepUnsent() }
-        assertFailsWith<PatchException> { revoke(11, types = "${SESSION}Ljava/lang/String;Ljava/util/Map;").validateKeepUnsent() }
+        assertFailsWith<PatchException> { revoke(5, static).validateKeepUnsent() }
+        assertFailsWith<PatchException> { revoke(11, static, map).validateKeepUnsent() }
         for (types in listOf("Ljava/lang/String;Ljava/lang/Object;", "Ljava/lang/String;$SESSION"))
             assertFailsWith<PatchException>(types) { revoke(5, types = types).validateKeepUnsent() }
     }
 
-    @Test fun discoveryFindsOnlyTheStaticRevokeHandler() {
+    @Test fun discoveryFindsOnlyTheInstanceRevokeHandler() {
         val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
-        val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"\nreturn-void"
+        val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"
+return-void"
         fun found(types: String, flags: Int) = mirroredControls(listOf(fixtureClass("Lfixture/Revoke;", listOf(
             fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", revoke, 11, flags))))).getValue("keep_unsent").size
-        assertEquals(1, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", static))
+        assertEquals(1, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", AccessFlags.PUBLIC.value))
         assertEquals(0, found("${SESSION}Ljava/lang/String;", AccessFlags.PUBLIC.value))
         assertEquals(0, found("${SESSION}Ljava/lang/String;", static))
-        assertEquals(0, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", AccessFlags.PUBLIC.value))
+        assertEquals(0, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", static))
         assertEquals(0, found("Ljava/lang/String;Ljava/lang/Object;", AccessFlags.PUBLIC.value))
     }
 
-    /** 583 handles the revoke in a static (Intent, session, String, Map) method, so its Intent is p0. */
-    @Test fun theStaticRevokeHandlerReadsItsIntentFromP0() {
-        val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
+    /** 584 handles the revoke in an instance (Intent, session, String, Map) method, so its Intent is p1. */
+    @Test fun theInstanceRevokeHandlerReadsItsIntentFromP1() {
         val map = "${SESSION}Ljava/lang/String;Ljava/util/Map;"
         fun handler(types: String, registers: Int = 11) =
-            fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", "return-void", registers, static)
-        assertEquals(0, handler(map).validateKeepUnsent())
+            fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", "return-void", registers, AccessFlags.PUBLIC.value)
+        assertEquals(1, handler(map).validateKeepUnsent())
         assertFailsWith<PatchException> { handler("${SESSION}Ljava/lang/String;Ljava/lang/Object;").validateKeepUnsent() }
         assertFailsWith<PatchException> { handler("Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;").validateKeepUnsent() }
-        // p0 lands on v15 with 19 registers and on v16 with 20, where a plain invoke can't reach it.
+        // p1 lands on v15 with 19 registers and on v16 with 20, where a plain invoke can't reach it.
         handler(map, 19).validateKeepUnsent()
         assertFailsWith<PatchException> { handler(map, 20).validateKeepUnsent() }
         val method = handler(map)
@@ -193,7 +195,7 @@ class ControlsTest {
         val read = method.implementation!!.instructions.single {
             (it as? ReferenceInstruction)?.reference?.toString() == "Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;"
         } as FiveRegisterInstruction
-        assertEquals(method.parameterRegister(0), read.registerC)
+        assertEquals(method.parameterRegister(1), read.registerC)
     }
 
     @Test fun settingsHaveALauncherEntryAndAPrivateProviderWithoutChangingHostPermissions() {
