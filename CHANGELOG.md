@@ -14,6 +14,7 @@
 - Hiding Quick setups with a long press now names the button that brings it back, **Quick setups section** under Your choices. The old message sent you to the App tab you were already on, and the button talked about a home page that doesn't exist.
 - A video picked in a chat whose access ran out before or during the send no longer gets **Fix videos that won't send** marked as failing in settings. It goes out the way Messenger would send it anyway.
 - If the phone's sound encoder won't start while a video's sound is being fixed, it's let go right away instead of staying held until Messenger closes.
+- Android 12 and newer show only two lines of a pop-up message and cut the rest with "...", which hid the useful part of 27 of HushMessenger's. They're shorter now and fit, from the font file and backup messages to the camera, gallery and restart ones.
 
 ### Docs
 

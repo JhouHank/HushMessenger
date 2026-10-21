@@ -230,7 +230,7 @@ public class LegacyDrawerTest {
         assertNull(Settings.drawerFolderClicked(added(result)));
         assertNotNull(Settings.hookErrors.get("menu_row"));
         assertFalse(Settings.hookErrors.get("menu_row").contains("private launch detail"));
-        assertEquals("Couldn't open HushMessenger settings. Long-press Messenger's home screen icon and try Patch controls.",
+        assertEquals("Patch controls: long-press Messenger's home screen icon",
                 ShadowToast.getTextOfLatestToast());
         for (ShadowLog.LogItem item : ShadowLog.getLogsForTag("HushMessenger")) {
             assertFalse(item.msg.contains("private launch detail"));

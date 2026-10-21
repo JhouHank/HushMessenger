@@ -132,7 +132,7 @@ public class QuickSetupsTest {
             View root = screen.get().getWindow().getDecorView();
             root.findViewWithTag("tab_app").performClick();
             root.findViewWithTag("quick_privacy").performClick();
-            assertEquals("Those switches aren't in this bundle, so nothing changed.", ShadowToast.getTextOfLatestToast());
+            assertEquals("Those switches aren't installed. Nothing changed.", ShadowToast.getTextOfLatestToast());
             root.findViewWithTag("quick_quiet").performClick();
             assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
             root.findViewWithTag("quick_quiet").performClick();
@@ -179,7 +179,7 @@ public class QuickSetupsTest {
             // The long press happens on the App tab, so the toast has to name the button there, not send you to App.
             TextView restore = root.findViewWithTag("quick_setups_home");
             assertTrue(restore.isShown());
-            assertEquals("Quick setups hidden. Tap " + restore.getText() + " under Your choices to show it again.",
+            assertEquals("Hidden. Tap " + restore.getText() + " under Your choices.",
                 ShadowToast.getTextOfLatestToast());
             assertEquals("Hidden. Tap to show it again.", status.getText().toString());
             root.findViewWithTag("quick_setups_home").performClick();

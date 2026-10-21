@@ -251,14 +251,14 @@ public class CustomFontSettingsTest {
             Shadows.shadowOf(activity.getContentResolver()).registerInputStream(photo,
                 new ByteArrayInputStream(new byte[] {(byte) 0x89, 'P', 'N', 'G', 0, 0, 0, 0}));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(photo));
-            awaitToast("That isn't a .ttf or .otf font file. Your font didn't change.");
+            awaitToast("Not a .ttf or .otf font. Your font didn't change.");
             assertEquals("", Settings.preferences.getString(OwnFont.NAME_KEY, ""));
 
             Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
             Shadows.shadowOf(activity.getContentResolver()).registerInputStream(rubik,
                 new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
-            awaitToast("Font set to Rubik-Regular.ttf. Restart Messenger to see it.");
+            awaitToast("Restart Messenger to use Rubik-Regular.ttf.");
             assertEquals("Rubik-Regular.ttf", Settings.preferences.getString(OwnFont.NAME_KEY, ""));
             assertArrayEquals(FontFileTest.font(FontFileTest.STATIC_FONT), Files.readAllBytes(FontFile.file(activity).toPath()));
             assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.", status.getText().toString());
@@ -424,7 +424,7 @@ public class CustomFontSettingsTest {
                 settle();
                 assertFalse(way, prefs.contains(OwnFont.SCALE_KEY));
                 assertEquals("Text size 100%", size.getText().toString());
-                assertEquals("Couldn't save that change, so your font stays as it was. Try again.", ShadowToast.getTextOfLatestToast());
+                assertEquals("Couldn't save that. Your font didn't change.", ShadowToast.getTextOfLatestToast());
                 root.findViewWithTag("font_shift_down").performClick();
                 settle();
                 assertFalse(way, prefs.contains(OwnFont.SHIFT_KEY));
@@ -440,7 +440,7 @@ public class CustomFontSettingsTest {
                 Shadows.shadowOf(activity.getContentResolver()).registerInputStream(other,
                     new ByteArrayInputStream(FontFileTest.font(FontFileTest.VARIABLE_FONT)));
                 activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(other));
-                awaitToast("Couldn't save a copy of that font.");
+                awaitToast("Couldn't save the font. Check free space and retry.");
                 assertEquals(way, "Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
                 assertArrayEquals(rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
                 assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.", status.getText().toString());
@@ -618,7 +618,7 @@ public class CustomFontSettingsTest {
 
                 if (byDeadline) {
                     Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(SettingsActivity.fontTimeoutMillis));
-                    assertEquals(stall, "That file took too long to copy, so it was stopped. Your font didn't change.",
+                    assertEquals(stall, "Copying took too long. Your font didn't change.",
                         ShadowToast.getTextOfLatestToast());
                 } else {
                     stop.performClick();
@@ -631,7 +631,7 @@ public class CustomFontSettingsTest {
                 Uri later = Uri.parse("content://fonts/picked/" + name);
                 resolver.registerInputStream(later, new ByteArrayInputStream(rubik));
                 activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(later));
-                awaitToast("Font set to " + name);
+                awaitToast("Restart Messenger to use " + name);
 
                 release.countDown();
                 stalled.get().join(10_000);
@@ -639,7 +639,7 @@ public class CustomFontSettingsTest {
                 Shadows.shadowOf(Looper.getMainLooper()).idle();
                 assertEquals(stall, name, Settings.preferences.getString(OwnFont.NAME_KEY, null));
                 assertArrayEquals(stall, rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
-                assertEquals(stall, "Font set to " + name + ". Restart Messenger to see it.", ShadowToast.getTextOfLatestToast());
+                assertEquals(stall, "Restart Messenger to use " + name + ".", ShadowToast.getTextOfLatestToast());
                 assertEquals(name + " is picked. Turn the switch on to use it.", status.getText().toString());
             } finally {
                 release.countDown();
@@ -695,7 +695,7 @@ public class CustomFontSettingsTest {
             Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
             resolver.registerInputStream(rubik, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
-            awaitToast("Font set to Rubik-Regular.ttf");
+            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
         } finally {
             release.countDown();
         }
@@ -719,9 +719,9 @@ public class CustomFontSettingsTest {
             while (savedOn.isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(10);
             assertFalse("the copy reached its save", savedOn.isEmpty());
             root.findViewWithTag("font_file_stop").performClick();
-            assertEquals("It's already saving the font, so it'll finish in a moment.", ShadowToast.getTextOfLatestToast());
+            assertEquals("Already saving the font. It'll finish in a moment.", ShadowToast.getTextOfLatestToast());
             disk.countDown();
-            awaitToast("Font set to Rubik-Regular.ttf");
+            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
             assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
         } finally {
             disk.countDown();
@@ -755,7 +755,7 @@ public class CustomFontSettingsTest {
             ((Runnable) deadline.get(job)).run();
             assertEquals(toasts, ShadowToast.shownToastCount());
             disk.countDown();
-            awaitToast("Font set to Rubik-Regular.ttf");
+            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
             assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
         } finally {
             disk.countDown();
