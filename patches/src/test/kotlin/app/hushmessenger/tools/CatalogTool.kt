@@ -201,6 +201,12 @@ object CatalogTool {
         require(missing.isEmpty()) { "The patcher DEX lacks ${missing.size} patch classes, ${missing.first()} first" }
     }
 
+    /** The bundle's manifest timestamp matches the source's, which has to be there: two missing ones would match. */
+    fun requireBundleTimestamp(bundle: String?, source: String?) {
+        require(source != null && source.matches(Regex("\\d+"))) { "Source has no bundle timestamp" }
+        require(bundle == source) { "Bundle timestamp differs from source" }
+    }
+
     fun validateDex(data: ByteArray): Int {
         require(data.size >= 112 && data.copyOfRange(0, 8).toString(Charsets.US_ASCII)
             .matches(Regex("dex\\n0(?:3[5-9]|40)\\u0000"))) { "Invalid DEX header" }
@@ -421,7 +427,7 @@ object CatalogTool {
             extensionDex = jar.getInputStream(jar.getEntry("extensions/messenger.mpe")).use { it.readBytes() }
             for (dex in listOf(patcherDex, extensionDex)) require(validateDex(dex) > 0) { "Bundle DEX contains no classes" }
             patchClasses = names.filter { it.startsWith("app/hushmessenger/patches/") && it.endsWith(".class") }
-            require(jar.manifest.mainAttributes.getValue("Timestamp") == properties.getProperty("bundleTimestampMillis")) { "Bundle timestamp differs from source" }
+            requireBundleTimestamp(jar.manifest.mainAttributes.getValue("Timestamp"), properties.getProperty("bundleTimestampMillis"))
             jar.manifest.mainAttributes.getValue("Version")
         }
         require(version == properties.getProperty("version")) { "Bundle version differs from source" }

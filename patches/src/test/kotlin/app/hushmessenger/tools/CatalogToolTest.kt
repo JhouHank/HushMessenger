@@ -318,6 +318,16 @@ class CatalogToolTest {
         assertFailsWith<IllegalArgumentException> { CatalogTool.validatePatcherClasses(emptyList(), patcher) }
     }
 
+    /** Missing on both sides is no match, so the catalog check can't call a bundle fresh by comparing nothing. */
+    @Test fun aBundleAndSourceBothWithoutATimestampAreRefused() {
+        CatalogTool.requireBundleTimestamp("1790552148000", "1790552148000")
+        val missing = assertFailsWith<IllegalArgumentException> { CatalogTool.requireBundleTimestamp(null, null) }
+        assertEquals("Source has no bundle timestamp", missing.message)
+        val differs = assertFailsWith<IllegalArgumentException> { CatalogTool.requireBundleTimestamp(null, "1790552148000") }
+        assertEquals("Bundle timestamp differs from source", differs.message)
+        assertFailsWith<IllegalArgumentException> { CatalogTool.requireBundleTimestamp("", "") }
+    }
+
     /** A run that refuses its bundle, however early, leaves no success receipt from an earlier run behind. */
     @Test fun aRefusedBundleLeavesNoReceipt(@TempDir temporary: Path) {
         val receipt = temporary.resolve("catalog-evidence.json").toFile()
