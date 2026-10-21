@@ -2908,6 +2908,8 @@ public class CompatReport {
         var below = new ArrayList<ClassDef>();
         for (var cls : classes)
             if (!cls.getType().equals(launcher.getType()) && lineage(cls, byType).stream().anyMatch(up -> up.getType().equals(launcher.getType()))) below.add(cls);
+        // 584's launcher is abstract with two final subclasses that both inherit its start, so every object of it runs this start.
+        if (below.stream().noneMatch(other -> declaresStart(other, start))) return launcher;
         var candidates = new ArrayList<ClassDef>(below);
         candidates.add(0, launcher);
         ClassDef target = null;
@@ -4077,6 +4079,50 @@ public class CompatReport {
         return false;
     }
 
+    /**
+     * Which instructions can define the register as it is read at the target: their indices, -1 for none before the
+     * method. Null when a branch lands between instructions. Mirrors ReadFlow.definitionsAt.
+     */
+    static Set<Integer> definitionsAt(Method method, int target, int register) {
+        var code = instructions(method);
+        int[] address = new int[code.size() + 1];
+        var indexAt = new HashMap<Integer, Integer>();
+        for (int i = 0; i < code.size(); i++) { indexAt.put(address[i], i); address[i + 1] = address[i] + code.get(i).getCodeUnits(); }
+        var found = new HashSet<Integer>();
+        var seen = new HashSet<Long>();
+        var pending = new ArrayDeque<int[]>();
+        pending.add(new int[] {0, -1});
+        while (!pending.isEmpty()) {
+            var state = pending.poll();
+            if (!seen.add(((long) state[0] << 32) | (state[1] & 0xffffffffL))) continue;
+            int i = state[0], origin = state[1];
+            if (i == target) found.add(origin);
+            var insn = code.get(i);
+            int next = writesRegister(insn, register) ? i : origin;
+            if (insn instanceof OffsetInstruction jump && insn.getOpcode() != Opcode.FILL_ARRAY_DATA) {
+                Integer landing = indexAt.get(address[i] + jump.getCodeOffset());
+                if (landing == null) return null;
+                if (code.get(landing) instanceof SwitchPayload payload) {
+                    for (var element : payload.getSwitchElements()) {
+                        Integer to = indexAt.get(address[i] + element.getOffset());
+                        if (to == null) return null;
+                        pending.add(new int[] {to, next});
+                    }
+                } else pending.add(new int[] {landing, next});
+            }
+            if (insn.getOpcode().canContinue() && i + 1 < code.size()) pending.add(new int[] {i + 1, next});
+            if (insn.getOpcode().canThrow()) for (var block : method.getImplementation().getTryBlocks()) {
+                if (address[i] < block.getStartCodeAddress() || address[i] >= block.getStartCodeAddress() + block.getCodeUnitCount()) continue;
+                for (var handler : block.getExceptionHandlers()) {
+                    Integer to = indexAt.get(handler.getHandlerCodeAddress());
+                    if (to == null) return null;
+                    pending.add(new int[] {to, origin});
+                }
+            }
+        }
+        return found;
+    }
+
     static boolean writesRegister(Instruction i, int register) {
         return i.getOpcode().setsRegister() && i instanceof OneRegisterInstruction o &&
             (o.getRegisterA() == register || (i.getOpcode().setsWideRegister() && o.getRegisterA() + 1 == register));
@@ -4201,30 +4247,29 @@ public class CompatReport {
         int list = callArgs(c.get(add)).get(0);
         var qr = byType.get(QR_BUTTON);
         if (qr == null) return List.of();
-        String builder = null, mig = null, builderScheme = null, tagField = null, listenerField = null, iconProvider = null, iconSetter = null, listener = null, spec = null;
+        String builder = null, mig = null, builderScheme = null, tagField = null, listenerField = null, iconProvider = null, listener = null, spec = null;
         FieldReference iconRead = null;
         Integer listenerCase = null;
         int listenerRegister = -1;
-        var consts = new HashMap<Integer, Integer>();
         var strings = new HashMap<Integer, String>();
+        // The button's builder is the one class the block constructs from a label String.
+        var builders = new LinkedHashSet<String>();
+        for (int i = plugin; i <= add; i++)
+            if (c.get(i).getOpcode() == Opcode.INVOKE_DIRECT && c.get(i) instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference m &&
+                "<init>".equals(m.getName()) && refParams(m).equals(List.of("Ljava/lang/String;"))) builders.add(m.getDefiningClass());
+        if (builders.size() != 1) return List.of();
+        builder = builders.iterator().next();
         for (int i = plugin; i <= add; i++) {
             var insn = c.get(i);
             var r = insn instanceof ReferenceInstruction ri ? ri.getReference() : null;
-            if (builder == null && insn.getOpcode() == Opcode.INVOKE_STATIC && r instanceof MethodReference m && refParams(m).equals(List.of("Landroid/content/res/Resources;", "I"))) {
-                builder = m.getReturnType();
-                continue;
-            }
-            if (insn instanceof NarrowLiteralInstruction lit && (insn.getOpcode() == Opcode.CONST_4 || insn.getOpcode() == Opcode.CONST_16)) consts.put(((OneRegisterInstruction) insn).getRegisterA(), lit.getNarrowLiteral());
-            else if (r instanceof StringReference s && insn instanceof OneRegisterInstruction o) strings.put(o.getRegisterA(), s.getString());
+            if (r instanceof StringReference s && insn instanceof OneRegisterInstruction o) strings.put(o.getRegisterA(), s.getString());
             else if (insn.getOpcode() == Opcode.IGET_OBJECT && r instanceof FieldReference f) {
                 if (THREAD_SCHEME.equals(f.getDefiningClass()) && MIG_SCHEME.equals(f.getType())) mig = f.toString();
                 if (QR_BUTTON.equals(f.getDefiningClass()) && !THREAD_SCHEME.equals(f.getType()) && !"Landroid/content/Context;".equals(f.getType())) iconRead = f;
             } else if (insn.getOpcode() == Opcode.INVOKE_STATIC && r instanceof MethodReference m && iconRead != null && iconProvider == null &&
                 refParams(m).equals(List.of(iconRead.getType())) && m.getReturnType().startsWith("L")) {
                 if (c.get(i - 1).getOpcode() == Opcode.IGET_OBJECT && ((TwoRegisterInstruction) c.get(i - 1)).getRegisterA() == callArgs(insn).get(0)) iconProvider = m.toString();
-            } else if (builder != null && insn.getOpcode() == Opcode.INVOKE_STATIC && r instanceof MethodReference m && "V".equals(m.getReturnType()) &&
-                refParams(m).size() == 3 && builder.equals(refParams(m).get(2))) iconSetter = m.toString();
-            else if (builder != null && insn.getOpcode() == Opcode.IPUT_OBJECT && r instanceof FieldReference f && builder.equals(f.getDefiningClass())) {
+            } else if (insn.getOpcode() == Opcode.IPUT_OBJECT && r instanceof FieldReference f && builder.equals(f.getDefiningClass())) {
                 int value = ((TwoRegisterInstruction) insn).getRegisterA();
                 if (MIG_SCHEME.equals(f.getType())) builderScheme = f.toString();
                 else if ("Ljava/lang/String;".equals(f.getType()) && QR_BUTTON_TAG.equals(strings.get(value))) tagField = f.toString();
@@ -4233,12 +4278,17 @@ public class CompatReport {
                 var args = callArgs(insn);
                 if (refParams(m).equals(List.of("Ljava/lang/Object;", "I")) && args.size() == 3 && args.get(1) == pluginRead.getRegisterA()) {
                     listener = m.getDefiningClass();
-                    listenerCase = consts.get(args.get(2));
+                    // The case is a constant set wherever the method keeps it: the one definition that reaches the call.
+                    var defs = definitionsAt(bar, i, args.get(2));
+                    if (defs != null && defs.size() == 1 && defs.iterator().next() >= 0) {
+                        var def = c.get(defs.iterator().next());
+                        if (def instanceof NarrowLiteralInstruction lit && (def.getOpcode() == Opcode.CONST_4 || def.getOpcode() == Opcode.CONST_16)) listenerCase = lit.getNarrowLiteral();
+                    }
                     listenerRegister = args.get(0);
-                } else if (builder != null && refParams(m).equals(List.of(builder))) spec = m.getDefiningClass();
+                } else if (refParams(m).equals(List.of(builder))) spec = m.getDefiningClass();
             }
         }
-        if (builder == null || iconRead == null || iconProvider == null || iconSetter == null || mig == null || builderScheme == null ||
+        if (builder == null || iconRead == null || iconProvider == null || mig == null || builderScheme == null ||
             tagField == null || listenerField == null || listener == null || listenerCase == null || spec == null) return List.of();
         // The plugin keeps more than one lazy of the icon's type, so the field is the one the block reads, by name.
         Field iconField = null;
@@ -4257,7 +4307,35 @@ public class CompatReport {
         }
         if (sources.size() != 1) return List.of();
         String iconSource = sources.iterator().next();
-        String iconType = iconSetter.substring(iconSetter.indexOf('(') + 1, iconSetter.indexOf(';', iconSetter.indexOf('(')) + 1);
+        // The builder keeps its icon in an int field, which one public static helper on it fills from the provider's result.
+        String providerType = iconProvider.substring(iconProvider.indexOf(')') + 1);
+        var builderClass0 = byType.get(builder);
+        if (builderClass0 == null) return List.of();
+        Method setterMethod = null;
+        for (var m : builderClass0.getMethods()) {
+            var ps = params(m);
+            if (!AccessFlags.STATIC.isSet(m.getAccessFlags()) || !AccessFlags.PUBLIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType()) ||
+                ps.size() != 3 || !ps.get(1).equals(providerType) || !ps.get(2).equals(builder)) continue;
+            if (setterMethod != null) return List.of();
+            setterMethod = m;
+        }
+        if (setterMethod == null || setterMethod.getImplementation() == null) return List.of();
+        String iconSetter = hookId(setterMethod);
+        String iconType = params(setterMethod).get(0);
+        var sc = instructions(setterMethod);
+        if (sc.size() != 4 || sc.get(0).getOpcode() != Opcode.INVOKE_VIRTUAL || sc.get(1).getOpcode() != Opcode.MOVE_RESULT ||
+            sc.get(2).getOpcode() != Opcode.IPUT || sc.get(3).getOpcode() != Opcode.RETURN_VOID ||
+            !(sc.get(0) instanceof ReferenceInstruction resolveRef && resolveRef.getReference() instanceof MethodReference resolve) ||
+            !(sc.get(2) instanceof ReferenceInstruction storeRef && storeRef.getReference() instanceof FieldReference store) ||
+            !resolve.getDefiningClass().equals(providerType) || !refParams(resolve).equals(List.of(iconType)) || !"I".equals(resolve.getReturnType()) ||
+            !store.getDefiningClass().equals(builder) || !"I".equals(store.getType())) return List.of();
+        // The QR block does the same two steps inline, so the helper is the button's own way of setting an icon.
+        boolean resolves = false, stores = false;
+        for (int i = plugin; i <= add; i++) {
+            if (resolve.toString().equals(ref(c.get(i)))) resolves = true;
+            if (c.get(i).getOpcode() == Opcode.IPUT && store.toString().equals(ref(c.get(i)))) stores = true;
+        }
+        if (!resolves || !stores) return List.of();
         var iconClass = byType.get(iconType);
         if (iconClass == null) return List.of();
         var icons = new LinkedHashSet<String>();

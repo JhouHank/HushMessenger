@@ -93,7 +93,7 @@ internal fun MutableMethod.injectChatSeen() {
     """.trimIndent(), ExternalLabel("stock_read", getInstruction(0)))
 }
 
-private fun Instruction.readWrites(register: Int) = opcode.setsRegister() && this is OneRegisterInstruction &&
+internal fun Instruction.readWrites(register: Int) = opcode.setsRegister() && this is OneRegisterInstruction &&
     (registerA == register || (opcode.setsWideRegister() && registerA + 1 == register))
 
 private fun Instruction.readReads(register: Int): Boolean {
@@ -109,7 +109,7 @@ private fun Instruction.readReads(register: Int): Boolean {
 }
 
 /** Include catch and switch edges when checking dominance and scratch liveness. */
-private class ReadFlow(method: Method) {
+internal class ReadFlow(method: Method) {
     val code = method.readCode()
     private val addresses = IntArray(code.size + 1).also { a -> for (i in code.indices) a[i + 1] = a[i] + code[i].codeUnits }
     private val indexAt = code.indices.associateBy { addresses[it] }
