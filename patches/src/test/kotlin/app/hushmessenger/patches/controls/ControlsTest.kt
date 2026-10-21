@@ -168,8 +168,7 @@ class ControlsTest {
 
     @Test fun discoveryFindsOnlyTheInstanceRevokeHandler() {
         val static = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value
-        val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"
-return-void"
+        val revoke = "const-string v0, \"com.facebook.stella.ipc.messenger.ACTION_REVOKE_MESSAGE\"\nreturn-void"
         fun found(types: String, flags: Int) = mirroredControls(listOf(fixtureClass("Lfixture/Revoke;", listOf(
             fixtureMethod("Lfixture/Revoke;->A00(Landroid/content/Intent;$types)V", revoke, 11, flags))))).getValue("keep_unsent").size
         assertEquals(1, found("${SESSION}Ljava/lang/String;Ljava/util/Map;", AccessFlags.PUBLIC.value))

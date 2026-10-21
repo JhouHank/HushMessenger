@@ -89,34 +89,24 @@ class ControlProfileTest {
     ) = fixtureMethod("$COMPOSER_FACTORY->A6X(LX/5vA;)V", """
             new-instance v12, Ljava/util/ArrayList;
             invoke-direct {v12}, Ljava/util/ArrayList;-><init>()V
+            const/4 v4, 0x0
+            ${if (branchIntoCopy) "if-eqz v4, :copy" else "nop"}
+            ${if (switchIntoCopy) "packed-switch v4, :cases" else "nop"}
             invoke-static {}, Lcom/google/common/collect/ImmutableList;->builder()$builder
             move-result-object v2
-            ${if (branchIntoCopy) "if-eqz v2, :copy" else "nop"}
-            const/4 v4, 0x0
-            ${if (switchIntoCopy) "packed-switch v4, :cases" else "nop"}
             :copy
             ${when {
                 foldedCopy -> "invoke-static {v2, v12}, $folded"
-                rangeCopy -> "move-object/from16 v3, v12
-invoke-virtual/range {v2 .. v3}, $copy
-invoke-static {v2}, $build"
-                unbuilt -> "invoke-virtual {v2, v12}, $copy
-const/4 v4, 0x0
-invoke-static {v2}, $build"
-                otherBuilder -> "invoke-virtual {v2, v12}, $copy
-invoke-static {v12}, $build"
-                else -> "invoke-virtual {v2, v12}, $copy
-invoke-static {v2}, $build"
+                rangeCopy -> "move-object/from16 v3, v12\ninvoke-virtual/range {v2 .. v3}, $copy\ninvoke-static {v2}, $build"
+                unbuilt -> "invoke-virtual {v2, v12}, $copy\nconst/4 v4, 0x0\ninvoke-static {v2}, $build"
+                otherBuilder -> "invoke-virtual {v2, v12}, $copy\ninvoke-static {v12}, $build"
+                else -> "invoke-virtual {v2, v12}, $copy\ninvoke-static {v2}, $build"
             }}
             move-result-object v3
-            ${if (extraCopy) "invoke-virtual {v2, v12}, $copy
-invoke-static {v2}, $build" else "nop"}
+            ${if (extraCopy) "invoke-virtual {v2, v12}, $copy\ninvoke-static {v2}, $build" else "nop"}
             sget-object v0, $AVATAR_TAB_EVENT->A00:$AVATAR_TAB_EVENT
             return-void
-            ${if (switchIntoCopy) ":cases
-.packed-switch 0x1
-:copy
-.end packed-switch" else ""}
+            ${if (switchIntoCopy) ":cases\n.packed-switch 0x1\n:copy\n.end packed-switch" else ""}
         """.trimIndent(), registers = 16).apply {
             // Instruction snippets carry no try blocks, so the handler is added directly.
             if (catchIntoCopy) implementation!!.run {

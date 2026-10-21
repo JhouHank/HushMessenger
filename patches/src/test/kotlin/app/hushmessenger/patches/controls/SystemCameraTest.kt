@@ -285,7 +285,7 @@ class SystemCameraTest {
             // A branch from before the extras that lands between them and the launch skips the mark.
             "if-eqz p0, :launch\n$CHAT_CAPTURE_BODY",
             // Two launches leave nothing to say which one is the capture.
-            CHAT_CAPTURE_BODY.replace("    return-void\n    :other", "    invoke-interface {v3, v1, p3}, LX/6iH;->C0w(Landroid/os/Bundle;LX/6NI;)Z\n    return-void\n    :other"),
+            CHAT_CAPTURE_BODY.replace("return-void\n:other", "invoke-interface {v3, v1, p3}, LX/6iH;->C0w(Landroid/os/Bundle;LX/6NI;)Z\nreturn-void\n:other"),
         )) {
             val method = fixtureMethod(CHAT_CAPTURE, body, registers = 9)
             val before = method.code()
