@@ -15,8 +15,8 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 internal const val EPHEMERAL_VIEWER = "Lcom/facebook/messaging/media/ephemeralmedia/viewer/EphemeralMediaViewerFragment;"
 internal const val QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;"
-/** "Generate AI stickers" in Messenger 583's string pack. */
-internal const val GENERATE_AI_LABEL = 0x7f140560
+/** "Generate AI stickers" in Messenger 584's string pack (0x7f140560 in 583). */
+internal const val GENERATE_AI_LABEL = 0x7f140559
 /** The viewer's onCreateDialog override, A1F in every 583 build. */
 internal const val EPHEMERAL_DIALOG = "A1F"
 private const val WINDOW = "Landroid/view/Window;"
@@ -114,8 +114,8 @@ internal fun MutableMethod.injectScreenshotViewer() {
 }
 
 /**
- * The cell under each 583 naming, the label it shows, how many renders offer that label and how many instructions its own
- * render has (24 registers in both). Both offer the label from four renders; 346611351's render is one instruction shorter.
+ * The cell under 584's naming, the label it shows, how many renders offer that label and how many instructions its own
+ * render has (24 registers). Four renders offer the label.
  */
 internal data class AiCell(
     val type: String, val superclass: String, val scope: String, val component: String,
@@ -124,10 +124,9 @@ internal data class AiCell(
     val render = "$type->render($scope)$component"
 }
 internal val aiCells = listOf(
-    AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", size = 104),
-    AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;"),
+    AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;"),
 )
-internal const val AI_CELL_SIZE = 105
+internal const val AI_CELL_SIZE = 107
 internal const val AI_CELL_REGISTERS = 24
 internal const val AI_CELL_SOURCES = 4
 

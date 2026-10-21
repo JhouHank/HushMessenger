@@ -211,13 +211,12 @@ class NativeMediaControlsTest {
             assertEquals(listOf(cell.render), findAiStickerCells(aiStickerCellFixture(cell.render)).map { it.hookId() })
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources - 1)).isEmpty())
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, sourceCount = cell.sources + 1)).isEmpty())
-            // An older release's label for the same row, and 582's.
-            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f140511)).isEmpty())
+            // An older release's label for the same row: 583's and 582's.
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f140560)).isEmpty())
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f14051c)).isEmpty())
         }
-        // Both namings offer 583's label from four renders, and 346611351's cell render is one instruction shorter.
-        assertEquals(listOf(Triple(GENERATE_AI_LABEL, 4, 104), Triple(GENERATE_AI_LABEL, 4, 105)),
-            aiCells.map { Triple(it.label, it.sources, it.size) })
+        // 584's cell offers its label from four renders.
+        assertEquals(listOf(Triple(GENERATE_AI_LABEL, 4, 107)), aiCells.map { Triple(it.label, it.sources, it.size) })
     }
 
     @Test fun a582CellIsNoLongerFound() {
@@ -275,9 +274,9 @@ class NativeMediaControlsTest {
         }
     }
 
-    /** Both 583 namings' cells, each under its own name, to check the injection compares 583's label. */
-    @Test fun eachCellCompares583sLabel() {
-        assertEquals(2, aiCells.size)
+    /** 584's cell under its own name, to check the injection compares 584's label. */
+    @Test fun eachCellCompares584sLabel() {
+        assertEquals(1, aiCells.size)
         for (cell in aiCells) {
             val base = SYNTHETIC_PROFILE
             activeProfile = ControlProfile(base.hooks + ("ai_sticker_cell" to setOf(cell.render)), base.pluginSentinel, base.preferenceGetter,

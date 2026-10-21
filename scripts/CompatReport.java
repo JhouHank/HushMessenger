@@ -1711,7 +1711,7 @@ public class CompatReport {
     static final String QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;";
     static final String WINDOW = "Landroid/view/Window;";
     static final String SET_FLAGS = WINDOW + "->setFlags(II)V", ADD_FLAGS = WINDOW + "->addFlags(I)V";
-    static final int GENERATE_AI_LABEL = 0x7f140560;
+    static final int GENERATE_AI_LABEL = 0x7f140559;
     // The viewer's onCreateDialog override, A1F in every 583 build
     static final String EPHEMERAL_DIALOG = "A1F";
 
@@ -1799,15 +1799,14 @@ public class CompatReport {
     }
 
     /**
-     * Mirrors NativeMediaControls.kt: each 583 naming's cell, its label, how many renders offer that label and its
-     * render's size (24 registers in both). Both offer the label from four renders, of 104 or 105.
+     * Mirrors NativeMediaControls.kt: 584's cell, its label, how many renders offer that label and its render's size
+     * (24 registers). Four renders offer the label.
      */
     record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size) {
         String render() { return type + "->render(" + scope + ")" + component; }
     }
     static List<Method> findAiStickerCells(List<ClassDef> classes) {
-        var shapes = List.of(new AiCell("LX/F0Y;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL, 4, 104),
-            new AiCell("LX/F3k;", "LX/1NT;", "LX/2Cf;", "LX/1Gu;", GENERATE_AI_LABEL, 4, 105));
+        var shapes = List.of(new AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;", GENERATE_AI_LABEL, 4, 107));
         var result = new ArrayList<Method>();
         for (var shape : shapes) {
             var matching = classes.stream().filter(c -> c.getType().equals(shape.type())).toList();
