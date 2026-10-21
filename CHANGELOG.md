@@ -4,6 +4,7 @@
 
 ### Changed and fixed
 
+- HushMessenger now patches Messenger 584.0.0.49.98 (version code 346814894) and no longer takes 583.0.0.29.95. That's the one arm64 build of 584 on [APKMirror](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-584-0-0-49-98-release/) so far. Every switch was checked against it again, so update Messenger to 584 before you repatch.
 - **Hide inbox ads** is gone. Meta stopped selling Messenger inbox ads in November 2025, and Messenger 584 took out the ad cards the switch used to filter, so there's nothing left for it to hide. If you pick patches by hand in Morphe, it just won't be in the list anymore.
 
 ### Docs

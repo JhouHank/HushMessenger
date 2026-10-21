@@ -374,7 +374,7 @@ public class CompatReport {
         return buildCall.getRegisterCount() == 1 && buildCall.getRegisterC() == made1;
     }
 
-    /** "583.0.0.29.95 (version code 346611351 or 346611369)", joined with " or " across version names. */
+    /** "584.0.0.49.98 (version code 346814894)", joined with " or " across version names. */
     static String supported(Map<String, Profile> builds) {
         var codes = new TreeMap<String, List<String>>();
         for (var build : builds.values()) codes.computeIfAbsent(build.version, v -> new ArrayList<>()).add(build.code);

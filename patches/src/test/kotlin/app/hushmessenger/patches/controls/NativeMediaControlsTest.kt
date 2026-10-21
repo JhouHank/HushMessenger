@@ -18,8 +18,8 @@ import java.security.MessageDigest
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.*
 
-/** Emoji drawer flag reads in each 583 build, across its nine drawer hooks. */
-private const val EMOJI_DRAWER_READS = 10
+/** Emoji drawer flag reads in 584, one in each of its four drawer hooks. */
+private const val EMOJI_DRAWER_READS = 4
 
 /** [resumeTail] pads onResume after the guarded part: 22 instructions in 584. An older release's two more are refused. */
 internal fun screenshotViewerFixture(id: String, quickSize: Int = 451, resumeTail: Int = 22): MutableMethod {
@@ -240,7 +240,7 @@ class NativeMediaControlsTest {
         val found = mirroredControls(listOf(fixtureClass(payment.definingClass, listOf(payment)), fixtureClass(cleanup.definingClass, listOf(cleanup))))
         assertTrue(found.getValue("screenshot_viewers").isEmpty())
         assertEquals(before, listOf(payment, cleanup).map { it.implementation!!.instructions.toList() })
-        activeProfile = PROFILE_346611351
+        activeProfile = BASE_PROFILE
         assertFailsWith<PatchException> { screenshotViewerFixture("$EPHEMERAL_VIEWER->A1D(Landroid/os/Bundle;)Landroid/app/Dialog;").injectScreenshotViewer() }
     }
 

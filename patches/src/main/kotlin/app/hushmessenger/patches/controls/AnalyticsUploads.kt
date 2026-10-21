@@ -118,7 +118,7 @@ internal fun Method.isInlinedUploadTask() =
 /**
  * Google Play can also bind GooglePlayUploadService and hand it a task through the binder its obfuscated GcmTaskService
  * base returns from onBind, so the task never passes onStartCommand. The base runs each task on a Runnable that reports
- * the result and frees the tag. Every 583 build inlines the upload into that Runnable's run(), which is the hook.
+ * the result and frees the tag. 584 inlines the upload into that Runnable's run(), which is the hook.
  * Unrelated GcmTaskServiceCompat tasks share the Runnable and stay stock.
  */
 internal fun findBoundUploadTasks(classes: Iterable<ClassDef>): List<Method> {

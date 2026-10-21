@@ -194,7 +194,7 @@ internal class ReplyReadShape(
 /** Messenger 584's 392-instruction dispatcher. The composer is copied to v19 and the staging sits four before the dispatch. */
 internal val REPLY_READ_SHAPE = ReplyReadShape(size = 392, composer = 10, session = 20, nullThread = 26, absent = 71, dispatch = 233, composerReg = 19, stage = 4)
 
-/** The exact 583 staging seam. The thread survives in v12 until the account is staged there for dispatch. */
+/** The exact 584 staging seam. The thread survives in v12 until the account is staged there for dispatch. */
 internal fun MutableMethod.validateReplyRead(): Int {
     readRequire(isReplyReadDispatch() && implementation!!.registerCount == 35)
     val flow = ReadFlow(this)

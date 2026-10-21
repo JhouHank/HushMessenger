@@ -55,7 +55,7 @@ class PinnedChatsTest {
     }
 
     @Test fun everyProfileHooksItsOwnGetter() {
-        val getters = mapOf(SYNTHETIC_PROFILE to "LX/2na;", BASE_PROFILE to "LX/2nP;", PROFILE_346611351 to "LX/2nP;")
+        val getters = mapOf(SYNTHETIC_PROFILE to "LX/2na;", BASE_PROFILE to "LX/2qf;")
         for ((profile, owner) in getters) {
             val id = SYNTHETIC_PINNED_CHAT_LIMIT.replace("LX/2na;", owner)
             assertEquals(setOf(id), profile.hooks.getValue(PINNED_CHATS))

@@ -25,35 +25,34 @@ class ControlProfileTest {
             for (key in BASE_PROFILE.hooks.keys) {
                 assertEquals(BASE_PROFILE.hooks.getValue(key).size, profile.hooks.getValue(key).size, key)
             }
-            assertEquals(ExpectedTotals.HOOKS_583, profile.hooks.values.sumOf { it.size })
+            assertEquals(ExpectedTotals.HOOKS_584, profile.hooks.values.sumOf { it.size })
         }
-        assertEquals(9, BASE_PROFILE.hooks.getValue(EMOJI_DRAWER).size)
+        assertEquals(4, BASE_PROFILE.hooks.getValue(EMOJI_DRAWER).size)
     }
 
     @Test fun theVersionCodePicksTheProfile() {
         assertEquals(MessengerTarget.VERSION_CODES.toSet(), controlProfiles.keys)
-        for (code in listOf("346611350", "346611351", "346611353")) assertSame(PROFILE_346611351, controlProfileFor(code))
-        // 346611418 and 346611435 are the nodpi builds Morphe Manager downloads.
-        for (code in listOf("346611369", "346611386", "346611418", "346611420", "346611422", "346611423", "346611435", "346611436", "346611438",
-            "346611439", "346611440", null)) {
-            assertSame(BASE_PROFILE, controlProfileFor(code))
-        }
+        assertSame(PROFILE_346814894, BASE_PROFILE)
+        for (code in listOf("346814894", "346814999", null)) assertSame(BASE_PROFILE, controlProfileFor(code))
+        val profiles = controlProfiles + (348000001 to SYNTHETIC_PROFILE)
+        assertSame(SYNTHETIC_PROFILE, controlProfileFor("348000001", profiles))
+        assertSame(BASE_PROFILE, controlProfileFor("346814894", profiles))
     }
 
     @Test fun aSecondVersionNameUsesItsOwnBuildsProfile() {
-        val versions = MessengerTarget.VERSIONS + ("584.0.0.1.91" to listOf(347000001))
-        val profiles = controlProfiles + (347000001 to PROFILE_346611351)
-        assertSame(PROFILE_346611351, controlProfileFor("347000001", profiles))
-        assertSame(BASE_PROFILE, controlProfileFor("346611369", profiles))
-        val found = mapOf("ad_context_banner" to PROFILE_346611351.hooks.getValue("ad_context_banner").map { id ->
+        val versions = MessengerTarget.VERSIONS + ("585.0.0.1.91" to listOf(348000001))
+        val profiles = controlProfiles + (348000001 to SYNTHETIC_PROFILE)
+        assertSame(SYNTHETIC_PROFILE, controlProfileFor("348000001", profiles))
+        assertSame(BASE_PROFILE, controlProfileFor("346814894", profiles))
+        val found = mapOf("ad_context_banner" to SYNTHETIC_PROFILE.hooks.getValue("ad_context_banner").map { id ->
             fixtureMethod(id, "const/4 v0, 0x0\nreturn v0")
         })
-        activeProfile = controlProfileFor("347000001", profiles)
+        activeProfile = controlProfileFor("348000001", profiles)
         validateControls(found, setOf("ad_context_banner"), versions)
-        activeProfile = controlProfileFor("346611369", profiles)
+        activeProfile = controlProfileFor("346814894", profiles)
         val failure = assertFailsWith<PatchException> { validateControls(found, setOf("ad_context_banner"), versions) }
         assertContains(failure.message.orEmpty(),
-            "Use an unmodified arm64 Messenger ${MessengerTarget.supportedApks()} or 584.0.0.1.91 APK (version code 347000001).")
+            "Use an unmodified arm64 Messenger ${MessengerTarget.supportedApks()} or 585.0.0.1.91 APK (version code 348000001).")
     }
 
     @Test fun validationFollowsTheActiveBuild() {
@@ -62,10 +61,10 @@ class ControlProfileTest {
         })
         activeProfile = BASE_PROFILE
         val base = found(BASE_PROFILE.hooks.getValue("ad_context_banner"))
-        val other = found(PROFILE_346611351.hooks.getValue("ad_context_banner"))
+        val other = found(SYNTHETIC_PROFILE.hooks.getValue("ad_context_banner"))
         validateControls(base, setOf("ad_context_banner"))
         assertFailsWith<PatchException> { validateControls(other, setOf("ad_context_banner")) }
-        activeProfile = PROFILE_346611351
+        activeProfile = SYNTHETIC_PROFILE
         validateControls(other, setOf("ad_context_banner"))
         assertFailsWith<PatchException> { validateControls(base, setOf("ad_context_banner")) }
     }

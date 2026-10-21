@@ -379,8 +379,9 @@ class SystemCameraTest {
             val dex = DexFileFactory.loadDexContainer(apk.toFile(), Opcodes.forApi(35))
             val launches = findSystemCamera(dex.dexEntryNames.flatMap { dex.getEntry(it)!!.dexFile.classes })
             validateControls(mapOf(SYSTEM_CAMERA to launches), setOf(SYSTEM_CAMERA))
-            // The older listener, the chat screen's camera factory, its launcher's start and the photo's two checks.
-            assertEquals(6, launches.size, code)
+            // The older listener, the chat screen's camera factory, its launcher's start, the two composer dispatchers 584
+            // inlines the capture handler into, and the photo's two checks.
+            assertEquals(7, launches.size, code)
             for (method in launches) injectAndCheck(MutableMethod(method), "$code ${method.hookId()}")
         }
     }

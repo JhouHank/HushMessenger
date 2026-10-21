@@ -268,7 +268,7 @@ class MarkReadButtonTest {
     }
 
     @Test fun everyProfileNamesBothBarsAndOneListener() {
-        for (profile in listOf(SYNTHETIC_PROFILE, BASE_PROFILE, PROFILE_346611351)) {
+        for (profile in listOf(SYNTHETIC_PROFILE, BASE_PROFILE)) {
             assertEquals(2, profile.hooks.getValue(MARK_READ_BAR).size)
             assertEquals(1, profile.hooks.getValue(MARK_READ_CLICK).size)
         }

@@ -388,9 +388,11 @@ class ExternalGalleryTest {
                 handler.injectExternalGallery()
                 assertGalleryHook(before, handler.code(), site.at, routed.id, "$code ${routed.id}")
             }
-            // 583's launcher is abstract, so the hook checks for the one subclass that runs the hooked start.
-            val target = classes.single { it.type == galleryRoute!!.launcher }
-            assertTrue(!AccessFlags.ABSTRACT.isSet(target.accessFlags) && target.superclass == galleryRoute!!.start.substringBefore("->"), code)
+            // 584's launcher is abstract and both its subclasses inherit the hooked start, so the hook checks for the launcher itself.
+            val start = galleryRoute!!.start
+            assertEquals(start.substringBefore("->"), galleryRoute!!.launcher, code)
+            assertTrue(classes.none { it.superclass == galleryRoute!!.launcher &&
+                it.methods.any { method -> method.hookId().substringAfter("->") == start.substringAfter("->") } }, code)
             assertReaderHook(MutableMethod(found.single { it.hookId() == galleryRoute!!.reader }), code)
             assertSharedStart(classes, code)
         }

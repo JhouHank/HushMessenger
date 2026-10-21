@@ -136,9 +136,9 @@ private fun ClassDef.galleryImplements(iface: String, byType: Map<String, ClassD
     generateSequence(this) { cls -> cls.superclass?.let(byType::get) }.take(16).any { iface in it.interfaces }
 
 /**
- * The one class whose objects run [start] as [launcher] declares it, or none. Messenger 583's launcher is abstract, with
- * one final subclass that runs this start and another that brings its own, and the hook calls the start virtually, so it
- * only hands its bundle to the first kind.
+ * The one class whose objects run [start] as [launcher] declares it, or none. Messenger 583's launcher was abstract, with
+ * one final subclass that ran this start and another that brought its own, and the hook calls the start virtually, so it
+ * only handed its bundle to the first kind. 584's two subclasses both inherit the start, so the launcher itself is the class.
  */
 private fun List<ClassDef>.galleryTarget(launcher: ClassDef, start: Method, byType: Map<String, ClassDef>): ClassDef? {
     val signature = start.parameterTypes.map { it.toString() }
@@ -158,7 +158,7 @@ private fun List<ClassDef>.galleryTarget(launcher: ClassDef, start: Method, byTy
 
 /**
  * Which of the chat composer's two kinds of event handler this signature is: the older one, handed the event and its
- * class name, or the composer plugin, handed the event to check its class. 583 has one of each, and a chat's gallery
+ * class name, or the composer plugin, handed the event to check its class. 584 has one of each, and a chat's gallery
  * button goes through the plugin.
  */
 private fun Method.galleryHandlerKind(): String? {

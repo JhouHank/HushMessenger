@@ -159,6 +159,7 @@ With **Hide read receipts** on, a chat you open stays unread on your phone, beca
 | Architecture | `arm64-v8a` |
 | Minimum Android version | Android 9 (API 28) |
 | APKMirror downloads | [All variants of 583.0.0.29.95](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-583-0-0-29-95-release/) |
+| Added in the next release | `584.0.0.49.98`, version code `346814894` ([APKMirror](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-584-0-0-49-98-release/)). It replaces 583.0.0.29.95. |
 
 HushMessenger takes all 13 arm64 builds APKMirror lists for 583.0.0.29.95, plus build 346611440, which isn't on APKMirror. The patch checks the version code before it changes anything and stops on a build that isn't listed. Older Messenger versions aren't supported by current bundles. v0.23.0 still takes 582.0.0.61.92.
 
@@ -179,7 +180,10 @@ SHA-256 of the stock APKs the checks ran against:
 346611438  fda7b7e9818aca3183d4c27097be8d350aeeb8f5efe0f8e07e1a8eca7ac75fd3
 346611439  6150df6d26e0beb6653dc69b4ae9ccde63e713eccd23e6a2a055cc3728019771
 346611440  cbb1b91799aba7a39afbd34f3daf3d325d1c715c8f41110cb95c44c45c7283bd
+346814894  3cdcde5608814756f409e21ef5bcb679931edb34dfe33e36f84b1de663ddf966
 ```
+
+The last line is 584.0.0.49.98, which the next release patches instead of 583. APKMirror has only that one arm64 build of it so far.
 
 On Windows, compare your file with `Get-FileHash -Algorithm SHA256 .\messenger.apk`. Meta sometimes publishes different APKs under one version name.
 

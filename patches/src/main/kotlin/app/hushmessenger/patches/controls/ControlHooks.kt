@@ -678,7 +678,7 @@ internal fun MutableMethod.injectSubtabs() {
 }
 
 /**
- * How 583 reads the external-browser preference: an eight-register check that keeps the false default in v2 and
+ * How 584 reads the external-browser preference: an eight-register check that keeps the false default in v2 and
  * returns when the answer is on.
  */
 private const val BROWSER_PREFERENCE_REGISTERS = 8
@@ -1075,7 +1075,7 @@ internal fun MutableMethod.injectOutgoingTyping() {
 
 /**
  * The Menu tab's folder row class, which the Settings row is built from. The builder may also make other folder rows
- * of that class (the QR code row) and their folder keys, but nothing else. 583 creates no row icons in the builder.
+ * of that class (the QR code row) and their folder keys, but nothing else. 584 creates no row icons in the builder.
  */
 internal fun Method.menuFolderItemType(): String {
     val code = implementation!!.instructions.toList()
@@ -1206,7 +1206,7 @@ internal fun MutableMethod.validateUnsentIndicator() {
     if (returnType != "Ljava/lang/String;") throw PatchException("Messenger controls: unsent_indicator hook must return String")
     if (parameterTypes != listOf("I")) throw PatchException("Messenger controls: unsent_indicator hook must take one int param")
     val code = implementation!!.instructions.toList()
-    // 583 takes the row from the wrapper's list, casts it and asks it for its text, ending in v0.
+    // 584 takes the row from the wrapper's list, casts it and asks it for its text, ending in v0.
     val shape = listOf(Opcode.IGET_OBJECT, Opcode.INVOKE_INTERFACE, Opcode.MOVE_RESULT_OBJECT, Opcode.CHECK_CAST,
         Opcode.INVOKE_INTERFACE, Opcode.MOVE_RESULT_OBJECT, Opcode.RETURN_OBJECT)
     if (code.size != shape.size) throw PatchException("Messenger controls: unsent_indicator hook has ${code.size} instructions, expected ${shape.size}")
@@ -1564,7 +1564,7 @@ internal fun MutableMethod.validateStorySave(): StorySave {
     val card = reg(entry + 3)
     val saveable = mutableListOf<String>()
     var add = entry + 4
-    // 583 lists the card types: a match jumps to the item, the last miss skips it.
+    // 584 lists the card types: a match jumps to the item, the last miss skips it.
     if (op(add) != Opcode.INSTANCE_OF) fail("Save item's card test no longer matches the tested build")
     while (op(add) == Opcode.INSTANCE_OF) {
         val test = code[add] as TwoRegisterInstruction
