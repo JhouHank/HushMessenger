@@ -170,6 +170,7 @@ internal val PROFILE_346814894 = ControlProfile(
         "people_tab" to setOf("LX/FYa;->A01(LX/FYa;)V"),
         "phone_id_sync" to setOf("LX/1HB;->A03(LX/1HB;)Ljava/util/ArrayList;", "LX/1HB;->A06(Ljava/lang/String;)V"),
         "pinned_chats" to setOf("LX/2qf;->A00(Lcom/facebook/auth/usersession/FbUserSession;)I"),
+        "recent_media" to setOf("LX/9eA;->A01(LX/6NI;Lkotlin/jvm/functions/Function0;)V"),
         "reels_badge" to setOf("LX/4WJ;->A09(LX/4WJ;)Z"),
         "reply_read" to setOf("LX/9Tt;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/8hs;LX/9BR;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/Bga;LX/99n;LX/9BQ;LX/Bdg;LX/AZV;LX/6NI;LX/97B;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/5gq;Ljava/lang/String;)V"),
         "save_stories" to setOf("LX/NZc;->onClick(Landroid/view/View;)V"),

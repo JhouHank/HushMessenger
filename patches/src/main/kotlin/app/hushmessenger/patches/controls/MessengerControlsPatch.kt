@@ -158,6 +158,7 @@ internal fun MutableMethod.validateHook(hook: String) {
         XHE_AUDIO -> validateXheAudio()
         XHE_TRANSCODE -> validateXheTranscode()
         DISAPPEARING_SWIPE -> validateDisappearingSwipe()
+        RECENT_MEDIA -> validateRecentMedia()
         HIDE_READ_RECEIPTS -> validateChatSeen()
         REPLY_READ -> validateReplyRead()
         MARK_READ_BAR -> validateMarkReadBar()
@@ -232,6 +233,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             XHE_AUDIO -> method.injectXheAudio()
             XHE_TRANSCODE -> method.injectXheTranscode()
             DISAPPEARING_SWIPE -> method.injectDisappearingSwipe()
+            RECENT_MEDIA -> method.injectRecentMedia()
             ANALYTICS_UPLOADS -> method.injectAnalyticsUpload()
             ATTRIBUTION_UPLOADS -> method.injectAttributionUpload()
             AD_EVENTS -> method.injectAdEvent()
@@ -435,6 +437,9 @@ val xheAudioPatch = controlPatch("xhe_audio", "Fix videos that won't send",
 @Suppress("unused")
 val disappearingSwipePatch = controlPatch("disappearing_swipe", "Turn off the swipe up for disappearing messages",
     "Swiping up at the bottom of a chat no longer turns on disappearing messages, so a scroll can't set the timer by accident. You can still change it in the chat's settings.", "Conversations")
+@Suppress("unused")
+val hideRecentMediaPatch = controlPatch("recent_media", "Hide the recent photo card",
+    "Stops the card above the message box that offers to send the screenshot, photo or video you just took. You can still send it from the gallery.", "Conversations")
 @Suppress("unused")
 val keepMessageLogPatch = controlPatch("message_log", "Keep a message log",
     "Saves each message when its notification arrives, so you can still read it if it's unsent. Works in end-to-end encrypted chats too. Stays on your phone.", "Privacy")

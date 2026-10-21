@@ -195,6 +195,7 @@ public class CompatReport {
         PATCHES.put("Send videos without re-encoding", List.of("original_video"));
         PATCHES.put("Fix videos that won't send", List.of("xhe_audio", "xhe_transcode"));
         PATCHES.put("Turn off the swipe up for disappearing messages", List.of("disappearing_swipe"));
+        PATCHES.put("Hide the recent photo card", List.of("recent_media"));
         PATCHES.put("Use the phone's camera app", List.of("system_camera"));
         PATCHES.put("Open your gallery app", List.of("external_gallery"));
         PATCHES.put("Stop analytics uploads", List.of("analytics_uploads"));
@@ -3476,6 +3477,35 @@ public class CompatReport {
         return starts;
     }
 
+    static final String QUICK_SEND_SHOW = "Lcom/facebook/xapp/messaging/composer/recentmedia/quicksend/event/QuickSendShowEvent;";
+    static final String IMAGES_URI = "Landroid/provider/MediaStore$Images$Media;->EXTERNAL_CONTENT_URI:Landroid/net/Uri;";
+
+    /**
+     * recent_media: the static void detector that reads the newest photo from the media store and makes the recent photo
+     * card's event with the event's own static factory. The quick send handler that takes the event and makes another is
+     * left out. Mirrors RecentMedia.kt.
+     */
+    static List<Method> recentMediaDetectors(List<ClassDef> classes) {
+        var found = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || !AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !"V".equals(method.getReturnType()) || QUICK_SEND_SHOW.equals(cls.getType())) continue;
+            boolean takesEvent = false;
+            for (var t : method.getParameterTypes()) takesEvent |= QUICK_SEND_SHOW.equals(t.toString());
+            if (takesEvent) continue;
+            boolean factory = false, images = false;
+            for (var i : method.getImplementation().getInstructions()) {
+                if (!(i instanceof ReferenceInstruction ri)) continue;
+                if ((i.getOpcode() == Opcode.INVOKE_STATIC || i.getOpcode() == Opcode.INVOKE_STATIC_RANGE) &&
+                    ri.getReference() instanceof MethodReference mr && QUICK_SEND_SHOW.equals(mr.getDefiningClass()) &&
+                    QUICK_SEND_SHOW.equals(mr.getReturnType())) factory = true;
+                if (ri.getReference() instanceof FieldReference fr && IMAGES_URI.equals(fr.toString())) images = true;
+            }
+            if (factory && images) found.add(method);
+        }
+        return found;
+    }
+
     static final String SEND_MESSAGE_EVENT = "Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;";
 
     /**
@@ -4531,6 +4561,7 @@ public class CompatReport {
         found.get("ai_mention_rows").addAll(aiMentionRowChecks(classes));
         found.get("xhe_audio").addAll(shareCopies(classes));
         found.get("disappearing_swipe").addAll(disappearingSwipeStarts(classes));
+        found.get("recent_media").addAll(recentMediaDetectors(classes));
         found.get("hide_read_receipts").addAll(chatSeenBroadcasts(classes));
         found.get("reply_read").addAll(replyReadDispatches(classes));
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
@@ -5107,7 +5138,7 @@ public class CompatReport {
     static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
         "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
         "disappearing_swipe", "external_gallery", "facebook", "facebook_profile", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
-        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "stories", "system_camera", "typing",
+        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "recent_media", "stories", "system_camera", "typing",
         "unsent_indicator");
 
     /** More registers than the parameters take, as ControlHooks.kt's validateScratch asks. */

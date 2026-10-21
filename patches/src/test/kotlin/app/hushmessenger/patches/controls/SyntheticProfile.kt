@@ -96,6 +96,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     XHE_AUDIO to setOf(SYNTHETIC_SHARE_COPY),
     XHE_TRANSCODE to setOf(VIDEO_TRANSCODE),
     DISAPPEARING_SWIPE to setOf(OVERSCROLL_START),
+    RECENT_MEDIA to setOf(RECENT_MEDIA_DETECTOR),
     EMOJI_DRAWER to setOf(DRAWER_RENDERER, DRAWER_EFFECT),
     "original_photo" to ORIGINAL_PHOTO_HOOKS,
     ORIGINAL_VIDEO to setOf(VIDEO_TRANSCODE),

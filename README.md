@@ -105,6 +105,7 @@ The screenshots below show the settings in the current release, in the dark and 
 | Slide chats in and out | Slides a chat in from the side when you open it and back out when you leave. |
 | Hold stories at the end | A story stays on screen when it ends, photo or video, until you tap or swipe to the next one. The last one stays open until you close it. Experimental. |
 | Turn off the swipe up for disappearing messages | Swiping up at the bottom of a chat no longer turns on disappearing messages. |
+| Hide the recent photo card | The card above the message box that offers to send the screenshot, photo or video you just took doesn't show up. You can still send it from the gallery. |
 | Allow chat bubbles | **Stock**, **Chat Heads** or **Native Bubbles** (Android 11 and newer). See [Chat heads and bubbles](#chat-heads-and-bubbles). |
 | Unlock app icons | Every icon in Messenger's App icon setting becomes selectable without a subscription. |
 | Material You theme | In dark mode on Android 12 and newer, Messenger takes the accent color from your wallpaper. A **Pure black dark mode** switch sits under Appearance. |

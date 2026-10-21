@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Reported issues
+
+- [#85](https://github.com/SysAdminDoc/HushMessenger/issues/85) New **Hide the recent photo card** switch under Conversations. Take a screenshot or a photo and Messenger puts a card above the message box offering to send it. With this on, the card doesn't show up. Anything you took is still in the gallery button when you want to send it. It starts off.
+
 ### Changed and fixed
 
 - HushMessenger now patches Messenger 584.0.0.49.98 (version code 346814894) and no longer takes 583.0.0.29.95. That's the one arm64 build of 584 on [APKMirror](https://www.apkmirror.com/apk/facebook-2/messenger/facebook-messenger-584-0-0-49-98-release/) so far. Every switch was checked against it again, so update Messenger to 584 before you repatch.
