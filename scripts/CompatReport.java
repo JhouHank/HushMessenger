@@ -87,8 +87,8 @@ public class CompatReport {
     static final String STORY_CARD_DATE_KEY = "last_date_creation_card_shown";
     // The Notifications tab's server flag ID as 583 numbers it. Meta renumbers it with each release.
     static final long PEOPLE_SERVER_FLAG = 72344188615735036L;
-    // The redesigned emoji drawer's server flag as 583 numbers it. Meta renumbers it with each release.
-    static final long EMOJI_DRAWER_FLAG = 36320635751841408L;
+    // The redesigned emoji drawer's server flag as 584 numbers it. Meta renumbers it with each release.
+    static final long EMOJI_DRAWER_FLAG = 36320584214265525L;
     // The drawer renderer throws this when the redesign can't draw, which ties the flag to the emoji drawer
     static final String EMOJI_DRAWER_ANCHOR = "Cannot render redesigned drawer with search icon ";
     // Controls whose hook count follows how Redex inlined one flag read, so it differs between releases
