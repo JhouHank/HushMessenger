@@ -2080,10 +2080,19 @@ public class CompatReport {
         var callbackCtor=definition((MethodReference)ref(mainCtorCode.get(prefixStore-1))); var callbackCode=instructions(callbackCtor);
         require(callbackCtor.getParameterTypes().equals(List.of(main.getType())) && callbackCode.size()==3 && callbackCode.get(0).getOpcode()==Opcode.IPUT_OBJECT && ((TwoRegisterInstruction)callbackCode.get(0)).getRegisterA()==1 && ((TwoRegisterInstruction)callbackCode.get(0)).getRegisterB()==0,"callback Main pointer disconnected");
         var callbackMain=(FieldReference)ref(callbackCode.get(0));
-        int getterReceiver=args(renderCode.get(scopeResult-1)).get(0), mainLoaderRead=-1;
-        for(int at=scopeResult-2;at>=0;at--) if(writes(renderCode.get(at),getterReceiver)) { mainLoaderRead=at; break; }
-        require(mainLoaderRead>=0 && renderCode.get(mainLoaderRead).getOpcode()==Opcode.IGET_OBJECT,"Main loader source absent");
-        var mainLoader=(FieldReference)ref(renderCode.get(mainLoaderRead)); var getterCode=instructions(scopeGetter);
+        int getterCall=scopeResult-1, getterReceiver=args(renderCode.get(getterCall)).get(0);
+        // 584 reads the loader through a lazy field: the field, a null test that skips a checked static getter, then the call.
+        require(getterCall>=4 && renderCode.get(getterCall-1).getOpcode()==Opcode.MOVE_RESULT_OBJECT && register(renderCode.get(getterCall-1))==getterReceiver &&
+            renderCode.get(getterCall-2).getOpcode()==Opcode.INVOKE_STATIC && renderCode.get(getterCall-3).getOpcode()==Opcode.IF_NEZ &&
+            register(renderCode.get(getterCall-3))==getterReceiver && branch(render,getterCall-3)==getterCall &&
+            renderCode.get(getterCall-4).getOpcode()==Opcode.IGET_OBJECT && register(renderCode.get(getterCall-4))==getterReceiver,"Main loader source absent");
+        var mainLoader=(FieldReference)ref(renderCode.get(getterCall-4));
+        var checkedLoader=definition((MethodReference)ref(renderCode.get(getterCall-2))); var checkedCode=instructions(checkedLoader);
+        require(AccessFlags.STATIC.isSet(checkedLoader.getAccessFlags()) && checkedLoader.getParameterTypes().stream().map(Object::toString).toList().equals(List.of(main.getType())) &&
+            checkedLoader.getReturnType().equals(mainLoader.getType()) && checkedCode.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT,
+            Opcode.IF_EQZ, Opcode.RETURN_OBJECT, Opcode.INVOKE_STATIC, Opcode.MOVE_RESULT_OBJECT, Opcode.THROW)) &&
+            Objects.toString(ref(checkedCode.get(0))).equals(mainLoader.toString()),"Main loader getter changed");
+        var getterCode=instructions(scopeGetter);
         var currentPath=List.of(callbackMain,mainLoader,(FieldReference)ref(getterCode.get(0)),(FieldReference)ref(getterCode.get(1)),(FieldReference)ref(getterCode.get(8)));
         String owner=callbackCtor.getDefiningClass();
         for(var f:currentPath) { require(f.getDefiningClass().equals(owner),"current folder path disconnected");
@@ -3391,41 +3400,22 @@ public class CompatReport {
         return builders.size() == 1 ? builders : List.of();
     }
 
-    /** 583's numbering of the @ list row flags. Meta renumbers them with each release. Mirrors AiMentionRows.kt. */
-    record AiRowFlags(Set<Long> row, Set<Long> chat, long encrypted, long imagine, long imagineYourself) {}
+    /** 584's numbering of the @ list row flags. Meta renumbers them with each release. Mirrors AiMentionRows.kt. */
+    record AiRowFlags(Set<Long> row, Set<Long> chat, long shared, long encrypted, long imagine, long imagineYourself) {}
     static final AiRowFlags AI_ROW_FLAGS =
-        new AiRowFlags(Set.of(0x810637011b2d49L, 0x81063701042d42L), Set.of(0x810637011b2d49L, 0x81063700042cffL),
-            0x81063700052d00L, 0x81063700402d10L, 0x81063700f92d3eL);
+        new AiRowFlags(Set.of(0x81062d011b2d6cL, 0x81062d01042d65L), Set.of(0x81062d011b2d6cL, 0x81062d00042d22L),
+            0x81062d011b2d6cL, 0x81062d00052d23L, 0x81062d00402d33L, 0x81062d00f92d61L);
     static final String CAPABILITIES = "Lcom/facebook/xapp/messaging/capability/vector/Capabilities;";
     static final String FB_SESSION_TYPE = "Lcom/facebook/auth/usersession/FbUserSession;";
 
     /**
      * ai_mention_rows: the instance checks behind the Meta AI, imagine and imagine yourself rows of the newer @ list, told
      * apart by parameters and the server flag each reads: ()Z reading both row flags (community channels),
-     * (FbUserSession, Capabilities)Z reading both chat flags (regular chats), (FbUserSession, Capabilities)Z with no flag
-     * that checks a capability and defers to a same-class (FbUserSession)Z reading the encrypted flag (encrypted chats),
-     * (FbUserSession, ThreadKey, Capabilities, Z, Z)Z reading the imagine flag and (FbUserSession, ThreadKey,
-     * Capabilities)Z reading the imagine yourself flag. Counted only when there is exactly one of each, all five share a
-     * class and all read 583's flags. Mirrors AiMentionRows.kt.
+     * (FbUserSession, Capabilities)Z reading both chat flags (regular chats), (FbUserSession)Z reading the shared flag and
+     * the encrypted flag (encrypted chats), (FbUserSession, ThreadKey, Capabilities, Z, Z)Z reading the imagine flag and
+     * (FbUserSession, ThreadKey, Capabilities)Z reading the imagine yourself flag. Counted only when there is exactly one
+     * of each, all five share a class and all read 584's flags. Mirrors AiMentionRows.kt.
      */
-    static boolean defersToEncryptedCheck(ClassDef cls, Method method, long encrypted) {
-        var calls = new ArrayList<MethodReference>();
-        for (var i : method.getImplementation().getInstructions())
-            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr) calls.add(mr);
-        if (calls.stream().noneMatch(c -> (CAPABILITIES + "->A00(I)Z").equals(c.toString()))) return false;
-        var siblings = calls.stream().filter(c -> c.getDefiningClass().equals(cls.getType()) && "Z".equals(c.getReturnType()) &&
-            c.getParameterTypes().size() == 1 && FB_SESSION_TYPE.equals(c.getParameterTypes().get(0).toString())).toList();
-        if (siblings.size() != 1) return false;
-        for (var other : cls.getMethods()) {
-            if (!other.getName().equals(siblings.get(0).getName()) || other.getImplementation() == null ||
-                !"Z".equals(other.getReturnType()) || other.getParameterTypes().size() != 1 ||
-                !FB_SESSION_TYPE.equals(other.getParameterTypes().get(0).toString())) continue;
-            for (var i : other.getImplementation().getInstructions())
-                if (i.getOpcode() == Opcode.CONST_WIDE && i instanceof WideLiteralInstruction flag && flag.getWideLiteral() == encrypted) return true;
-        }
-        return false;
-    }
-
     static List<Method> aiMentionRowChecks(List<ClassDef> classes) {
         return aiMentionRowChecks(classes, AI_ROW_FLAGS);
     }
@@ -3442,7 +3432,7 @@ public class CompatReport {
             String row = null;
             if (params.isEmpty() && flags.containsAll(build.row())) row = "meta_ai";
             else if (params.equals(List.of(FB_SESSION_TYPE, CAPABILITIES)) && flags.containsAll(build.chat())) row = "meta_ai_chats";
-            else if (params.equals(List.of(FB_SESSION_TYPE, CAPABILITIES)) && flags.isEmpty() && defersToEncryptedCheck(cls, method, build.encrypted())) row = "meta_ai_encrypted";
+            else if (params.equals(List.of(FB_SESSION_TYPE)) && flags.containsAll(Set.of(build.shared(), build.encrypted()))) row = "meta_ai_encrypted";
             else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES, "Z", "Z")) && flags.contains(build.imagine())) row = "imagine";
             else if (params.equals(List.of(FB_SESSION_TYPE, THREAD_KEY, CAPABILITIES)) && flags.contains(build.imagineYourself())) row = "imagine_yourself";
             if (row != null) rows.computeIfAbsent(row, k -> new ArrayList<>()).add(method);
