@@ -68,7 +68,8 @@ internal fun communityInboxFixture(anyBody: String? = null, channelCheck: Boolea
         143 to "new-instance v0, $closure", 155 to "invoke-direct/range {v14 .. v29}, $ctorId", 196 to "return-void")),
         30,
         AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)
-    val switch = fixtureMethod(switchId, sparse(45, mapOf(
+    val switch = fixtureMethod(switchId, sparse(42, mapOf(
+        0 to "invoke-static {p0}, $main->A04($main)Ljava/lang/Object;", 1 to "move-result-object v1",
         2 to "sget-object v0, $requests", 3 to "if-ne p1, v0, :inbox",
         4 to "sget-object v4, $FOLDER->pending:$FOLDER", 7 to "sget-object v4, $FOLDER->pending:$FOLDER",
         9 to "const-string v1, \"InboxLoaderCoordinator.setFolderAndFilter\"",

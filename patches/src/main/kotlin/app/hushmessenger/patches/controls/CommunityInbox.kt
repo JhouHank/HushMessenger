@@ -133,7 +133,7 @@ internal fun findCommunityInbox(classes: Iterable<ClassDef>): CommunityInboxCont
         val switch = main.methods.filter { it.communityString("folderName") }.communitySingle()
         val s = switch.communityCode()
         val requests = communityEnums(byType[scope.type] ?: throw CommunityChanged())["MESSAGE_REQUESTS"] ?: throw CommunityChanged()
-        communityRequire(s.size == 45 && switch.communityString("InboxLoaderCoordinator.setFolderAndFilter") &&
+        communityRequire(s.size == 42 && s[0].opcode == Opcode.INVOKE_STATIC && s[1].opcode == Opcode.MOVE_RESULT_OBJECT && switch.communityString("InboxLoaderCoordinator.setFolderAndFilter") &&
             switch.parameterTypes.map(CharSequence::toString) == listOf(main.type, scope.type) && s[2].communityRef().toString() == requests.toString() &&
             s[3].opcode == Opcode.IF_NE && s.branchTarget(3) == 13 && s[4].communityRef().toString() == folders["PENDING"].toString() &&
             s[7].communityRef().toString() == folders["PENDING"].toString() && s[13].communityRef().toString() == folders["INBOX"].toString() &&
