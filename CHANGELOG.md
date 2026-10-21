@@ -22,7 +22,7 @@
 ### Checks
 
 - A release can't go public until the whole app has been walked with that exact bundle on a release phone or an emulator. The publish stage now takes the walk's receipt as `-Walk` and stops before the tag or GitHub if the walk wasn't a full pass, saw a Messenger crash, ran on some other device, or patched with a different bundle.
-- The release check fails when the source has no bundle timestamp. Before, a bundle and a source both missing it counted as a match.
+- The development release check, the one a held build goes through, fails when the source has no bundle timestamp. Before, a bundle and a source both missing one counted as a match there. The full release check already refused it, and now it says why.
 
 ## 0.25.0 (2026-10-18)
 
