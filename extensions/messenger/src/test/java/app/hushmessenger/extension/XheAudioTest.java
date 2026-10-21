@@ -345,6 +345,21 @@ public class XheAudioTest {
         assertEquals("a Uri we can't read is Messenger's to send, not a broken hook", 0, Settings.hookErrorAt(XheAudio.KEY));
     }
 
+    @Test public void anEncoderThatFailsToStartIsReleased() {
+        boolean[] released = new boolean[1];
+        IllegalStateException refused = new IllegalStateException("configure refused the format");
+        try {
+            XheAudio.startedOrReleased("encoder", () -> { throw refused; }, () -> released[0] = true);
+            fail("the failure has to reach the conversion");
+        } catch (IllegalStateException thrown) {
+            assertSame(refused, thrown);
+        }
+        assertTrue("nothing else holds the encoder yet, so it's released here", released[0]);
+        boolean[] untouched = new boolean[1];
+        assertEquals("encoder", XheAudio.startedOrReleased("encoder", () -> { }, () -> untouched[0] = true));
+        assertFalse("a started encoder stays open for the conversion", untouched[0]);
+    }
+
     @Test public void conversionsRunningAtOnceEachKeepTheirOwnFiles() throws Exception {
         File movies = folder.newFolder("Movies");
         File[] picked = {new File(movies, "Aa.mp4"), new File(movies, "BB.mp4")};

@@ -1027,9 +1027,28 @@ public final class XheAudio {
         MediaCodec encoder = name != null
             ? MediaCodec.createByCodecName(name)
             : MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
-        encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-        encoder.start();
-        return encoder;
+        return startedOrReleased(encoder, () -> {
+            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            encoder.start();
+        }, encoder::release);
+    }
+
+    /**
+     * Hands back [codec] once [setUp] ran, else runs [release] and rethrows. The caller only gets the codec on a normal
+     * return, so a configure or start that throws would leave it held with nothing left to release it.
+     */
+    static <T> T startedOrReleased(T codec, Runnable setUp, Runnable release) {
+        try {
+            setUp.run();
+            return codec;
+        } catch (RuntimeException failed) {
+            try {
+                release.run();
+            } catch (RuntimeException alsoFailed) {
+                failed.addSuppressed(alsoFailed);
+            }
+            throw failed;
+        }
     }
 
     private static void stalled(long lastWork, int idle, String what) throws IOException {
