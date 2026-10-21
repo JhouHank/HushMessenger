@@ -3108,12 +3108,14 @@ public class CompatReport {
     static final String GOOGLE_PLAY_UPLOAD_SERVICE = "Lcom/facebook/analytics2/logger/GooglePlayUploadService;";
     static final String TASK_SERVICE_COMPAT = "Lcom/facebook/common/jobscheduler/compat/GcmTaskServiceCompat;";
     static final String BOUND_UPLOAD_MARK = "Job with no build ID, cancelling job";
+    // 584 moved the first message into a string table, so the stale build ID message marks it too
+    static final String OLD_BUILD_UPLOAD_MARK = "Job with old build ID: %d, cancelling job, expected: %d";
 
     static boolean holdsBoundUploadMark(Method m) {
         if (m.getImplementation() == null) return false;
         for (var i : m.getImplementation().getInstructions())
             if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference s &&
-                BOUND_UPLOAD_MARK.equals(s.getString())) return true;
+                (BOUND_UPLOAD_MARK.equals(s.getString()) || OLD_BUILD_UPLOAD_MARK.equals(s.getString()))) return true;
         return false;
     }
 
