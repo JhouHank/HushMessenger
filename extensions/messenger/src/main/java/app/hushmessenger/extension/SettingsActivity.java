@@ -389,7 +389,8 @@ public final class SettingsActivity extends Activity {
         view.setOnLongClickListener(held -> {
             Settings.preferences.edit().putBoolean(HIDE_QUICK_SETUPS, true).apply();
             showQuickSetups();
-            feedback(text.get("quick_setups_hidden", text.format("app")), Toast.LENGTH_LONG);
+            // The section is hidden from the App tab, so the toast names the button on this tab that brings it back.
+            feedback(text.get("quick_setups_hidden", text.format("quick_setups_home"), text.format("choices")), Toast.LENGTH_LONG);
             return true;
         });
     }

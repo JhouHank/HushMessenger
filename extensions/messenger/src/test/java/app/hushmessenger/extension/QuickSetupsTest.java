@@ -176,7 +176,11 @@ public class QuickSetupsTest {
             assertTrue(root.findViewWithTag("quick_privacy").performLongClick());
             assertTrue(Settings.preferences.getBoolean("hide_quick_setups", false));
             assertFalse(root.findViewWithTag("quick_setups").isShown());
-            assertEquals("Quick setups hidden. Bring it back from App.", ShadowToast.getTextOfLatestToast());
+            // The long press happens on the App tab, so the toast has to name the button there, not send you to App.
+            TextView restore = root.findViewWithTag("quick_setups_home");
+            assertTrue(restore.isShown());
+            assertEquals("Quick setups hidden. Tap " + restore.getText() + " under Your choices to show it again.",
+                ShadowToast.getTextOfLatestToast());
             assertEquals("Hidden. Tap to show it again.", status.getText().toString());
             root.findViewWithTag("quick_setups_home").performClick();
             assertFalse(Settings.preferences.getBoolean("hide_quick_setups", false));

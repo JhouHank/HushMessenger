@@ -193,8 +193,8 @@ final class SettingsText {
         ENGLISH.put("restart_waiting_many", "%d changes wait for a restart");
         ENGLISH.put("quick_setups", "QUICK SETUPS");
         ENGLISH.put("quick_setups_help", "Switches a set of controls in one tap. You can still change each one afterward. Press and hold to hide this section.");
-        ENGLISH.put("quick_setups_hidden", "Quick setups hidden. Bring it back from %s.");
-        ENGLISH.put("quick_setups_home", "Quick setups on the home page");
+        ENGLISH.put("quick_setups_hidden", "Quick setups hidden. Tap %s under %s to show it again.");
+        ENGLISH.put("quick_setups_home", "Quick setups section");
         ENGLISH.put("quick_setups_home_shown", "Shown. Tap to hide it.");
         ENGLISH.put("quick_setups_home_hidden", "Hidden. Tap to show it again.");
         ENGLISH.put("quick_quiet", "Quiet");
