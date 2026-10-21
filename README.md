@@ -221,7 +221,7 @@ $env:GITHUB_TOKEN = gh auth token
 python -m unittest discover -s scripts/tests -v
 ```
 
-The bundle lands in `patches/build/libs/`, and clean builds from the same source give the same checksum. `:patches:check` wants the exact stock APK of every supported build in a folder named by `HUSH_NATIVE_FIXTURES`, each file called `messenger-583-<version code>.apk`. `:patches:test` runs without them and skips the tests that replay on those APKs.
+The bundle lands in `patches/build/libs/`, and clean builds from the same source give the same checksum. `:patches:check` wants the exact stock APK of every supported build in a folder named by `HUSH_NATIVE_FIXTURES`, each file named with its version code after the last dash, like `messenger-583-346611369.apk`. `:patches:test` runs without them and skips the tests that replay on those APKs.
 
 To exercise Messenger itself, use ARM64 Android or an emulator image with ARM translation. Messenger `583/346611369` was checked on the Android 12L Google APIs x86_64 image with `libndk_translation.so`. Keep separate emulator data directories for Meta-signed stock and re-signed builds. Android users and work profiles share the installed APK and its signing key.
 
