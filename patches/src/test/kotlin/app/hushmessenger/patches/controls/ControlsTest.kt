@@ -336,6 +336,22 @@ class ControlsTest {
         }
     }
 
+    @Test fun theStoryQueryIsFoundThroughARedexStringTableLookup() {
+        val lookup = "LX/Tbl;->A00(I)Ljava/lang/String;"
+        val tables = mapOf(lookup to mapOf(7 to STORY_SUGGESTIONS_QUERY, 6 to "SomethingElse"))
+        fun caller(key: String, call: String = "invoke-static {v1}, $lookup") = fixtureMethod(PEOPLE_STORY_HOOK,
+            "$key\n$call\nmove-result-object v0\nreturn-void", registers = 4,
+            flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)
+        assertEquals(setOf(STORY_SUGGESTIONS_QUERY), caller("const/4 v1, 0x7").tableStrings(tables))
+        assertEquals(1, caller("const/4 v1, 0x7").implementation!!.instructions.toList().indexOfAnchor(STORY_SUGGESTIONS_QUERY, tables))
+        assertEquals(setOf("SomethingElse"), caller("const/4 v1, 0x6").tableStrings(tables))
+        // A key loaded into another register, a key that is not in the table, or another table gives no anchor.
+        assertEquals(emptySet(), caller("const/4 v2, 0x7").tableStrings(tables))
+        assertEquals(emptySet(), caller("const/4 v1, 0x9").tableStrings(tables))
+        assertEquals(emptySet(), caller("const/4 v1, 0x7", "invoke-static {v1}, LX/Other;->A00(I)Ljava/lang/String;").tableStrings(tables))
+        assertEquals(-1, caller("const/4 v1, 0x9").implementation!!.instructions.toList().indexOfAnchor(STORY_SUGGESTIONS_QUERY, tables))
+    }
+
     @Test fun storyViewerSkipsItsSuggestionsRequestOnlyWhileTheSwitchIsOn() {
         val viewer = peopleStoryMethod()
         val original = viewer.implementation!!.instructions.toList()

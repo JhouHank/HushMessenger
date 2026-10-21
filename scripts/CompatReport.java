@@ -1858,7 +1858,7 @@ public class CompatReport {
     record CommunityInbox(Method render, String identity) {}
     static CommunityInbox communityInbox(List<ClassDef> input) {
         if (input.stream().noneMatch(c->new CommunityDiscovery(List.of(c)).original(c).equals("InboxFragment"))) return null;
-        try { return new CommunityDiscovery(input).prove(); } catch (RuntimeException changed) { changed.printStackTrace(); return null; }
+        try { return new CommunityDiscovery(input).prove(); } catch (RuntimeException changed) { return null; }
     }
     /** The same connected Main-only route and native subscribed predicate used by the injector. */
     static final class CommunityDiscovery {
