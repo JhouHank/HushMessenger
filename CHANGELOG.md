@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Docs
+
+- The README's troubleshooting list now covers a cloned Messenger showing the settings icon again, chats and calls notifying twice because of the Facebook app, and restoring chats with a PIN when the Google Drive restore errors out.
+
 ### Checks
 
 - A release can't go public until the whole app has been walked with that exact bundle on a release phone or an emulator. The publish stage now takes the walk's receipt as `-Walk` and stops before the tag or GitHub if the walk wasn't a full pass, saw a Messenger crash, ran on some other device, or patched with a different bundle.
