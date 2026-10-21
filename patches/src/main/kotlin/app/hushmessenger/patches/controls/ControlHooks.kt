@@ -191,6 +191,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     }
     val appIconManagers = findAppIconManagers(classes)
     val stringTables = redexStringTables(classes)
+    activeStringTables = stringTables
     var searchFieldRender: Method? = null
     var changedViewer = false
     val drawerReaders = mutableListOf<Method>()
@@ -263,7 +264,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
             if (!AccessFlags.STATIC.isSet(method.accessFlags) &&
                 strings.containsAll(setOf(PEOPLE_SEARCH_SOURCE, "Failed to load people you may know"))) add("people_search")
             if (AccessFlags.STATIC.isSet(method.accessFlags) && method.returnType == "V" && method.parameterTypes == listOf(cls.type) &&
-                STORY_SUGGESTIONS_QUERY in strings) add("people_story")
+                STORY_SUGGESTIONS_QUERY in strings + method.tableStrings(stringTables)) add("people_story")
             // The chat list supplier's items read, which first traces under its own name.
             if (cls.type == INBOX_SUPPLIER && !AccessFlags.STATIC.isSet(method.accessFlags) && method.returnType == IMMUTABLE_LIST &&
                 method.parameterTypes.isEmpty() && INBOX_ITEMS_TRACE in strings) add(INBOX_REFRESH_HOOK)
@@ -678,29 +679,41 @@ internal fun MutableMethod.injectOriginalPhoto() {
     addInstructionsWithLabels(0, call.trimIndent(), ExternalLabel("stock_behavior", getInstruction(0)))
 }
 
+private const val SUBTABS_SUPPLIER_CLASS =
+    "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;"
+
+/**
+ * 584 reads the visibility flag through a holder object: the supplier into v0 from this, its A07 holder into v0, the
+ * holder's AtomicBoolean into v1, 1 into v0, then v1.set(v0).
+ */
 internal fun MutableMethod.validateSubtabs() {
     val instructions = implementation!!.instructions
-    val literal = instructions.getOrNull(2)
+    val literal = instructions.getOrNull(3)
     val supplier = instructions.getOrNull(0) as? TwoRegisterInstruction
-    val flag = instructions.getOrNull(1) as? TwoRegisterInstruction
-    val setter = instructions.getOrNull(3) as? FiveRegisterInstruction
+    val holder = instructions.getOrNull(1) as? TwoRegisterInstruction
+    val flag = instructions.getOrNull(2) as? TwoRegisterInstruction
+    val setter = instructions.getOrNull(4) as? FiveRegisterInstruction
+    val holderRef = (instructions.getOrNull(1) as? ReferenceInstruction)?.reference as? FieldReference
+    val flagRef = (instructions.getOrNull(2) as? ReferenceInstruction)?.reference as? FieldReference
     if (implementation!!.registerCount != 3 || instructions.map { it.opcode } !=
-        listOf(Opcode.IGET_OBJECT, Opcode.IGET_OBJECT, Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID) ||
-        supplier?.registerA != 0 || supplier.registerB != 2 || flag?.registerA != 1 || flag.registerB != 0 ||
+        listOf(Opcode.IGET_OBJECT, Opcode.IGET_OBJECT, Opcode.IGET_OBJECT, Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID) ||
+        supplier?.registerA != 0 || supplier.registerB != 2 || holder?.registerA != 0 || holder.registerB != 0 ||
+        flag?.registerA != 1 || flag.registerB != 0 ||
         setter?.registerCount != 2 || setter.registerC != 1 || setter.registerD != 0 ||
         (literal as? OneRegisterInstruction)?.registerA != 0 ||
         (literal as? WideLiteralInstruction)?.wideLiteral != 1L ||
         (instructions[0] as? ReferenceInstruction)?.reference.toString() != activeProfile.subtabsSupplier ||
-        (instructions[1] as? ReferenceInstruction)?.reference.toString() !=
-            "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;->A07:Ljava/util/concurrent/atomic/AtomicBoolean;" ||
-        (instructions[3] as? ReferenceInstruction)?.reference.toString() != "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V") {
+        holderRef == null || holderRef.definingClass != SUBTABS_SUPPLIER_CLASS || holderRef.name != "A07" ||
+        flagRef == null || flagRef.definingClass != holderRef.type || flagRef.name != "A00" ||
+        flagRef.type != "Ljava/util/concurrent/atomic/AtomicBoolean;" ||
+        (instructions[4] as? ReferenceInstruction)?.reference.toString() != "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V") {
         throw PatchException("Messenger controls: inbox tabs no longer use the checked visibility flag")
     }
 }
 
 internal fun MutableMethod.injectSubtabs() {
     validateSubtabs()
-    addInstructions(3, "invoke-static {v0}, $SETTINGS->showSubtabs(Z)Z\nmove-result v0")
+    addInstructions(4, "invoke-static {v0}, $SETTINGS->showSubtabs(Z)Z\nmove-result v0")
 }
 
 /**
@@ -787,12 +800,12 @@ internal fun ClassDef.isRowWrapper(): Boolean =
 internal fun ClassDef.hasMessageIdGetter(): Boolean = messageIdGetterName.isNotEmpty() &&
     methods.any { it.name == messageIdGetterName && it.returnType == "Ljava/lang/String;" && it.parameterTypes == listOf("I") }
 
-/** The Notifications tab's server flag ID as 583 numbers it. Meta renumbers it with each release. */
-private const val PEOPLE_SERVER_FLAG = 72344188615735036L
+/** The Notifications tab's server flag ID as 584 numbers it. Meta renumbers it with each release. */
+private const val PEOPLE_SERVER_FLAG = 72344171435866083L
 
 /** The section check's register count, and the register that holds its false default. */
-private const val PEOPLE_SECTION_REGISTERS = 8
-private const val PEOPLE_SECTION_DEFAULT = 3
+private const val PEOPLE_SECTION_REGISTERS = 10
+private const val PEOPLE_SECTION_DEFAULT = 5
 
 /**
  * Where the Notifications tab loads its server flag: the method's only constant with that value, at 17, after the
@@ -808,7 +821,7 @@ private fun Method.isPeopleSectionShape() = parameterTypes.map(CharSequence::toS
 /**
  * The Notifications tab reads its stock "section hidden" preference into v0 and branches on it. A hidden
  * section is still shown when a server flag (v0, three instructions after its constant) is on; both branches
- * land on the final false return. The false value lives in v3 of the eight-register body, which logs a skipped
+ * land on the final false return. The false value lives in v5 of the ten-register body, which logs a skipped
  * impression under a monitor after the server branch.
  */
 internal fun MutableMethod.validatePeopleSection() {
@@ -942,7 +955,7 @@ internal fun MutableMethod.injectPeopleSearch() {
  */
 internal fun MutableMethod.validatePeopleStory(): Int {
     val code = implementation!!.instructions.toList()
-    val query = code.indexOfFirst { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == STORY_SUGGESTIONS_QUERY }
+    val query = code.indexOfAnchor(STORY_SUGGESTIONS_QUERY)
     val set = (query downTo 0).firstOrNull { code[it].opcode == Opcode.IPUT_BOOLEAN }
     val flag = set?.let { (code[it] as ReferenceInstruction).reference.toString() }
     val guard = code.indices.singleOrNull {

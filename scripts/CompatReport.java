@@ -85,8 +85,8 @@ public class CompatReport {
         + "PeopleTabPYMKHandler$fetchPymkSuggestions$$inlined$CoroutineExceptionHandler$1;";
     static final String PEOPLE_JEWEL_KEY = "pymk_jewel_section_hidden";
     static final String STORY_CARD_DATE_KEY = "last_date_creation_card_shown";
-    // The Notifications tab's server flag ID as 583 numbers it. Meta renumbers it with each release.
-    static final long PEOPLE_SERVER_FLAG = 72344188615735036L;
+    // The Notifications tab's server flag ID as 584 numbers it. Meta renumbers it with each release.
+    static final long PEOPLE_SERVER_FLAG = 72344171435866083L;
     // The redesigned emoji drawer's server flag as 584 numbers it. Meta renumbers it with each release.
     static final long EMOJI_DRAWER_FLAG = 36320584214265525L;
     // The drawer renderer throws this when the redesign can't draw, which ties the flag to the emoji drawer
@@ -540,7 +540,7 @@ public class CompatReport {
     }
 
     /** The section check's register count and its false-default register, as in ControlHooks.kt. */
-    static final int PEOPLE_SECTION_REGISTERS = 8, PEOPLE_SECTION_DEFAULT = 3;
+    static final int PEOPLE_SECTION_REGISTERS = 10, PEOPLE_SECTION_DEFAULT = 5;
 
     /** The Notifications tab's preference key and its server-override check, checked as validatePeopleSection does. */
     static List<String> peopleSection(List<Method> jewel, String getter) {
@@ -576,26 +576,34 @@ public class CompatReport {
         return List.of(ref(code.get(8)), ref(code.get(at + 1)));
     }
 
-    static final String SUBTABS_FLAG =
-        "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;->A07:Ljava/util/concurrent/atomic/AtomicBoolean;";
+    static final String SUBTABS_SUPPLIER_CLASS =
+        "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;";
 
     /**
      * The supplier field the inbox tabs run() reads, once the body is ControlHooks.kt's validateSubtabs shape: three
-     * registers, the supplier into v0 from this, its A07 flag into v1, 1 into v0, then v1.set(v0).
+     * registers, the supplier into v0 from this, its A07 holder into v0, the holder's AtomicBoolean into v1, 1 into v0,
+     * then v1.set(v0).
      */
     static String subtabsSupplier(List<Method> subtabs) {
         if (subtabs.size() != 1 || subtabs.get(0).getImplementation() == null ||
             subtabs.get(0).getImplementation().getRegisterCount() != 3) return null;
         var code = instructions(subtabs.get(0));
         if (!code.stream().map(Instruction::getOpcode).toList().equals(List.of(Opcode.IGET_OBJECT, Opcode.IGET_OBJECT,
-            Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID))) return null;
+            Opcode.IGET_OBJECT, Opcode.CONST_4, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID))) return null;
         var supplier = (TwoRegisterInstruction) code.get(0);
-        var flag = (TwoRegisterInstruction) code.get(1);
-        var set = (FiveRegisterInstruction) code.get(3);
-        boolean shaped = supplier.getRegisterA() == 0 && supplier.getRegisterB() == 2 && flag.getRegisterA() == 1 &&
-            flag.getRegisterB() == 0 && register(code.get(2)) == 0 && Long.valueOf(1L).equals(wide(code.get(2))) &&
-            set.getRegisterCount() == 2 && set.getRegisterC() == 1 && set.getRegisterD() == 0 && SUBTABS_FLAG.equals(ref(code.get(1))) &&
-            "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V".equals(ref(code.get(3)));
+        var holder = (TwoRegisterInstruction) code.get(1);
+        var flag = (TwoRegisterInstruction) code.get(2);
+        var set = (FiveRegisterInstruction) code.get(4);
+        var holderRef = (FieldReference) ((ReferenceInstruction) code.get(1)).getReference();
+        var flagRef = (FieldReference) ((ReferenceInstruction) code.get(2)).getReference();
+        boolean shaped = supplier.getRegisterA() == 0 && supplier.getRegisterB() == 2 && holder.getRegisterA() == 0 &&
+            holder.getRegisterB() == 0 && flag.getRegisterA() == 1 && flag.getRegisterB() == 0 &&
+            register(code.get(3)) == 0 && Long.valueOf(1L).equals(wide(code.get(3))) &&
+            set.getRegisterCount() == 2 && set.getRegisterC() == 1 && set.getRegisterD() == 0 &&
+            holderRef.getDefiningClass().equals(SUBTABS_SUPPLIER_CLASS) && holderRef.getName().equals("A07") &&
+            flagRef.getDefiningClass().equals(holderRef.getType()) && flagRef.getName().equals("A00") &&
+            flagRef.getType().equals("Ljava/util/concurrent/atomic/AtomicBoolean;") &&
+            "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V".equals(ref(code.get(4)));
         return shaped ? ref(code.get(0)) : null;
     }
 
@@ -1850,7 +1858,7 @@ public class CompatReport {
     record CommunityInbox(Method render, String identity) {}
     static CommunityInbox communityInbox(List<ClassDef> input) {
         if (input.stream().noneMatch(c->new CommunityDiscovery(List.of(c)).original(c).equals("InboxFragment"))) return null;
-        try { return new CommunityDiscovery(input).prove(); } catch (RuntimeException changed) { return null; }
+        try { return new CommunityDiscovery(input).prove(); } catch (RuntimeException changed) { changed.printStackTrace(); return null; }
     }
     /** The same connected Main-only route and native subscribed predicate used by the injector. */
     static final class CommunityDiscovery {
@@ -2194,6 +2202,33 @@ public class CompatReport {
      * creates its observer just before the observer's (Object, int) constructor, and the observer's one list callback sets
      * one declared int to 5 or 1, which the items read checks.
      */
+    /**
+     * 584 moved the list callback's body into a static supplier method; the observer's callback only forwards its list:
+     * iget-object vS, this, observer->A:supplier; if-eqz list, :end; invoke-static {vS, list}, supplier->M(supplier, List)V;
+     * return-void. Returns that method, or null when the callback is not exactly this forward. Mirrors forwardedCallback in InboxRefresh.kt.
+     */
+    static Method forwardedInboxCallback(Method callback, String observerType, ClassDef supplier) {
+        if (callback.getImplementation() == null) return null;
+        var body = instructions(callback);
+        int list = callback.getImplementation().getRegisterCount() - 1;
+        if (body.size() != 4 || body.get(0).getOpcode() != Opcode.IGET_OBJECT || !(body.get(0) instanceof TwoRegisterInstruction read) ||
+            !(((ReferenceInstruction) body.get(0)).getReference() instanceof FieldReference owner) || read.getRegisterB() != list - 1 ||
+            !observerType.equals(owner.getDefiningClass()) || !INBOX_SUPPLIER.equals(owner.getType()) ||
+            body.get(1).getOpcode() != Opcode.IF_EQZ || register(body.get(1)) != list || !jumpsTo(body, 1, 3) ||
+            body.get(2).getOpcode() != Opcode.INVOKE_STATIC || !calls(body.get(2), read.getRegisterA(), list) ||
+            !(((ReferenceInstruction) body.get(2)).getReference() instanceof MethodReference target) ||
+            !INBOX_SUPPLIER.equals(target.getDefiningClass()) || !"V".equals(target.getReturnType()) ||
+            !inboxParams(target).equals(List.of(INBOX_SUPPLIER, "Ljava/util/List;")) || body.get(3).getOpcode() != Opcode.RETURN_VOID) return null;
+        Method found = null;
+        for (var m : supplier.getMethods()) {
+            if (!m.getName().equals(target.getName()) || !"V".equals(m.getReturnType()) || !AccessFlags.STATIC.isSet(m.getAccessFlags()) ||
+                !inboxParams(m).equals(List.of(INBOX_SUPPLIER, "Ljava/util/List;"))) continue;
+            if (found != null) return null;
+            found = m;
+        }
+        return found;
+    }
+
     static String inboxRefreshRoute(Map<String, ClassDef> byType, Method items) {
         var code = instructions(items);
         if (!INBOX_SUPPLIER.equals(items.getDefiningClass()) || AccessFlags.STATIC.isSet(items.getAccessFlags()) ||
@@ -2236,7 +2271,8 @@ public class CompatReport {
             callback = m;
         }
         if (callback == null) return null;
-        var list = instructions(callback);
+        var forwarded = forwardedInboxCallback(callback, observerType, supplier);
+        var list = instructions(forwarded != null ? forwarded : callback);
         String listed = null, name = null;
         for (int k = 3; k < list.size(); k++) {
             if (list.get(k).getOpcode() != Opcode.IPUT || !(((ReferenceInstruction) list.get(k)).getReference() instanceof FieldReference f) ||
@@ -5003,7 +5039,8 @@ public class CompatReport {
 
                 // people_story: the story viewer's once-per-viewer request for a page of suggested people
                 if ("V".equals(method.getReturnType()) && isStatic && paramTypes.equals(List.of(cls.getType())) &&
-                    strings.contains("MsgrPeopleYouMayKnowQuery")) {
+                    (strings.contains("MsgrPeopleYouMayKnowQuery") ||
+                        tableStrings(instructions, stringTables).contains("MsgrPeopleYouMayKnowQuery"))) {
                     found.get("people_story").add(method);
                 }
 

@@ -313,23 +313,23 @@ internal fun peopleStoryMethod(
 
 /**
  * Instructions 0-20 match the supported APKs; one instruction stands in for the list reset. The suggestions logger
- * comes first, so the owner is p1, and false lives in v3 of eight registers, with the [logger] load in v4. The older
+ * comes first, so the owner is p1, and false lives in v5 of ten registers, with the [logger] load in v3. The older
  * shapes are only there to be refused: with [inlinedReset] one call replaces the two at 14-15, so the server flag moves
  * from 17 to 16, and without [logged] the reader takes only its owner and keeps false in v4 of six registers.
  */
 internal fun peopleJewelMethod(
     key: String = "LX/JTx;->A01:LX/1BL;",
     resultRegister: String = "v0",
-    serverFlag: String = "72344188615735036L",
+    serverFlag: String = "72344171435866083L",
     serverTarget: String = ":shown",
     flags: Int = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value,
     inlinedReset: Boolean = false,
     extraFlag: Boolean = false,
     extraFlagValue: String = serverFlag,
     logged: Boolean = true,
-    default: String = if (logged) "v3" else "v4",
-    registers: Int = if (logged) 8 else 6,
-    logger: String = if (logged) "v4" else "v3",
+    default: String = if (logged) "v5" else "v4",
+    registers: Int = if (logged) 10 else 6,
+    logger: String = "v3",
 ) = fixtureMethod(if (logged) PEOPLE_JEWEL_HOOK else PEOPLE_JEWEL_HOOK.replace("(LX/3nt;", "("), """
     iget-object v0, ${if (logged) "p1" else "p0"}, LX/HAR;->A07:LX/17Z;
     invoke-static {v0}, LX/17Z;->A0F(LX/17Z;)Ljava/lang/Object;

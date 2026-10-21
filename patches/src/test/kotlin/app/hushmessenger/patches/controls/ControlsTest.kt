@@ -74,17 +74,18 @@ class ControlsTest {
         val supplier = "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;"
         fun subtabs(value: String) = method(registers = 3, returnType = "V", body = """
             iget-object v0, p0, LX/2UL;->A00:$supplier
-            iget-object v1, v0, $supplier->A07:Ljava/util/concurrent/atomic/AtomicBoolean;
+            iget-object v0, v0, $supplier->A07:LX/21D;
+            iget-object v1, v0, LX/21D;->A00:Ljava/util/concurrent/atomic/AtomicBoolean;
             const/4 v0, 0x1
             invoke-virtual {v1, $value}, Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V
             return-void
         """.trimIndent())
         val original = subtabs("v0")
         original.injectSubtabs()
-        assertEquals(7, original.implementation!!.instructions.size)
+        assertEquals(8, original.implementation!!.instructions.size)
         val changed = subtabs("v2")
         assertFailsWith<PatchException> { changed.injectSubtabs() }
-        assertEquals(5, changed.implementation!!.instructions.size)
+        assertEquals(6, changed.implementation!!.instructions.size)
     }
 
     @Test fun compatReportRefusesEveryInboxTabsBodyThePatchRefuses() {
@@ -92,7 +93,8 @@ class ControlsTest {
         val supplier = "Lcom/facebook/messaging/inboxsubtabs/plugins/subtabs/itemsupplier/InboxSubtabsItemSupplierImplementation;"
         val body = """
             iget-object v0, p0, LX/2UL;->A00:$supplier
-            iget-object v1, v0, $supplier->A07:Ljava/util/concurrent/atomic/AtomicBoolean;
+            iget-object v0, v0, $supplier->A07:LX/21D;
+            iget-object v1, v0, LX/21D;->A00:Ljava/util/concurrent/atomic/AtomicBoolean;
             const/4 v0, 0x1
             invoke-virtual {v1, v0}, Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V
             return-void
@@ -105,7 +107,9 @@ class ControlsTest {
         for ((name, taken) in listOf(
             "the setter's value" to takenBy(body.replace("{v1, v0}", "{v1, v2}")),
             "the value" to takenBy(body.replace("v0, 0x1", "v0, 0x0")),
-            "the flag field" to takenBy(body.replace("->A07:", "->A08:")),
+            "the holder field" to takenBy(body.replace("->A07:", "->A08:")),
+            "the flag field" to takenBy(body.replace("LX/21D;->A00:", "LX/21D;->A01:")),
+            "the flag's owner" to takenBy(body.replace("LX/21D;->A00:", "LX/21E;->A00:")),
             "the setter" to takenBy(body.replace("->set(Z)V", "->lazySet(Z)V")),
             "the register count" to takenBy(body, registers = 4),
         )) assertEquals(false to false, taken, name)
@@ -240,22 +244,22 @@ class ControlsTest {
         assertEquals(code.lastIndex, code.branchTarget(serverBranch + 4))
     }
 
-    /** The reader has eight registers and keeps false in v3; 582's ten-register reader with its own flag is refused. */
-    @Test fun theNotificationsReaderKeepsFalseInV3AndRefuses582s() {
+    /** The reader has ten registers and keeps false in v5; 583's eight-register reader with its own flag is refused. */
+    @Test fun theNotificationsReaderKeepsFalseInV5AndRefuses583s() {
         val reader = peopleJewelMethod()
         reader.injectPeopleSection()
         val code = reader.implementation!!.instructions.toList()
         assertEquals("$SETTINGS->hidePeopleSection(Z)Z", (code[12] as ReferenceInstruction).reference.toString())
         assertEquals("$SETTINGS->keepPeopleSection(Z)Z", (code[22] as ReferenceInstruction).reference.toString())
-        val flag582 = "72344188615734930L"
+        val flag583 = "72344188615735036L"
         for (changed in listOf(
-            // The false default has to be in v3 of eight registers.
-            peopleJewelMethod(default = "v5"),
-            peopleJewelMethod(registers = 10),
+            // The false default has to be in v5 of ten registers.
+            peopleJewelMethod(default = "v3"),
+            peopleJewelMethod(registers = 8),
             peopleJewelMethod(registers = 9),
-            // 582's reader: its own flag, false in v5 of ten registers.
-            peopleJewelMethod(serverFlag = flag582, default = "v5", registers = 10, logger = "v3"),
-            peopleJewelMethod(serverFlag = flag582),
+            // 583's reader: its own flag, false in v3 of eight registers.
+            peopleJewelMethod(serverFlag = flag583, default = "v3", registers = 8, logger = "v4"),
+            peopleJewelMethod(serverFlag = flag583),
         )) {
             val before = changed.implementation!!.instructions.toList()
             assertFailsWith<PatchException> { changed.injectPeopleSection() }
