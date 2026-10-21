@@ -350,7 +350,7 @@
             "name": "Fix videos that won't send",
             "description": "Messenger stops two kinds of video with \"Unable to send\". One is a video whose only sound is xHE-AAC, which Facebook and Instagram now use. The other is a Samsung screen recording whose recorder tag Messenger's media check rejects. Whether you share one into Messenger from another app or pick it in a chat, the sound is converted to regular AAC, or the tag is dropped, so it sends. The picture isn't touched. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
@@ -1661,7 +1661,7 @@
             "name": "Hide the recent photo card",
             "description": "Stops the card above the message box that offers to send the screenshot, photo or video you just took. You can still send it from the gallery. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
@@ -2275,7 +2275,7 @@
             "name": "Open your gallery app",
             "description": "The gallery button in a chat opens your phone's own gallery app. What you pick then opens in Messenger's editor for that chat, ready to send. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
@@ -2547,7 +2547,7 @@
             "name": "Send photos at original quality",
             "description": "With HD on, sends a JPEG photo at its full size instead of Messenger's smaller copy, so it stays sharp. Location is still removed. Photos over 20 MB are still made smaller. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
@@ -2604,7 +2604,7 @@
             "name": "Send videos without re-encoding",
             "description": "Sends a video as the original file instead of a recompressed copy, when Messenger allows it. Videos over 25 MB, edited videos and some formats are still compressed. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
@@ -3292,7 +3292,7 @@
             "name": "Use the phone's camera app",
             "description": "The camera button in a chat opens your phone's own camera app. The photo then opens in Messenger's editor, ready to send. Photos only. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
-            "category": "Conversations",
+            "category": "Photos and videos",
             "dependencies": [
                 {
                     "type": "BytecodePatch",
