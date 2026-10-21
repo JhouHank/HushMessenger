@@ -1596,9 +1596,9 @@ public class CompatReport {
     }
 
     /**
-     * The Threads and Instagram link launchers (RestoreTrustPatch.kt's linkLaunchSite): a void (Context, Uri)
-     * method naming the app's package and then its log tag, with one (Context, Intent)Z family launch whose
-     * answer the return-void after it drops. Each must take the extension call the way the patch places it.
+     * The Threads and Instagram link launchers (RestoreTrustPatch.kt's linkLaunchSites): a void (Context, Uri)
+     * method naming the app's package and then its log tag, with (Context, Intent)Z family launches whose
+     * answers the return-void after each drops. Every launch must take the extension call the way the patch places it.
      */
     static List<String> linkLauncherProblems(List<ClassDef> classes) {
         var problems = new ArrayList<String>();
@@ -1631,15 +1631,22 @@ public class CompatReport {
     static String linkLaunchProblem(Method method) {
         if (AccessFlags.STATIC.isSet(method.getAccessFlags())) return "is static";
         var code = instructions(method);
-        int index = -1, launches = 0;
+        var launches = new ArrayList<Integer>();
         for (int i = 0; i < code.size(); i++) {
             if (code.get(i).getOpcode() == Opcode.INVOKE_VIRTUAL && ((ReferenceInstruction) code.get(i)).getReference() instanceof MethodReference m
                 && "Z".equals(m.getReturnType()) && List.of("Landroid/content/Context;", "Landroid/content/Intent;").equals(m.getParameterTypes().stream().map(CharSequence::toString).toList())) {
-                index = i;
-                launches++;
+                launches.add(i);
             }
         }
-        if (launches != 1) return "has " + launches + " launches, expected 1";
+        if (launches.isEmpty()) return "has no launches";
+        for (int index : launches) {
+            String why = linkLaunchProblem(method, code, index);
+            if (why != null) return why;
+        }
+        return null;
+    }
+
+    static String linkLaunchProblem(Method method, List<Instruction> code, int index) {
         if (index + 1 >= code.size() || code.get(index + 1).getOpcode() != Opcode.RETURN_VOID) return "uses its launch's answer";
         if (mediaTargets(method).contains(index + 1)) return "jumps to the return after its launch";
         var call = (FiveRegisterInstruction) code.get(index);
