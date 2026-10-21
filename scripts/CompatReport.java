@@ -5297,6 +5297,19 @@ public class CompatReport {
         return parameters.size() == 1 && "Landroid/content/Context;".equals(parameters.get(0).toString());
     }
 
+    /** MaterialYouPatch.kt's isFdsColorsShape: the only field is a static instance of the class, with (Context, ?, ?)I methods asking a (Context)Z. */
+    static boolean isFdsColorsShape(ClassDef cls) {
+        var fields = new ArrayList<Field>();
+        for (Field f : cls.getFields()) fields.add(f);
+        if (fields.size() != 1 || !fields.get(0).getType().equals(cls.getType()) || !AccessFlags.STATIC.isSet(fields.get(0).getAccessFlags())) return false;
+        for (Method m : cls.getMethods()) {
+            if (!"I".equals(m.getReturnType()) || m.getParameterTypes().size() != 3 || !"Landroid/content/Context;".equals(m.getParameterTypes().get(0).toString())) continue;
+            if (instructions(m).stream().anyMatch(i -> i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr &&
+                "Z".equals(mr.getReturnType()) && takesOnlyContext(mr.getParameterTypes()))) return true;
+        }
+        return false;
+    }
+
     /**
      * What MaterialYouPatch.kt finds by shape when it patches: one DarkColorScheme token resolver, one dark mode
      * check called by FDSColors' (Context, ?, ?)I resolvers, FDSColors' int returns, and the constants and calls
@@ -5306,11 +5319,13 @@ public class CompatReport {
     static List<String> materialYouProblems(List<ClassDef> classes, List<String> targets) {
         var problems = new ArrayList<String>();
         ClassDef scheme = null, fds = null;
+        var fdsShapes = new ArrayList<ClassDef>();
         int surfaces = 0, colorCalls = 0;
         var editableClasses = new TreeSet<String>();
         for (ClassDef cls : classes) {
             if (cls.getType().equals(DARK_SCHEME)) scheme = cls;
             if (cls.getType().equals(FDS_COLORS)) fds = cls;
+            if (isFdsColorsShape(cls)) fdsShapes.add(cls);
             for (Method m : cls.getMethods()) {
                 for (Instruction i : instructions(m)) {
                     Opcode op = i.getOpcode();
@@ -5338,8 +5353,10 @@ public class CompatReport {
                 editableClasses.add(scheme.getType());
             }
         }
+        // 584 dropped FDSColors' name (LX/9TH;), so the patch falls back to its shape
+        if (fds == null && fdsShapes.size() == 1) fds = fdsShapes.get(0);
         if (fds == null) {
-            problems.add("no " + FDS_COLORS);
+            problems.add("no " + FDS_COLORS + ", and " + fdsShapes.size() + " classes shaped like it");
         } else {
             var resolvers = new ArrayList<Method>();
             int intReturns = 0;
@@ -5349,12 +5366,13 @@ public class CompatReport {
                 if (m.getParameterTypes().size() == 3 && "Landroid/content/Context;".equals(m.getParameterTypes().get(0).toString()))
                     resolvers.add(m);
             }
-            // The 21 builds have two, A00 and A01, calling the same check; the patch reads the check from the first
+            // The 21 builds have two, A00 and A01, calling the same check; the patch reads the check from the first.
+            // Only static calls count, as in the patch: 584's A01 asks the check's own instance instead.
             var calls = new TreeMap<String, MethodReference>();
             boolean firstCalls = false;
             for (Method resolver : resolvers) {
                 for (Instruction i : instructions(resolver)) {
-                    if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr &&
+                    if (i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference mr &&
                         "Z".equals(mr.getReturnType()) && takesOnlyContext(mr.getParameterTypes())) {
                         calls.putIfAbsent(mr.toString(), mr);
                         if (resolver == resolvers.get(0)) firstCalls = true;
