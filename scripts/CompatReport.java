@@ -3561,33 +3561,33 @@ public class CompatReport {
 
     /**
      * Where ReadReceipts.kt's REPLY_READ_SHAPE puts the pieces: size, composer copy, account copy, the thread's null
-     * default, the null path's copy and the dispatch.
+     * default, the null path's copy, the dispatch, the composer copy's register and how far before the dispatch v12 is staged.
      */
-    static final int[] REPLY_READ_SHAPE = {398, 10, 21, 27, 69, 235};
+    static final int[] REPLY_READ_SHAPE = {392, 10, 20, 26, 71, 233, 19, 4};
 
     /**
      * reply_read injects at fixed indices, so ReadReceipts.kt's validateReplyRead pins the method's shape. The same
-     * outline is checked here, so a changed body shows up as unresolved instead of passing until patch time: 36
-     * registers, 583's 398 instructions, the typed ThreadKey getter on p7's type two after the null default with its
-     * result in v12, v12 taking v10 two before the dispatch, and the five-argument dispatch on p4's type that starts
+     * outline is checked here, so a changed body shows up as unresolved instead of passing until patch time: 35
+     * registers, 584's 392 instructions, the typed ThreadKey getter on p7's type two after the null default with its
+     * result in v12, v12 taking v10 four before the dispatch, and the five-argument dispatch on p4's type that starts
      * with the FbUserSession and ends with two Strings. The dataflow proof stays in the patch.
      */
     static boolean replyReadShape(Method method) {
         var impl = method.getImplementation();
-        if (impl == null || impl.getRegisterCount() != 36) return false;
+        if (impl == null || impl.getRegisterCount() != 35) return false;
         var code = new ArrayList<Instruction>();
         impl.getInstructions().forEach(code::add);
         int[] shape = REPLY_READ_SHAPE;
         if (shape[0] != code.size()) return false;
-        int composer = shape[1], session = shape[2], n = shape[3], absent = shape[4], d = shape[5];
+        int composer = shape[1], session = shape[2], n = shape[3], absent = shape[4], d = shape[5], cr = shape[6], s = d - shape[7];
         var params = method.getParameterTypes();
         if (code.get(n + 2).getOpcode() != Opcode.INVOKE_INTERFACE_RANGE || !(code.get(n + 2) instanceof ReferenceInstruction g) ||
                 !(g.getReference() instanceof MethodReference getter) || !params.get(7).toString().equals(getter.getDefiningClass()) ||
                 !getter.getParameterTypes().isEmpty() || !"Lcom/facebook/messaging/model/threadkey/ThreadKey;".equals(getter.getReturnType()))
             return false;
         if (code.get(n + 3).getOpcode() != Opcode.MOVE_RESULT_OBJECT || ((OneRegisterInstruction) code.get(n + 3)).getRegisterA() != 12) return false;
-        if (code.get(d - 2).getOpcode() != Opcode.MOVE_OBJECT || ((TwoRegisterInstruction) code.get(d - 2)).getRegisterA() != 12 ||
-                ((TwoRegisterInstruction) code.get(d - 2)).getRegisterB() != 10) return false;
+        if (code.get(s).getOpcode() != Opcode.MOVE_OBJECT || ((TwoRegisterInstruction) code.get(s)).getRegisterA() != 12 ||
+                ((TwoRegisterInstruction) code.get(s)).getRegisterB() != 10) return false;
         if (code.get(d).getOpcode() != Opcode.INVOKE_INTERFACE_RANGE || !(code.get(d) instanceof ReferenceInstruction di) ||
                 !(di.getReference() instanceof MethodReference dispatch) || !params.get(4).toString().equals(dispatch.getDefiningClass()) ||
                 !"V".equals(dispatch.getReturnType())) return false;
@@ -3602,9 +3602,12 @@ public class CompatReport {
         for (int at = 0; at < p.length; at++) { p[at] = next; next += params.get(at).charAt(0) == 'J' || params.get(at).charAt(0) == 'D' ? 2 : 1; }
         var getterArgs = (RegisterRangeInstruction) code.get(n + 2);
         if (getterArgs.getStartRegister() != p[7] || getterArgs.getRegisterCount() != 1) return false;
-        if (!moves(code.get(4), Opcode.MOVE_OBJECT_FROM16, 7, p[11]) || !moves(code.get(composer), Opcode.MOVE_OBJECT_FROM16, 20, p[4]) ||
-            !moves(code.get(session), Opcode.MOVE_OBJECT_FROM16, 10, p[0]) || !moves(code.get(d - 3), Opcode.MOVE_OBJECT_FROM16, 11, 20) ||
-            !moves(code.get(d - 1), Opcode.MOVE_OBJECT, 15, 0) || !moves(code.get(absent), Opcode.MOVE_OBJECT, 12, 5)) return false;
+        if (!moves(code.get(4), Opcode.MOVE_OBJECT_FROM16, 7, p[11]) || !moves(code.get(composer), Opcode.MOVE_OBJECT_FROM16, cr, p[4]) ||
+            !moves(code.get(session), Opcode.MOVE_OBJECT_FROM16, 10, p[0]) || !moves(code.get(s - 1), Opcode.MOVE_OBJECT_FROM16, 11, cr) ||
+            !moves(code.get(absent), Opcode.MOVE_OBJECT, 12, 5)) return false;
+        int stringMoves = 0;
+        for (int at = s + 1; at < d; at++) if (moves(code.get(at), Opcode.MOVE_OBJECT, 15, 0)) stringMoves++;
+        if (stringMoves != 1) return false;
         if (code.get(n).getOpcode() != Opcode.CONST_4 || ((OneRegisterInstruction) code.get(n)).getRegisterA() != 5 ||
             ((NarrowLiteralInstruction) code.get(n)).getNarrowLiteral() != 0 || code.get(n + 1).getOpcode() != Opcode.IF_EQZ ||
             ((OneRegisterInstruction) code.get(n + 1)).getRegisterA() != p[7] || !jumpsTo(code, n + 1, absent)) return false;
@@ -3623,10 +3626,11 @@ public class CompatReport {
         for (var block : impl.getTryBlocks()) {
             for (var handler : block.getExceptionHandlers()) targets.add(index.get(handler.getHandlerCodeAddress()));
             // Code inserted at the dispatch would land inside a try that covers the seam.
-            for (int at = d - 5; at <= d + 1; at++)
+            for (int at = s - 3; at <= d + 1; at++)
                 if (address[at] >= block.getStartCodeAddress() && address[at] < block.getStartCodeAddress() + block.getCodeUnitCount()) return false;
         }
-        for (int at : new int[] {n, n + 1, n + 2, n + 3, d - 2, d - 1, d, d + 1}) if (targets.contains(at)) return false;
+        for (int at = s; at <= d + 1; at++) if (targets.contains(at)) return false;
+        for (int at : new int[] {n, n + 1, n + 2, n + 3}) if (targets.contains(at)) return false;
         return true;
     }
 
