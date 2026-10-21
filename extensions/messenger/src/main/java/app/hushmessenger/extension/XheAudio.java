@@ -1026,7 +1026,7 @@ public final class XheAudio {
         if (rate != sampleRate || 2 * channels != frameBytes) throw new IOException("the decoder changed its sound format");
     }
 
-    private static MediaCodec startEncoder(int sampleRate, int channels) throws IOException {
+    static MediaCodec startEncoder(int sampleRate, int channels) throws IOException {
         MediaFormat format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels);
         format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
         format.setInteger(MediaFormat.KEY_BIT_RATE, BIT_RATE);

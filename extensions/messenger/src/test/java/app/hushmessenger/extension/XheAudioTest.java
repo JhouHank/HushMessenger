@@ -3,6 +3,7 @@ package app.hushmessenger.extension;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
@@ -30,6 +31,9 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+import org.robolectric.shadows.ShadowMediaCodec;
 import org.robolectric.shadows.ShadowMediaExtractor;
 import org.robolectric.shadows.ShadowSystemClock;
 import org.robolectric.shadows.util.DataSource;
@@ -382,7 +386,33 @@ public class XheAudioTest {
         onlyFinishedCopies(0);
     }
 
-    @Test public void anEncoderThatFailsToStartIsReleased() {
+    /** An encoder that won't start, the way one does when it can't take the format, counting the releases it gets. */
+    @Implements(MediaCodec.class)
+    public static final class RefusingCodec extends ShadowMediaCodec {
+        static volatile int released;
+
+        @Implementation @Override protected void native_start() {
+            throw new IllegalStateException("start refused the format");
+        }
+
+        @Implementation protected void native_release() {
+            released++;
+        }
+    }
+
+    @Test @Config(shadows = RefusingCodec.class)
+    public void anEncoderThatWontStartIsReleasedBeforeTheConversionFails() throws Exception {
+        RefusingCodec.released = 0;
+        try {
+            XheAudio.startEncoder(44_100, 2);
+            fail("the encoder's failure has to reach the conversion");
+        } catch (IllegalStateException refused) {
+            assertEquals("start refused the format", refused.getMessage());
+        }
+        assertEquals("nothing else holds the encoder yet, so it's released here, once", 1, RefusingCodec.released);
+    }
+
+    @Test public void theStartHelperReleasesOnlyACodecThatFailedToStart() {
         boolean[] released = new boolean[1];
         IllegalStateException refused = new IllegalStateException("configure refused the format");
         try {
