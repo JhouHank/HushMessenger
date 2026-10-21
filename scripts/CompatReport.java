@@ -3372,7 +3372,7 @@ public class CompatReport {
                     !"Landroid/content/res/Resources;->getString(I)Ljava/lang/String;".equals(ref(code.get(pick)))) continue;
                 var get = (FiveRegisterInstruction) code.get(pick);
                 if (!(code.get(pick - 7) instanceof ReferenceInstruction ci && ci.getReference() instanceof MethodReference check) ||
-                    code.get(pick - 7).getOpcode() != Opcode.INVOKE_VIRTUAL || !"Z".equals(check.getReturnType()) ||
+                    (code.get(pick - 7).getOpcode() != Opcode.INVOKE_VIRTUAL && code.get(pick - 7).getOpcode() != Opcode.INVOKE_INTERFACE) || !"Z".equals(check.getReturnType()) ||
                     check.getParameterTypes().size() != 1 ||
                     !"Lcom/facebook/auth/usersession/FbUserSession;".equals(check.getParameterTypes().get(0).toString())) continue;
                 int held = register(code.get(pick - 6));
