@@ -275,7 +275,14 @@ public final class XheAudio {
         long claimed = 0;
         try {
             String name;
-            try (InputStream in = input != null ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri)) {
+            InputStream opened;
+            try {
+                opened = input != null ? new FileInputStream(input) : context.getContentResolver().openInputStream(uri);
+            } catch (SecurityException lapsed) {
+                // The grant can run out between the first look and this copy, and then Messenger can't read it either.
+                return null;
+            }
+            try (InputStream in = opened) {
                 if (in == null) throw new IOException("the picked video could not be opened");
                 name = copyAndName(in, copied, limits, work);
             }

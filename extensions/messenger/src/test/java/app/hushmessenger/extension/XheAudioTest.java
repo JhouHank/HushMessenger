@@ -345,6 +345,43 @@ public class XheAudioTest {
         assertEquals("a Uri we can't read is Messenger's to send, not a broken hook", 0, Settings.hookErrorAt(XheAudio.KEY));
     }
 
+    static final String LAPSES = "app.hushmessenger.test.lapses";
+
+    /** Serves a Samsung recording to the first look, then refuses the copy, the way a grant runs out partway through. */
+    public static final class LapsesAtTheCopy extends ContentProvider {
+        static volatile File served;
+        static volatile int refused;
+
+        @Override public boolean onCreate() { return true; }
+        @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+            // The copy's scratch file is made right before the copy opens the Uri, so it being there marks the copy.
+            String[] scratch = pickedCache().list((dir, name) -> name.startsWith(XheAudio.SCRATCH) && name.endsWith(".source"));
+            if (scratch != null && scratch.length > 0) {
+                refused++;
+                throw new SecurityException("Permission Denial: the grant for " + uri + " ran out");
+            }
+            return ParcelFileDescriptor.open(served, ParcelFileDescriptor.MODE_READ_ONLY);
+        }
+        @Override public String getType(Uri uri) { return "video/mp4"; }
+        @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) { return null; }
+        @Override public Uri insert(Uri uri, ContentValues values) { return null; }
+        @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+        @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { return 0; }
+    }
+
+    @Test public void aPickedVideoWhoseGrantLapsesBeforeTheCopyIsSentAsItIsWithoutAHookFailure() throws Exception {
+        LapsesAtTheCopy.served = folder.newFile("gallery.mp4");
+        LapsesAtTheCopy.refused = 0;
+        Files.write(LapsesAtTheCopy.served.toPath(), samsungRecording(9));
+        Robolectric.setupContentProvider(LapsesAtTheCopy.class, LAPSES);
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        String uri = "content://" + LAPSES + "/video/10";
+        assertEquals(uri, fromTranscoder(uri));
+        assertEquals("the first look found the Samsung box, so the copy was tried", 1, LapsesAtTheCopy.refused);
+        assertEquals("a grant that ran out partway is Messenger's to send, not a broken hook", 0, Settings.hookErrorAt(XheAudio.KEY));
+        onlyFinishedCopies(0);
+    }
+
     @Test public void anEncoderThatFailsToStartIsReleased() {
         boolean[] released = new boolean[1];
         IllegalStateException refused = new IllegalStateException("configure refused the format");
