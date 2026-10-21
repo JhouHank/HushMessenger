@@ -321,6 +321,30 @@ public class XheAudioTest {
         onlyFinishedCopies(2);
     }
 
+    static final String LAPSED = "app.hushmessenger.test.lapsed";
+
+    /** Refuses every read, the way a gallery's Uri does once its grant has lapsed before the send starts. */
+    public static final class Lapsed extends ContentProvider {
+        @Override public boolean onCreate() { return true; }
+        @Override public ParcelFileDescriptor openFile(Uri uri, String mode) {
+            throw new SecurityException("Permission Denial: reading " + uri + " requires a grant");
+        }
+        @Override public String getType(Uri uri) { return "video/mp4"; }
+        @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) { return null; }
+        @Override public Uri insert(Uri uri, ContentValues values) { return null; }
+        @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+        @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { return 0; }
+    }
+
+    @Test public void aPickedVideoWhoseGrantLapsedIsSentAsItIsWithoutAHookFailure() throws Exception {
+        Robolectric.setupContentProvider(Lapsed.class, LAPSED);
+        Settings.preferences.edit().putBoolean(XheAudio.KEY, true).commit();
+        String uri = "content://" + LAPSED + "/video/9";
+        assertFalse(XheAudio.hasSamsungBox(RuntimeEnvironment.getApplication(), Uri.parse(uri)));
+        assertEquals(uri, fromTranscoder(uri));
+        assertEquals("a Uri we can't read is Messenger's to send, not a broken hook", 0, Settings.hookErrorAt(XheAudio.KEY));
+    }
+
     @Test public void conversionsRunningAtOnceEachKeepTheirOwnFiles() throws Exception {
         File movies = folder.newFolder("Movies");
         File[] picked = {new File(movies, "Aa.mp4"), new File(movies, "BB.mp4")};

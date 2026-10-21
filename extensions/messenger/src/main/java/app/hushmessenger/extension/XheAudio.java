@@ -569,7 +569,7 @@ public final class XheAudio {
             try {
                 try {
                     opener.open(source);
-                } catch (IOException | IllegalArgumentException unreadable) {
+                } catch (IOException | IllegalArgumentException | SecurityException unreadable) {
                     return null;
                 }
                 Tracks tracks = new Tracks();
@@ -605,7 +605,10 @@ public final class XheAudio {
         }
     }
 
-    /** [hasSamsungBox] for a content Uri. A provider that only streams can't be read that way, so it has none. */
+    /**
+     * [hasSamsungBox] for a content Uri. A provider that only streams can't be read that way, so it has none, and
+     * neither has one whose read grant has lapsed.
+     */
     static boolean hasSamsungBox(Context context, Uri uri) {
         try {
             ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(uri, "r");
@@ -614,7 +617,7 @@ public final class XheAudio {
             try (FileInputStream in = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
                 return !samsungBoxes(in.getChannel()).isEmpty();
             }
-        } catch (IOException unreadable) {
+        } catch (IOException | SecurityException unreadable) {
             return false;
         }
     }
