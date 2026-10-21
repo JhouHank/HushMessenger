@@ -686,6 +686,11 @@ public final class SettingsActivity extends Activity {
                 groupBody = ui.column();
                 groupBody.setPadding(ui.dp(16), ui.dp(4), ui.dp(16), ui.dp(4));
                 groupBody.setBackground(ui.shape(ui.surface, ui.line, 12));
+                // Lines only between shown controls: none above the first, none over the card's own border under the last.
+                android.graphics.drawable.GradientDrawable divider = ui.shape(ui.line, 0, 0);
+                divider.setSize(1, ui.dp(1));
+                groupBody.setDividerDrawable(divider);
+                groupBody.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
                 ui.add(group, groupBody, 10);
                 ui.add(content, group, 24);
                 groups.add(group);
@@ -1331,12 +1336,8 @@ public final class SettingsActivity extends Activity {
                 return super.performAccessibilityAction(host, action, arguments);
             }
         });
+        // A group draws the lines between its controls, so a control's own buttons sit above the line, not below it.
         row.setBackground(ui.interactive(ui.surface, 0, 0));
-        if (divided) {
-            row.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] {
-                ui.shape(ui.line, 0, 0), new android.graphics.drawable.InsetDrawable(ui.interactive(ui.surface, 0, 0), 0, 0, 0, ui.dp(1))
-            }));
-        } else row.setBackground(ui.interactive(ui.surface, 0, 0));
         row.setPadding(0, ui.dp(divided ? 16 : 0), 0, ui.dp(divided ? 16 : 0));
         return row;
     }
