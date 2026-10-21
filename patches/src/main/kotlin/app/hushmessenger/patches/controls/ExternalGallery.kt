@@ -147,6 +147,8 @@ private fun List<ClassDef>.galleryTarget(launcher: ClassDef, start: Method, byTy
     }
     fun ClassDef.lineage() = generateSequence(this) { cls -> cls.superclass?.let(byType::get) }.take(16).toList()
     val below = filter { cls -> cls.type != launcher.type && cls.lineage().any { it.type == launcher.type } }
+    // 584's launcher is abstract with two final subclasses that both inherit its start, so every object of it runs this start.
+    if (below.none { it.declaresStart() }) return launcher
     fun ClassDef.runsStart() = lineage().takeWhile { it.type != launcher.type }.none { it.declaresStart() }
     return (listOf(launcher) + below).filter { cls ->
         !AccessFlags.ABSTRACT.isSet(cls.accessFlags) && cls.runsStart() &&

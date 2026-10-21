@@ -108,7 +108,7 @@ private fun pluginClass(type: String = "LX/5SC;", body: String = GALLERY_PLUGIN_
     }, flags = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value)
 
 /** Edit's static helper: it takes the chat camera's launcher from the provider and starts Messenger's editor with it. */
-private fun galleryEditorBody(start: String = "LX/6iH;->C0w(Landroid/os/Bundle;LX/6NI;)Z") = """
+private fun galleryEditorBody(start: String = "LX/6iH;->BxF(Landroid/os/Bundle;LX/6NI;)Z") = """
     invoke-interface {p1}, LX/0c8;->get()Ljava/lang/Object;
     move-result-object v0
     check-cast v0, LX/6iH;
@@ -258,13 +258,15 @@ class ExternalGalleryTest {
         // A launcher of the subclass with its own start isn't one of these, so it gets Messenger's gallery.
         assertEquals(listOf(Opcode.INSTANCE_OF, Opcode.CHECK_CAST), listOf(after[site.at + 8].opcode, after[site.at + 10].opcode))
         for (at in listOf(site.at + 8, site.at + 10)) assertEquals("LX/5xY;", (after[at] as ReferenceInstruction).reference.toString())
-        // Two subclasses that both run it, or none, leave no one class to check for.
+        // 584's two plain subclasses both inherit the start, so every object runs it and the abstract launcher is the target.
         val twoPlain = abstractLauncher().dropLast(1) + fixtureClass("LX/5xW;", superclass = "LX/5xZ;", flags = FINAL_CLASS)
+        assertEquals(setOf(GALLERY_HANDLER, GALLERY_PLUGIN, CHAT_CAMERA_START, COMPOSER_RESULT),
+            findExternalGallery(galleryClasses(*twoPlain.toTypedArray())).map { it.hookId() }.toSet())
+        assertEquals("LX/5xZ;", galleryRoute!!.launcher)
+        // Only subclasses that bring their own start leave no one class to check for.
         val onlyOwn = abstractLauncher().filter { it.type != "LX/5xY;" }
-        for ((case, classes) in listOf("two plain" to galleryClasses(*twoPlain.toTypedArray()), "only its own start" to galleryClasses(*onlyOwn.toTypedArray()))) {
-            assertTrue(findExternalGallery(classes).isEmpty(), case)
-            assertEquals(null, galleryRoute, case)
-        }
+        assertTrue(findExternalGallery(galleryClasses(*onlyOwn.toTypedArray())).isEmpty(), "only its own start")
+        assertEquals(null, galleryRoute, "only its own start")
     }
 
     @Test fun theCameraAndGallerySwitchesShareTheLauncherStartInEitherOrder() {
