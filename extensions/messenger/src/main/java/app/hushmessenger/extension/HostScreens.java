@@ -193,9 +193,7 @@ public final class HostScreens {
             ShortcutManager manager = context.getSystemService(ShortcutManager.class);
             if (manager == null) return;
             List<String> ours = java.util.Arrays.asList(CONTROLS_SHORTCUT, RESTART_SHORTCUT);
-            java.util.Map<String, ShortcutInfo> published = new java.util.HashMap<>();
-            for (ShortcutInfo shortcut : manager.getDynamicShortcuts())
-                if (ours.contains(shortcut.getId())) published.put(shortcut.getId(), shortcut);
+            java.util.Map<String, ShortcutInfo> published = published(manager, ours);
             List<String> pinnedOn = new ArrayList<>(), pinnedOff = new ArrayList<>();
             for (ShortcutInfo shortcut : manager.getPinnedShortcuts())
                 if (ours.contains(shortcut.getId())) (shortcut.isEnabled() ? pinnedOn : pinnedOff).add(shortcut.getId());
@@ -208,12 +206,7 @@ public final class HostScreens {
             changed = !pinnedOff.isEmpty();
             if (!pinnedOff.isEmpty()) manager.enableShortcuts(pinnedOff);
             android.content.ComponentName launcher = messengerLauncher(context);
-            boolean inPlace = true;
-            for (int rank = 0; rank < ours.size(); rank++) {
-                ShortcutInfo shortcut = published.get(ours.get(rank));
-                if (shortcut == null || shortcut.getRank() != rank || (launcher != null && !launcher.equals(shortcut.getActivity()))) inPlace = false;
-            }
-            if (!inPlace) {
+            if (!inPlace(published, ours, launcher)) {
                 // Android numbers an icon's shortcuts again after every change, and among equal ranks it puts the ones just
                 // added first, in the order they came. Rank 1 would tie with Messenger's own second shortcut and land third,
                 // so both go in at rank 0, together, and come out as the top two.
@@ -231,6 +224,93 @@ public final class HostScreens {
         } finally {
             // The Menu row asks whether Patch controls is there, so a change has to be read again.
             if (changed) controlsShortcut = null;
+        }
+    }
+
+    /** Which of [ours] are published, by id. */
+    private static java.util.Map<String, ShortcutInfo> published(ShortcutManager manager, List<String> ours) {
+        java.util.Map<String, ShortcutInfo> published = new java.util.HashMap<>();
+        for (ShortcutInfo shortcut : manager.getDynamicShortcuts())
+            if (ours.contains(shortcut.getId())) published.put(shortcut.getId(), shortcut);
+        return published;
+    }
+
+    /** Each of [ours] sits at its own place from the top of Messenger's icon. */
+    private static boolean inPlace(java.util.Map<String, ShortcutInfo> published, List<String> ours,
+            android.content.ComponentName launcher) {
+        for (int rank = 0; rank < ours.size(); rank++) {
+            ShortcutInfo shortcut = published.get(ours.get(rank));
+            if (shortcut == null || shortcut.getRank() != rank || (launcher != null && !launcher.equals(shortcut.getActivity()))) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Messenger's own shortcut writes come here. It pushes a conversation shortcut on top of its icon for each message
+     * that arrives, in the background too, so a few chats moved Restart Messenger and then Patch controls past the four
+     * rows the launcher shows until Messenger next left the screen. Each write runs exactly as Messenger made it, then
+     * the pair goes back on top.
+     */
+    public static void messengerPushed(ShortcutManager manager, ShortcutInfo shortcut) {
+        Api30.push(manager, shortcut);
+        keepOnTop();
+    }
+
+    /**
+     * Android 11's push lives here, so Android 9 and 10 verify HostScreens without a method they don't have. Messenger
+     * pushes only on Android 11 and up, where this is its own call.
+     */
+    static final class Api30 {
+        private Api30() {}
+
+        static void push(ShortcutManager manager, ShortcutInfo shortcut) {
+            if (android.os.Build.VERSION.SDK_INT >= 30) manager.pushDynamicShortcut(shortcut);
+        }
+    }
+
+    /** The same after Messenger adds shortcuts. Messenger gets its own answer back. */
+    public static boolean messengerAdded(ShortcutManager manager, List<ShortcutInfo> shortcuts) {
+        boolean added = manager.addDynamicShortcuts(shortcuts);
+        keepOnTop();
+        return added;
+    }
+
+    /** The same after Messenger replaces its shortcuts, which takes the pair off. */
+    public static boolean messengerSet(ShortcutManager manager, List<ShortcutInfo> shortcuts) {
+        boolean set = manager.setDynamicShortcuts(shortcuts);
+        keepOnTop();
+        return set;
+    }
+
+    private static void keepOnTop() {
+        Application app = application;
+        // Android 9 and 10 have no push, so the pair waits for the next start or leave there.
+        if (app == null || android.os.Build.VERSION.SDK_INT < 30) return;
+        try {
+            shortcutWork.execute(() -> putBackOnTop(app));
+        } catch (RuntimeException error) {
+            Log.w("HushMessenger", "Can't put HushMessenger's launcher shortcuts back on top", error);
+        }
+    }
+
+    /**
+     * Pushes rather than adds: Android takes a push at any time, while each add from an app in the background counts
+     * against an allowance Messenger's own share targets need. A push lands on top, so Restart Messenger goes first.
+     * A full icon drops its lowest shortcut for one that's missing, as it does for Messenger's.
+     */
+    static void putBackOnTop(Context context) {
+        if (!started || failed) return;
+        try {
+            ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+            if (manager == null || !Settings.iconShortcutsShown(context)) return;
+            List<String> ours = java.util.Arrays.asList(CONTROLS_SHORTCUT, RESTART_SHORTCUT);
+            android.content.ComponentName launcher = messengerLauncher(context);
+            if (inPlace(published(manager, ours), ours, launcher)) return;
+            Api30.push(manager, shortcut(context, RESTART_SHORTCUT, "Restart Messenger", RESTART, android.R.drawable.ic_popup_sync, launcher));
+            Api30.push(manager, shortcut(context, CONTROLS_SHORTCUT, "Patch controls", SETTINGS, android.R.drawable.ic_menu_preferences, launcher));
+            controlsShortcut = null;
+        } catch (RuntimeException error) {
+            Log.w("HushMessenger", "Can't put HushMessenger's launcher shortcuts back on top", error);
         }
     }
 

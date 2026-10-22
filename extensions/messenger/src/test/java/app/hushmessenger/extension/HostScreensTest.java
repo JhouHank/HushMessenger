@@ -47,6 +47,7 @@ public class HostScreensTest {
         CrashGuard.resetForTests();
         HostScreens.controlsShortcut = null;
         AndroidShortcutManager.rateLimited = false;
+        AndroidShortcutManager.pushed = 0;
         realShortcutWork = HostScreens.shortcutWork;
         HostScreens.shortcutWork = Runnable::run;
         // A failed start takes the Bold and Italic entries out on this executor, so it runs inline here too.
@@ -315,6 +316,79 @@ public class HostScreensTest {
         assertEquals(List.of(), menu(manager, drawer));
     }
 
+    /**
+     * Messenger pushes a conversation shortcut on top for each message, in the background too, where Android holds its
+     * adds back for a while. Each of its writes still lands as it would, and the pair goes straight back on top with
+     * pushes, which Android never holds back.
+     */
+    @Test @Config(sdk = 36, shadows = AndroidShortcutManager.class)
+    public void messengersBackgroundShortcutsLeaveThePairOnTop() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        ComponentName messenger = launcherIcons(app);
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        startWithoutProvider(app);
+        AndroidShortcutManager.rateLimited = true;
+        for (int chat = 0; chat < 3; chat++) HostScreens.messengerPushed(manager, chat(app, messenger, "chat" + chat).build());
+        assertEquals(List.of(HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT, "chat2", "chat1", "chat0"), menu(manager, messenger));
+        // Messenger's add gets Android's own answer, held back here.
+        assertFalse(HostScreens.messengerAdded(manager, List.of(chat(app, messenger, "chat3").setRank(0).build())));
+        assertFalse(dynamicIds(manager).contains("chat3"));
+        AndroidShortcutManager.rateLimited = false;
+        assertTrue(HostScreens.messengerAdded(manager, List.of(chat(app, messenger, "chat3").setRank(0).build())));
+        assertEquals(List.of(HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT, "chat3", "chat2", "chat1", "chat0"),
+            menu(manager, messenger));
+        // A set takes the pair off along with everything else, and it comes straight back.
+        assertTrue(HostScreens.messengerSet(manager, List.of(chat(app, messenger, "page").build())));
+        assertEquals(List.of(HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT, "page"), menu(manager, messenger));
+        // On top already, nothing more is pushed.
+        int pushes = AndroidShortcutManager.pushed;
+        HostScreens.putBackOnTop(app);
+        assertEquals(pushes, AndroidShortcutManager.pushed);
+        assertEquals(java.util.Map.of(), AndroidShortcutManager.grayed);
+    }
+
+    /** Hidden, the pair stays off whatever Messenger writes, and Messenger's own shortcuts land as they would. */
+    @Test @Config(sdk = 36, shadows = AndroidShortcutManager.class)
+    public void messengersShortcutsLeaveHiddenOnesOff() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        ComponentName messenger = launcherIcons(app);
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        Settings.preferences.edit().putBoolean(Settings.HIDE_ICON_SHORTCUTS, true).commit();
+        startWithoutProvider(app);
+        HostScreens.messengerPushed(manager, chat(app, messenger, "chat0").build());
+        assertTrue(HostScreens.messengerAdded(manager, List.of(chat(app, messenger, "chat1").setRank(0).build())));
+        assertEquals(List.of("chat1", "chat0"), menu(manager, messenger));
+    }
+
+    /** Android 9 and 10 have no push, so Messenger's add there leaves the pair for the next start or leave. */
+    @Test @Config(sdk = 28, shadows = AndroidShortcutManager.class)
+    public void anAddOnAndroid9LeavesThePairForTheNextLeave() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        ComponentName messenger = launcherIcons(app);
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        startWithoutProvider(app);
+        assertTrue(HostScreens.messengerAdded(manager, List.of(chat(app, messenger, "chat0").setRank(0).build())));
+        assertEquals(List.of("chat0", HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT), menu(manager, messenger));
+        assertEquals(0, AndroidShortcutManager.pushed);
+    }
+
+    /** The patched calls come from Messenger's own classes, so the three entries must be public and static. */
+    @Test public void messengersShortcutWritesHaveTheirEntries() throws Exception {
+        for (java.lang.reflect.Method entry : List.of(
+                HostScreens.class.getMethod("messengerPushed", ShortcutManager.class, ShortcutInfo.class),
+                HostScreens.class.getMethod("messengerAdded", ShortcutManager.class, List.class),
+                HostScreens.class.getMethod("messengerSet", ShortcutManager.class, List.class))) {
+            assertTrue(entry.getName(), java.lang.reflect.Modifier.isStatic(entry.getModifiers()));
+            assertEquals(entry.getName(), entry.getName().equals("messengerPushed") ? void.class : boolean.class, entry.getReturnType());
+        }
+    }
+
+    /** One of Messenger's conversation shortcuts. A push without a rank of its own lands at the top. */
+    private static ShortcutInfo.Builder chat(Application app, ComponentName messenger, String id) {
+        return new ShortcutInfo.Builder(app, id).setShortLabel(id)
+            .setIntent(new Intent(Intent.ACTION_VIEW).setComponent(messenger)).setActivity(messenger);
+    }
+
     /** Messenger's own conversation shortcuts, which it adds at the top of its icon while it runs. */
     private static List<ShortcutInfo> conversations(Application app, ComponentName messenger, int count) {
         List<ShortcutInfo> chats = new java.util.ArrayList<>();
@@ -489,6 +563,37 @@ public class HostScreensTest {
             renumber(shortcuts.stream().map(ShortcutInfo::getId).toList());
             return added;
         }
+
+        /**
+         * ShortcutService.pushDynamicShortcut, which Robolectric runs as an add: never held back by the rate limit, rank 0
+         * unless one was asked for, ahead of the others at its rank, and a new one on a full icon drops the icon's lowest.
+         */
+        @Override @org.robolectric.annotation.Implementation(minSdk = android.os.Build.VERSION_CODES.R)
+        protected void pushDynamicShortcut(ShortcutInfo shortcut) {
+            try {
+                if (shortcut.getRank() == Integer.MAX_VALUE) ShortcutInfo.class.getMethod("setRank", int.class).invoke(shortcut, 0);
+            } catch (ReflectiveOperationException error) {
+                throw new AssertionError(error);
+            }
+            String icon = String.valueOf(shortcut.getActivity());
+            if (!published().containsKey(shortcut.getId())) {
+                int count = 0;
+                for (ShortcutInfo kept : getManifestShortcuts()) if (icon.equals(String.valueOf(kept.getActivity()))) count++;
+                ShortcutInfo lowest = null;
+                for (ShortcutInfo kept : published().values()) {
+                    if (!icon.equals(String.valueOf(kept.getActivity()))) continue;
+                    count++;
+                    if (lowest == null || kept.getRank() > lowest.getRank()) lowest = kept;
+                }
+                if (count >= getMaxShortcutCountPerActivity() && lowest != null) published().remove(lowest.getId());
+            }
+            published().put(shortcut.getId(), shortcut);
+            renumber(List.of(shortcut.getId()));
+            pushed++;
+        }
+
+        /** Pushes since the last reset. */
+        static int pushed;
 
         /** Per icon by rank; among equal ranks the ones this call added come first, in the call's order, then by id. */
         private static void renumber(List<String> added) {
