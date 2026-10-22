@@ -177,6 +177,7 @@ public class CompatReport {
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide People tab", List.of("tab_people"));
         PATCHES.put("Hide Notifications tab", List.of("tab_notifications"));
+        PATCHES.put("Hide tab badges", List.of("tab_badges", "facebook_badge"));
         PATCHES.put("Hold stories at the end", List.of("story_hold"));
         PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
         PATCHES.put("Hide avatar stickers", List.of("avatar_stickers", "avatar_tabs"));
@@ -3315,6 +3316,99 @@ public class CompatReport {
         return watchers.size() == 1 ? watchers : List.of();
     }
 
+    static final String TAB_CONTENT_SPEC = "messaging.navigation.home.tabs.tabcontent.TabContentInterfaceSpec";
+    static final String FACEBOOK_BUTTON =
+        "Lcom/facebook/messaging/inbox/tab/plugins/core/tabtoolbarbutton/facebookbutton/facebooktoolbarbutton/FacebookButtonTabButtonImplementation;";
+
+    /**
+     * tab_badges: the bottom bar's badge dispatcher, an instance (String) method naming the tab content spec and
+     * "getBadgeController", whose no-badge tabs all read one static field of its return type. Every match must hold that
+     * field and keep its tab id within v15, or none counts. Mirrors TabBadges.kt.
+     */
+    static List<Method> tabBadgeDispatchers(List<ClassDef> classes) {
+        var found = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !method.getReturnType().startsWith("L") || method.getParameterTypes().size() != 1 ||
+                !"Ljava/lang/String;".equals(method.getParameterTypes().get(0).toString())) continue;
+            var strings = new HashSet<String>();
+            for (var i : method.getImplementation().getInstructions())
+                if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr) strings.add(sr.getString());
+            if (strings.contains(TAB_CONTENT_SPEC) && strings.contains("getBadgeController")) found.add(method);
+        }
+        for (var method : found) {
+            var none = new HashSet<String>();
+            for (var i : instructions(method))
+                if (i.getOpcode() == Opcode.SGET_OBJECT && ((ReferenceInstruction) i).getReference() instanceof FieldReference f &&
+                    method.getReturnType().equals(f.getType())) none.add(f.toString());
+            // The tab id is p1, the method's last register.
+            if (none.size() != 1 || method.getImplementation().getRegisterCount() - 1 > 15) return List.of();
+        }
+        return found;
+    }
+
+    /**
+     * facebook_badge: the Facebook button's build, whose one (FbUserSession)Z check drops the cast badge controller to
+     * null right before the button is made with it, and whose check result no other path jumps past. Mirrors TabBadges.kt.
+     */
+    static List<Method> facebookBadgeChecks(List<ClassDef> classes) {
+        var found = new ArrayList<Method>();
+        for (var cls : classes) {
+            if (!FACEBOOK_BUTTON.equals(cls.getType())) continue;
+            for (var method : cls.getMethods()) if (facebookBadgeCheck(method) >= 0) found.add(method);
+        }
+        for (var method : found) {
+            int result = facebookBadgeCheck(method);
+            if (register(instructions(method).get(result)) > 15 || mediaTargets(method).contains(result + 1)) return List.of();
+        }
+        return found;
+    }
+
+    /** Index of the check's MOVE_RESULT, or -1. */
+    static int facebookBadgeCheck(Method method) {
+        if (!FACEBOOK_BUTTON.equals(method.getDefiningClass()) || AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+            !method.getParameterTypes().isEmpty() || !method.getReturnType().startsWith("L")) return -1;
+        var code = instructions(method);
+        int at = -1, sites = 0;
+        for (int i = 0; i + 3 < code.size(); i++) {
+            if (code.get(i).getOpcode() != Opcode.INVOKE_VIRTUAL ||
+                !(((ReferenceInstruction) code.get(i)).getReference() instanceof MethodReference callee) ||
+                !"Z".equals(callee.getReturnType()) || callee.getParameterTypes().size() != 1 ||
+                !"Lcom/facebook/auth/usersession/FbUserSession;".equals(callee.getParameterTypes().get(0).toString())) continue;
+            if (code.get(i + 1).getOpcode() != Opcode.MOVE_RESULT || code.get(i + 2).getOpcode() != Opcode.IF_NEZ ||
+                register(code.get(i + 2)) != register(code.get(i + 1)) || !jumpsTo(code, i + 2, i + 4) ||
+                code.get(i + 3).getOpcode() != Opcode.CONST_4 || ((NarrowLiteralInstruction) code.get(i + 3)).getNarrowLiteral() != 0) continue;
+            at = i;
+            sites++;
+        }
+        if (sites != 1) return -1;
+        int controller = register(code.get(at + 3));
+        Instruction cast = null;
+        for (int i = 0; i < at; i++)
+            if (code.get(i).getOpcode() == Opcode.CHECK_CAST && register(code.get(i)) == controller) cast = code.get(i);
+        if (cast == null) return -1;
+        var type = ((TypeReference) ((ReferenceInstruction) cast).getReference()).getType();
+        Instruction build = null;
+        for (int i = at + 4; i < code.size() && build == null; i++)
+            if ((code.get(i).getOpcode() == Opcode.INVOKE_DIRECT || code.get(i).getOpcode() == Opcode.INVOKE_DIRECT_RANGE) &&
+                ((ReferenceInstruction) code.get(i)).getReference() instanceof MethodReference init && "<init>".equals(init.getName()) &&
+                method.getReturnType().equals(init.getDefiningClass())) build = code.get(i);
+        if (build == null) return -1;
+        // The dropped register is the controller argument of the button the method returns, and nothing else.
+        var arguments = bubbleArgs(build);
+        int word = 1, uses = 0;
+        String usedAs = null;
+        for (var parameter : ((MethodReference) ((ReferenceInstruction) build).getReference()).getParameterTypes()) {
+            var name = parameter.toString();
+            if (word < arguments.size() && arguments.get(word) == controller) {
+                uses++;
+                usedAs = name;
+            }
+            word += "J".equals(name) || "D".equals(name) ? 2 : 1;
+        }
+        return uses == 1 && type.equals(usedAs) ? at + 1 : -1;
+    }
+
     static final Set<String> AI_MENTION_PLUGINS = Set.of(
         "messaging.aibot.core.mentionai.MentionAiRowSupplier", "messaging.aibot.core.imagine.ImagineRowSupplier",
         "messaging.communitymessaging.ai.mentionrowsupplier.CommunityAiRowSupplier");
@@ -4573,6 +4667,8 @@ public class CompatReport {
         if (community != null) found.get("community_inbox").add(community.render());
         found.get("emoji_drawer").addAll(emojiDrawerReaders(classes));
         found.get("emoji_search").addAll(emojiSearchWatchers(classes));
+        found.get("tab_badges").addAll(tabBadgeDispatchers(classes));
+        found.get("facebook_badge").addAll(facebookBadgeChecks(classes));
         found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
         found.get("ai_commands").addAll(aiCommandLists(classes));
         found.get("ai_search_hint").addAll(searchBarBuilders(classes));
@@ -5156,8 +5252,8 @@ public class CompatReport {
     static final Set<String> NEEDS_A_LOCAL = Set.of("ad_events", "ai_commands", "ai_fab", "ai_mention_rows", "ai_menu", "ai_search",
         "ai_search_chip", "allow_screenshot", "analytics_uploads", "app_icons", "attribution_uploads", "bubbles", "delta_unsent",
         "disappearing_swipe", "external_gallery", "facebook", "facebook_profile", "font_by_name", "font_repository", "growth_notes", "growth_story_card", "keep_unsent",
-        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "recent_media", "stories", "system_camera", "typing",
-        "unsent_indicator");
+        "mqtt_telemetry", "nearby_scans", "original_photo", "people_story", "phone_id_sync", "people_tab", "recent_media", "stories", "system_camera",
+        "tab_badges", "typing", "unsent_indicator");
 
     /** More registers than the parameters take, as ControlHooks.kt's validateScratch asks. */
     static boolean hasLocal(Method method) {

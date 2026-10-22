@@ -58,8 +58,7 @@ public final class SettingsActivity extends Activity {
     private final Map<Switch, CharSequence> switchDescriptions = new java.util.HashMap<>();
     private long documentGeneration;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (preferences, key) -> {
-        if (key == null || "paused".equals(key) || Settings.BUBBLE_CHAT_HEADS.equals(key) || Settings.KEEP_FACEBOOK_PROFILE.equals(key)
-            || Settings.installed.contains(key))
+        if (key == null || "paused".equals(key) || Settings.SUB_SWITCHES.containsKey(key) || Settings.installed.contains(key))
             documentGeneration++;
         refreshChoices();
         if (key == null || "check_updates".equals(key)) syncUpdateChoice(true);
@@ -162,6 +161,7 @@ public final class SettingsActivity extends Activity {
         {"moments", "Hide Chat Moments", "Hides Chat Moments in the menu.", "navigation"},
         {"reels_badge", "Hide Reels badge", "Hides the Reels notification badge.", "navigation"},
         {"tab_people", "Hide People tab", "Hides the People tab in the bar at the bottom. Restart Messenger to see the tab go.", "navigation"},
+        {"tab_badges", "Hide tab badges", "Hides the red dots and counts on the tabs at the bottom and on the Facebook button at the top. Turn on Keep for any you still want. Restart Messenger to see the change.", "navigation"},
         {"tab_notifications", "Hide Notifications tab", "Hides the Notifications tab in the bar at the bottom. Restart Messenger to see the tab go.", "navigation"},
         {"chat_animation", "Slide chats in and out", "Slides a chat in from the side when you open it and out when you go back. Chat heads and bubbles aren't affected.", "navigation"},
         {"story_hold", "Hold stories at the end", "Keeps a story on screen when it ends instead of moving on to the next one, so you go on with a tap or a swipe. Photos and videos both wait, and the last story stays open until you close it.", "navigation"},
@@ -789,13 +789,17 @@ public final class SettingsActivity extends Activity {
                 groups.add(group);
             }
             LinearLayout row = controlRow(spec[0], text.control(spec, 1), text.control(spec, 2), true);
-            if ("bubbles".equals(spec[0]) || "facebook".equals(spec[0]) || OwnFont.KEY.equals(spec[0]) || MessageLog.KEY.equals(spec[0]) || AutoReply.KEY.equals(spec[0])) {
+            if ("bubbles".equals(spec[0]) || "facebook".equals(spec[0]) || Settings.TAB_BADGES.equals(spec[0]) || OwnFont.KEY.equals(spec[0])
+                    || MessageLog.KEY.equals(spec[0]) || AutoReply.KEY.equals(spec[0])) {
                 // Below the row, where TalkBack reaches them: the row's label column hides its descendants.
                 LinearLayout wrapper = ui.column();
                 ui.add(wrapper, row, 0);
                 if ("bubbles".equals(spec[0])) addBubbleModes(wrapper);
                 else if ("facebook".equals(spec[0])) ui.add(wrapper, controlRow(Settings.KEEP_FACEBOOK_PROFILE,
                     text.format("facebook_keep_profile"), text.format("facebook_keep_profile_help"), false), 8);
+                else if (Settings.TAB_BADGES.equals(spec[0])) {
+                    for (String keep : Settings.KEEP_BADGES.values()) ui.add(wrapper, controlRow(keep, text.format(keep), "", false), 8);
+                }
                 else if (OwnFont.KEY.equals(spec[0])) addFontFile(wrapper);
                 else if (AutoReply.KEY.equals(spec[0])) addAutoReplyActions(wrapper);
                 else addMessageLogActions(wrapper);
@@ -2583,14 +2587,14 @@ public final class SettingsActivity extends Activity {
     private void restoreChoices(Map<String, Boolean> choices) {
         java.util.Set<String> known = new java.util.HashSet<>();
         for (String[] spec : CONTROLS) known.add(spec[0]);
-        known.add(Settings.BUBBLE_CHAT_HEADS);
-        known.add(Settings.KEEP_FACEBOOK_PROFILE);
+        known.addAll(Settings.SUB_SWITCHES.keySet());
         Map<String, Boolean> supported = new java.util.LinkedHashMap<>();
         int unknown = 0, unavailable = 0;
         for (Map.Entry<String, Boolean> choice : choices.entrySet()) {
             String key = choice.getKey();
-            if ("paused".equals(key) || (known.contains(key) && Settings.installed.contains(Settings.BUBBLE_CHAT_HEADS.equals(key) ? "bubbles"
-                : Settings.KEEP_FACEBOOK_PROFILE.equals(key) ? "facebook" : key))) supported.put(key, choice.getValue());
+            String owner = Settings.SUB_SWITCHES.get(key);
+            if ("paused".equals(key) || (known.contains(key) && Settings.installed.contains(owner != null ? owner : key)))
+                supported.put(key, choice.getValue());
             else if (known.contains(key)) unavailable++;
             else unknown++;
         }
@@ -3069,6 +3073,7 @@ public final class SettingsActivity extends Activity {
                 ("conversations".equals(spec[3]) || "photos_videos".equals(spec[3]) || "stickers".equals(spec[3])) ? "chats" : "more";
             // A switch inside a control's block is found by its own words too.
             String inside = "facebook".equals(spec[0]) ? text.get("facebook_keep_profile") + " " + text.get("facebook_keep_profile_help") : "";
+            if (Settings.TAB_BADGES.equals(spec[0])) for (String keep : Settings.KEEP_BADGES.values()) inside += " " + text.get(keep);
             boolean match = ("all".equals(category) || category.equals(bucket)) && SettingsSearch.matches(terms, spec[1], spec[2],
                 SettingsText.english(spec[3]), text.display(text.control(spec, 1)), text.display(text.control(spec, 2)), text.get(spec[3]), inside);
             controlRows.get(i).setVisibility(match ? View.VISIBLE : View.GONE);

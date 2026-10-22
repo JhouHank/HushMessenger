@@ -87,6 +87,7 @@ hook facebook LX/GM9;->A02()Z
 hook facebook LX/I5A;->A04()Z
 hook facebook LX/I5R;->A06()Z
 hook facebook LX/I5z;->A06()Z
+hook facebook_badge Lcom/facebook/messaging/inbox/tab/plugins/core/tabtoolbarbutton/facebookbutton/facebooktoolbarbutton/FacebookButtonTabButtonImplementation;->A02()LX/2RS;
 hook facebook_profile LX/I6L;->A00()Z
 hook facebook_profile LX/I6T;->A02()Z
 hook facebook_profile LX/I6U;->A01()Z
@@ -170,6 +171,7 @@ hook system_camera LX/98s;->A00(Landroid/content/Context;Landroid/os/Bundle;Land
 hook system_camera LX/99A;->BkO(Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/AZV;LX/6NI;Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;)V
 hook system_camera LX/AaX;->C0w(Landroid/os/Bundle;LX/6NI;)Z
 hook system_camera LX/AwA;->Bpf(LX/4Jq;Ljava/lang/String;)V
+hook tab_badges LX/1n1;->A00(Ljava/lang/String;)LX/38i;
 hook tab_notifications LX/1n0;->A09(LX/1n0;)Z
 hook tab_people LX/1n0;->A0E(LX/1n0;)Z
 hook text_style LX/8eA;->onFocusChanged(ZILandroid/graphics/Rect;)V

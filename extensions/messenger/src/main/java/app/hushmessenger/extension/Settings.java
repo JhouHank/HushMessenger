@@ -240,6 +240,80 @@ public final class Settings {
         return hidden;
     }
 
+    static final String TAB_BADGES = "tab_badges";
+    /**
+     * Under Hide tab badges: each badge's Keep switch, by the tab id Messenger's bottom bar asks its badge for. The
+     * Facebook button at the top of Chats goes by "facebook". Menu is the "more" tab; "me_setting" never has a badge.
+     */
+    static final Map<String, String> KEEP_BADGES;
+    static {
+        Map<String, String> keep = new LinkedHashMap<>();
+        keep.put("inbox", "tab_badges_keep_chats");
+        keep.put("people", "tab_badges_keep_people");
+        keep.put("jewel", "tab_badges_keep_notifications");
+        keep.put("more", "tab_badges_keep_menu");
+        keep.put("facebook", "tab_badges_keep_facebook");
+        KEEP_BADGES = Collections.unmodifiableMap(keep);
+    }
+
+    /** Switches shown under a control's row, by the control that has to be in the bundle for them to mean anything. */
+    static final Map<String, String> SUB_SWITCHES;
+    static {
+        Map<String, String> owners = new LinkedHashMap<>();
+        owners.put(BUBBLE_CHAT_HEADS, "bubbles");
+        owners.put(KEEP_FACEBOOK_PROFILE, "facebook");
+        for (String keep : KEEP_BADGES.values()) owners.put(keep, TAB_BADGES);
+        SUB_SWITCHES = Collections.unmodifiableMap(owners);
+    }
+
+    /** The badges hidden this run, by the tab ids KEEP_BADGES lists, or null before Messenger asked for one. */
+    static volatile Set<String> hiddenBadges;
+    private static final Object HIDDEN_BADGES = new Object();
+
+    /** The badges the saved switches, Pause and safe mode hide now. */
+    static Set<String> badgesToHide() {
+        if (!wouldUse(TAB_BADGES)) return Collections.emptySet();
+        SharedPreferences prefs = preferences;
+        Set<String> hidden = new HashSet<>();
+        for (Map.Entry<String, String> badge : KEEP_BADGES.entrySet())
+            if (!prefs.getBoolean(badge.getValue(), false)) hidden.add(badge.getKey());
+        return Collections.unmodifiableSet(hidden);
+    }
+
+    /**
+     * Messenger's bottom bar and the Facebook button take a badge controller as they're built and keep listening to it,
+     * so a badge doesn't come back or go away mid-run. Every asker gets the first answer until a restart, like the tabs.
+     */
+    private static Set<String> hiddenBadges() {
+        Set<String> held = hiddenBadges;
+        if (held != null) return held;
+        if (!HostScreens.started) HostScreens.initializeLate();
+        synchronized (HIDDEN_BADGES) {
+            if (hiddenBadges == null) hiddenBadges = badgesToHide();
+            return hiddenBadges;
+        }
+    }
+
+    /**
+     * Asked by the bottom bar for each tab's badge controller. True hands the tab the controller Messenger itself uses for
+     * a tab whose badge is turned off, so the tab shows no dot or count and opens as usual.
+     */
+    public static boolean hideTabBadge(String tab) {
+        try {
+            if (tab == null || !hiddenBadges().contains(tab)) return false;
+            activeAt.put(TAB_BADGES, System.currentTimeMillis());
+            return true;
+        } catch (RuntimeException error) {
+            hookFailed(TAB_BADGES, "Can't hide a tab badge", error);
+            return false;
+        }
+    }
+
+    /** Whether the Facebook button at the top of Chats gets its badge. Without one Messenger draws the plain button. */
+    public static boolean facebookButtonBadge(boolean original) {
+        return original && !hideTabBadge("facebook");
+    }
+
     /** First answer this process gave for the emoji drawer, or null before Messenger asked. */
     static volatile Boolean oldEmojiDrawer;
     private static final Object EMOJI_DRAWER = new Object();
@@ -270,6 +344,13 @@ public final class Settings {
      * safe mode now says otherwise. Null when the control doesn't hold one, Messenger hasn't asked yet, or they agree.
      */
     static Boolean heldUntilRestart(String key) {
+        if (TAB_BADGES.equals(key)) {
+            Set<String> badges = hiddenBadges;
+            if (badges == null) return null;
+            Set<String> now = badgesToHide();
+            // Still hiding what a restart would show again reads as held on; any other change is waiting to take effect.
+            return badges.equals(now) ? null : !badges.isEmpty() && now.isEmpty();
+        }
         Boolean held = "meta_ai".equals(key) ? metaAiTab : "emoji_drawer".equals(key) ? oldEmojiDrawer
             : OwnFont.KEY.equals(key) ? customFont : bottomTabs.get(key);
         return held == null || held == wouldUse(key) ? null : held;

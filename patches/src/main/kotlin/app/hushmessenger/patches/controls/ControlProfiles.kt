@@ -113,6 +113,7 @@ internal val PROFILE_346814894 = ControlProfile(
             "LX/2Qv;->A0C()Z", "LX/3qo;->A00()Z", "LX/3qp;->A00()Z", "LX/GGK;->A02()Z", "LX/GGK;->A05()Z",
             "LX/GM9;->A02()Z", "LX/I5A;->A04()Z", "LX/I5R;->A06()Z", "LX/I5z;->A06()Z",
         ),
+        "facebook_badge" to setOf("Lcom/facebook/messaging/inbox/tab/plugins/core/tabtoolbarbutton/facebookbutton/facebooktoolbarbutton/FacebookButtonTabButtonImplementation;->A02()LX/2RS;"),
         "facebook_profile" to setOf(
             "LX/I6L;->A00()Z", "LX/I6T;->A02()Z", "LX/I6U;->A01()Z", "LX/I6W;->A02()Z", "LX/I6Y;->A02()Z",
             "LX/I6d;->A03()Z", "LX/I6e;->A03()Z", "LX/I6g;->A01()Z", "LX/I6h;->A01()Z", "LX/I6j;->A06()Z",
@@ -191,6 +192,7 @@ internal val PROFILE_346814894 = ControlProfile(
             "LX/99A;->BkO(Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/AZV;LX/6NI;Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;)V",
             "LX/AaX;->C0w(Landroid/os/Bundle;LX/6NI;)Z", "LX/AwA;->Bpf(LX/4Jq;Ljava/lang/String;)V",
         ),
+        "tab_badges" to setOf("LX/1n1;->A00(Ljava/lang/String;)LX/38i;"),
         "tab_notifications" to setOf("LX/1n0;->A09(LX/1n0;)Z"),
         "tab_people" to setOf("LX/1n0;->A0E(LX/1n0;)Z"),
         "text_style" to setOf("LX/8eA;->onFocusChanged(ZILandroid/graphics/Rect;)V"),

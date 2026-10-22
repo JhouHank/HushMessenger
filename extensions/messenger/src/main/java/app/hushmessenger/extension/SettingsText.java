@@ -181,6 +181,11 @@ final class SettingsText {
         ENGLISH.put("bubble_settings_missing", "Screen not found. Open app info, then Notifications.");
         ENGLISH.put("facebook_keep_profile", "Keep the Profile button");
         ENGLISH.put("facebook_keep_profile_help", "Leaves the Profile button on a chat's details page, so you can still open the person's Facebook profile. The other Facebook shortcuts stay hidden.");
+        ENGLISH.put("tab_badges_keep_chats", "Keep the Chats badge");
+        ENGLISH.put("tab_badges_keep_people", "Keep the People badge");
+        ENGLISH.put("tab_badges_keep_notifications", "Keep the Notifications badge");
+        ENGLISH.put("tab_badges_keep_menu", "Keep the Menu badge");
+        ENGLISH.put("tab_badges_keep_facebook", "Keep the Facebook button's badge");
         ENGLISH.put("experimental", "Experimental");
         ENGLISH.put("choice_on", "%s on");
         ENGLISH.put("choice_off", "%s off");
