@@ -101,6 +101,7 @@ internal val settingsExtension = bytecodePatch(description = "Load HushMessenger
         messageLogContract = null
         readReceiptThreadFields = emptyMap()
         markReadRecipe = null
+        autoReplyPictureRecipe = null
         galleryRoute = null
     }
 }
@@ -348,6 +349,27 @@ private fun controlPatch(key: String, title: String, summary: String, group: Str
                     host.methods.add(new)
                     host.directMethods.add(new)
                 }
+            } else if (key == AUTO_REPLY) {
+                val recipe = autoReplyPictureRecipe
+                val host = mutableClassDefBy(SETTINGS)
+                fun stub(id: String) = host.methods.singleOrNull { it.hookId() == id }
+                    ?: throw PatchException("Messenger controls: the auto reply picture's extension stub is missing")
+                // Built before the first edit, so a changed stub stops the patch with Messenger untouched.
+                val built = if (recipe == null) emptyList() else listOf(
+                    stub(AUTO_REPLY_PICTURE_MESSAGES).let { it to autoReplyMessagesBuilder(it, recipe) },
+                    stub(AUTO_REPLY_SEND_MESSAGE).let { it to autoReplySendBuilder(it, recipe) },
+                    stub(AUTO_REPLY_PICTURES).let { it to autoReplyPicturesFlag(it) })
+                injectControl(key, methods)
+                // MutableMethod.implementation has no setter. Keep both method indexes in sync when replacing it.
+                for ((old, new) in built) {
+                    host.methods.remove(old)
+                    host.directMethods.remove(old)
+                    host.methods.add(new)
+                    host.directMethods.add(new)
+                }
+                // The settings then leave out the picture choice, and the patcher log says why.
+                if (recipe == null) java.util.logging.Logger.getLogger("").warning(
+                    "Auto reply: this Messenger's media send doesn't match the tested build, so replies go out as text only")
             } else {
                 injectControl(key, methods)
                 inboxRoute?.let { (route, stub) -> stub.writeInboxRefreshRoute(route) }

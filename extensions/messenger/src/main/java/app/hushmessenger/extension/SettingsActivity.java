@@ -89,7 +89,7 @@ public final class SettingsActivity extends Activity {
     /** Between onStart and onStop. A Clear that finishes while settings are out of sight is final at once. */
     private boolean started;
     static final int UNDO_MILLIS = 10_000;
-    static final int SAVE_CHOICES = 7101, READ_CHOICES = 7102, PICK_FONT = 7103;
+    static final int SAVE_CHOICES = 7101, READ_CHOICES = 7102, PICK_FONT = 7103, PICK_AUTO_REPLY_PICTURE = 7104;
     /** The names providers give fonts, and plain bytes for one that doesn't know a font. The copy checks what it really is. */
     static final String[] FONT_TYPES = {"font/ttf", "font/otf", "font/collection", "font/sfnt", "application/x-font-ttf",
         "application/x-font-otf", "application/font-sfnt", "application/vnd.ms-opentype", "application/octet-stream"};
@@ -340,6 +340,8 @@ public final class SettingsActivity extends Activity {
                 if (target != null && target.isShown()) target.requestFocus();
             });
             Bundle draft = state.getBundle("auto_reply_draft");
+            // The picker's answer arrives before the posted sheet is back, so the card it's for is known now.
+            if (draft != null) autoReplyPictureFor = draft.getInt("picture_for", -1);
             messageLogClearFailed = state.getBoolean("message_log_clear_failed");
             if (draft != null) root.post(() -> showAutoReplies(draft));
             else if (state.getBoolean("message_log_open")) root.post(this::showMessageLog);
@@ -2034,6 +2036,13 @@ public final class SettingsActivity extends Activity {
     private TextView autoReplyCount;
     private Button autoReplyAdd;
     private ScrollView autoReplyScroll;
+    /** The picture each reply card holds, by card, until Save. */
+    private final java.util.WeakHashMap<View, String> autoReplyPictures = new java.util.WeakHashMap<>();
+    /** The card whose picture is being picked, by position, or -1. */
+    private int autoReplyPictureFor = -1;
+    /** A picked picture that came back while the sheet was being rebuilt, and the card it's for. */
+    private android.net.Uri pendingAutoReplyPicture;
+    private int pendingAutoReplyPictureFor = -1;
 
     /** Two actions under the message-log switch: open the log or wipe it, no confirmation, just a toast. */
     private void addMessageLogActions(LinearLayout content) {
@@ -2285,8 +2294,10 @@ public final class SettingsActivity extends Activity {
         ArrayList<String> words = draft == null ? null : draft.getStringArrayList("words");
         ArrayList<String> replies = draft == null ? null : draft.getStringArrayList("replies");
         if (words != null && replies != null) {
+            ArrayList<String> pictures = draft.getStringArrayList("pictures");
             for (int i = 0; i < Math.min(AutoReply.MAX_RULES, Math.min(words.size(), replies.size())); i++) {
-                View card = autoReplyCard(list, new AutoReply.Rule("", ""));
+                String picture = pictures != null && i < pictures.size() ? pictures.get(i) : null;
+                View card = autoReplyCard(list, new AutoReply.Rule("", "", picture));
                 ((EditText) card.findViewWithTag("auto_reply_when")).setText(words.get(i));
                 ((EditText) card.findViewWithTag("auto_reply_reply")).setText(replies.get(i));
                 list.addView(card);
@@ -2318,7 +2329,13 @@ public final class SettingsActivity extends Activity {
         });
         Button cancel = ui.button(text.get("auto_reply_cancel"));
         cancel.setTag("auto_reply_cancel");
-        cancel.setOnClickListener(clicked -> dialog.dismiss());
+        cancel.setOnClickListener(clicked -> {
+            pruneAutoReplyPictures(prefs);
+            dialog.dismiss();
+        });
+        // Back or a tap outside throws the edits away like Cancel. The dismiss listener can't do this: it also runs
+        // when the screen is rebuilt with the edits kept as a draft.
+        dialog.setOnCancelListener(canceled -> pruneAutoReplyPictures(prefs));
         sheet.action(cancel);
         Button save = ui.primaryButton(text.get("auto_reply_save"));
         save.setTag("auto_reply_save");
@@ -2328,8 +2345,8 @@ public final class SettingsActivity extends Activity {
             for (int i = 0; i < list.getChildCount(); i++) {
                 View card = list.getChildAt(i);
                 EditText when = card.findViewWithTag("auto_reply_when"), reply = card.findViewWithTag("auto_reply_reply");
-                AutoReply.Rule rule = new AutoReply.Rule(when.getText().toString(), reply.getText().toString());
-                if (!rule.when.isEmpty() && rule.reply.isEmpty()) {
+                AutoReply.Rule rule = new AutoReply.Rule(when.getText().toString(), reply.getText().toString(), autoReplyPictures.get(card));
+                if ((!rule.when.isEmpty() || rule.picture != null) && rule.reply.isEmpty()) {
                     TextView error = card.findViewWithTag("auto_reply_error");
                     error.setVisibility(View.VISIBLE);
                     reply.setBackground(ui.interactive(ui.surface, ui.error, 12, ui.error));
@@ -2345,6 +2362,7 @@ public final class SettingsActivity extends Activity {
                 return;
             }
             int kept = AutoReply.save(prefs, rules, groups.isChecked());
+            pruneAutoReplyPictures(prefs);
             feedback(kept == 0 ? text.get("auto_reply_saved_none") : text.get("auto_reply_saved", kept), Toast.LENGTH_SHORT);
             dialog.dismiss();
         });
@@ -2365,6 +2383,123 @@ public final class SettingsActivity extends Activity {
             }
             sheet.scroll.scrollTo(0, draft.getInt("scroll"));
         });
+        if (pendingAutoReplyPicture != null) {
+            android.net.Uri picked = pendingAutoReplyPicture;
+            pendingAutoReplyPicture = null;
+            copyAutoReplyPicture(picked, pendingAutoReplyPictureFor);
+        }
+    }
+
+    /** Deletes picture copies no saved reply uses: the ones picked and then discarded, or swapped for another. */
+    private void pruneAutoReplyPictures(SharedPreferences prefs) {
+        Set<String> keep = new java.util.HashSet<>();
+        for (AutoReply.Rule rule : AutoReply.rules(prefs)) if (rule.picture != null) keep.add(rule.picture);
+        try {
+            AutoReplyPicture.prune(getApplicationContext(), keep);
+        } catch (RuntimeException failed) {
+            android.util.Log.w("HushMessenger", "auto_reply: unused pictures weren't cleared", failed);
+        }
+    }
+
+    /** The picture part of a reply card: a thumbnail, a line saying what happens, and pick and remove buttons. */
+    private void autoReplyPictureRow(LinearLayout card, String picture) {
+        ui.add(card, ui.text(text.get("auto_reply_picture"), 14, ui.text, true), 16);
+        LinearLayout shown = ui.row();
+        shown.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView thumb = new android.widget.ImageView(this);
+        thumb.setTag("auto_reply_picture_thumb");
+        thumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        thumb.setContentDescription(text.get("auto_reply_picture_thumb"));
+        LinearLayout.LayoutParams square = new LinearLayout.LayoutParams(ui.dp(56), ui.dp(56));
+        square.setMarginEnd(ui.dp(12));
+        shown.addView(thumb, square);
+        TextView status = ui.text("", 13, ui.muted, false);
+        status.setTag("auto_reply_picture_status");
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        shown.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+        ui.add(card, shown, 8);
+        LinearLayout buttons = ui.row();
+        if (ui.largeText) buttons.setOrientation(LinearLayout.VERTICAL);
+        buttons.setGravity(Gravity.END);
+        Button pick = ui.button(text.get("auto_reply_picture_pick"));
+        pick.setTag("auto_reply_picture_pick");
+        pick.setOnClickListener(clicked -> pickAutoReplyPicture(card));
+        buttons.addView(pick);
+        Button clear = ui.button(text.get("auto_reply_picture_clear"));
+        clear.setTag("auto_reply_picture_clear");
+        clear.setOnClickListener(clicked -> {
+            setAutoReplyPicture(card, null);
+            pick.requestFocus();
+        });
+        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(-2, -2);
+        if (ui.largeText) gap.topMargin = ui.dp(8);
+        else gap.setMarginStart(ui.dp(8));
+        buttons.addView(clear, gap);
+        ui.add(card, buttons, 8);
+        setAutoReplyPicture(card, picture);
+    }
+
+    /** Shows [name] on its card. The file stays until Save or Cancel, so a draft can still bring it back. */
+    private void setAutoReplyPicture(View card, String name) {
+        String picture = AutoReplyPicture.validName(name) ? name : null;
+        autoReplyPictures.put(card, picture);
+        android.widget.ImageView thumb = card.findViewWithTag("auto_reply_picture_thumb");
+        if (thumb == null) return;
+        android.graphics.Bitmap small = picture == null ? null : AutoReplyPicture.thumbnail(this, picture, ui.dp(56));
+        thumb.setImageBitmap(small);
+        thumb.setVisibility(small == null ? View.GONE : View.VISIBLE);
+        ((TextView) card.findViewWithTag("auto_reply_picture_status")).setText(text.get(picture == null ? "auto_reply_picture_none" :
+            small == null ? "auto_reply_picture_missing" : "auto_reply_picture_set"));
+        ((Button) card.findViewWithTag("auto_reply_picture_pick")).setText(text.get(picture == null ? "auto_reply_picture_pick" : "auto_reply_picture_change"));
+        card.findViewWithTag("auto_reply_picture_clear").setVisibility(picture == null ? View.GONE : View.VISIBLE);
+    }
+
+    private void pickAutoReplyPicture(View card) {
+        if (autoReplyList == null) return;
+        autoReplyPictureFor = autoReplyList.indexOfChild(card);
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
+        try { startActivityForResult(picker, PICK_AUTO_REPLY_PICTURE); }
+        catch (android.content.ActivityNotFoundException missing) {
+            autoReplyPictureFor = -1;
+            feedback(text.get("auto_reply_picture_no_picker"), Toast.LENGTH_LONG);
+        }
+        catch (RuntimeException error) {
+            autoReplyPictureFor = -1;
+            feedback(text.get("auto_reply_picture_failed"), Toast.LENGTH_LONG);
+        }
+    }
+
+    /** Copies the picked picture in on a worker and puts it on its card if the card is still there. */
+    private void copyAutoReplyPicture(android.net.Uri uri, int index) {
+        if (autoReplyList == null || index < 0 || index >= autoReplyList.getChildCount()) return;
+        View card = autoReplyList.getChildAt(index);
+        TextView status = card.findViewWithTag("auto_reply_picture_status");
+        if (status != null) status.setText(text.get("auto_reply_picture_copying"));
+        Context app = getApplicationContext();
+        Thread worker = new Thread(() -> {
+            String name;
+            try {
+                name = AutoReplyPicture.copy(app, uri);
+            } catch (java.io.IOException | RuntimeException | OutOfMemoryError failed) {
+                android.util.Log.w("HushMessenger", "auto_reply: the picked picture couldn't be copied, " + failed.getClass().getName());
+                name = null;
+            }
+            String copied = name;
+            runOnUiThread(() -> placeAutoReplyPicture(card, copied));
+        }, "HushAutoReplyPicture");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void placeAutoReplyPicture(View card, String name) {
+        if (isDestroyed() || autoReplyList == null || autoReplyList.indexOfChild(card) < 0) {
+            // The card went while the copy ran, so nothing can hold this file.
+            java.io.File orphan = name == null ? null : AutoReplyPicture.fileFor(getApplicationContext(), name);
+            if (orphan != null && !orphan.delete()) android.util.Log.w("HushMessenger", "auto_reply: an unused picture couldn't be deleted");
+            return;
+        }
+        if (name == null) feedback(text.get("auto_reply_picture_failed"), Toast.LENGTH_LONG);
+        setAutoReplyPicture(card, name == null ? autoReplyPictures.get(card) : name);
     }
 
     private void refreshReplyCount() {
@@ -2407,6 +2542,7 @@ public final class SettingsActivity extends Activity {
         };
         when.addTextChangedListener(clearError);
         reply.addTextChangedListener(clearError);
+        if (AutoReplyPicture.supported()) autoReplyPictureRow(card, rule.picture);
         LinearLayout row = ui.row();
         row.setGravity(Gravity.END);
         Button remove = ui.button(text.get("auto_reply_remove"));
@@ -2447,12 +2583,14 @@ public final class SettingsActivity extends Activity {
     private Bundle autoReplyDraft() {
         if (autoReplyDialog == null || autoReplyList == null) return null;
         Bundle draft = new Bundle();
-        ArrayList<String> words = new ArrayList<>(), replies = new ArrayList<>();
+        ArrayList<String> words = new ArrayList<>(), replies = new ArrayList<>(), pictures = new ArrayList<>();
         for (int i = 0; i < autoReplyList.getChildCount(); i++) {
             View card = autoReplyList.getChildAt(i);
             EditText when = card.findViewWithTag("auto_reply_when"), reply = card.findViewWithTag("auto_reply_reply");
             words.add(when.getText().toString());
             replies.add(reply.getText().toString());
+            String picture = autoReplyPictures.get(card);
+            pictures.add(picture == null ? "" : picture);
             EditText focused = when.hasFocus() ? when : reply.hasFocus() ? reply : null;
             if (focused != null) {
                 draft.putInt("focus_index", i);
@@ -2463,6 +2601,8 @@ public final class SettingsActivity extends Activity {
         }
         draft.putStringArrayList("words", words);
         draft.putStringArrayList("replies", replies);
+        draft.putStringArrayList("pictures", pictures);
+        draft.putInt("picture_for", autoReplyPictureFor);
         draft.putBoolean("groups", autoReplyGroups.isChecked());
         draft.putInt("scroll", autoReplyScroll.getScrollY());
         return draft;
@@ -2650,6 +2790,24 @@ public final class SettingsActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == PICK_AUTO_REPLY_PICTURE) {
+            int index = autoReplyPictureFor;
+            autoReplyPictureFor = -1;
+            if (result != RESULT_OK || data == null || data.getData() == null) return;
+            android.net.Uri picked = data.getData();
+            // Only a provider grant, never a path read with Messenger's own access.
+            if (!"content".equals(picked.getScheme())) {
+                feedback(text.get("auto_reply_picture_failed"), Toast.LENGTH_LONG);
+                return;
+            }
+            if (autoReplyList == null) {
+                pendingAutoReplyPicture = picked;
+                pendingAutoReplyPictureFor = index;
+            } else {
+                copyAutoReplyPicture(picked, index);
+            }
+            return;
+        }
         if (request == PICK_FONT) {
             // Cancelled: nothing to do and nothing to say.
             if (result != RESULT_OK || data == null || data.getData() == null) return;

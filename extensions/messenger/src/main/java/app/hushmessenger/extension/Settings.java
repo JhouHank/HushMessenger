@@ -1495,6 +1495,25 @@ public final class Settings {
         return null;
     }
 
+    /**
+     * Replaced by the auto reply patch when this Messenger's media send matched: builds the photo messages for [picture]
+     * in the chat [thread] (a thread key string) and returns Messenger's future of them. Null means the build has no
+     * bridge, so a reply goes out as text only.
+     */
+    public static Object autoReplyPictureMessages(Context context, String thread, Uri picture) {
+        return null;
+    }
+
+    /** Replaced with the notification reply service's own send for one built message. Returns its future, or null. */
+    public static Object autoReplySendMessage(Object message) {
+        return null;
+    }
+
+    /** Replaced to return true when the two methods above were filled in. */
+    public static boolean autoReplyPictures() {
+        return false;
+    }
+
     /** Only the independent folder identity survives refreshes, never a context or a row. */
     public static synchronized Object cachedLegacyDrawerKey(Object proposed) {
         if (proposed == null) return null;

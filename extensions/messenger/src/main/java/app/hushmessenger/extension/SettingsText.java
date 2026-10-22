@@ -380,6 +380,17 @@ final class SettingsText {
         ENGLISH.put("auto_reply_full", "That's the most replies it keeps (%s)");
         ENGLISH.put("auto_reply_saved", "Replies saved: %s");
         ENGLISH.put("auto_reply_saved_none", "No replies saved, so nothing gets answered");
+        ENGLISH.put("auto_reply_picture", "Picture (optional)");
+        ENGLISH.put("auto_reply_picture_none", "No picture. Add one to send it right after the reply.");
+        ENGLISH.put("auto_reply_picture_set", "Sent right after the reply");
+        ENGLISH.put("auto_reply_picture_missing", "The picture is gone. Pick it again or remove it.");
+        ENGLISH.put("auto_reply_picture_pick", "Add a picture");
+        ENGLISH.put("auto_reply_picture_change", "Change picture");
+        ENGLISH.put("auto_reply_picture_clear", "Remove picture");
+        ENGLISH.put("auto_reply_picture_thumb", "The picture sent with this reply");
+        ENGLISH.put("auto_reply_picture_copying", "Copying the picture...");
+        ENGLISH.put("auto_reply_picture_failed", "Couldn't use that picture. Try another one.");
+        ENGLISH.put("auto_reply_picture_no_picker", "No app here can pick a picture");
         ENGLISH.put("font_file_choose", "Choose a font file");
         ENGLISH.put("font_phone", "Use your phone's font");
         ENGLISH.put("font_file_help", "With a file picked, a few of Messenger's screens still use your phone's font.");
