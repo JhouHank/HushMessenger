@@ -1,0 +1,106 @@
+<# Offline contracts for walk-app.ps1: the result a walk earns, and the receipts publish will and won't take. #>
+[CmdletBinding()]
+param()
+$ErrorActionPreference = 'Stop'
+# Dot-sourcing walk-app.ps1 runs its param block in this scope, so nothing here may share a name with
+# one of its parameters. Its main body is skipped when it's dot-sourced.
+$contractScripts = $PSScriptRoot
+. (Join-Path $contractScripts 'walk-app.ps1')
+
+$checks = 0
+function Assert-WalkApp([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+    $script:checks++
+}
+
+$work = Join-Path ([IO.Path]::GetTempPath()) ('hushmessenger-walk-app-' + [guid]::NewGuid().ToString('N'))
+[void][IO.Directory]::CreateDirectory($work)
+try {
+    # The result a walk earns.
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 12 -Crashes 1 -Problems @() -Full $true) -ceq 'FAIL') 'A crash during a full walk should earn FAIL.'
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 12 -Crashes 0 -Problems @('fb-messenger://montage would not open') -Full $true) -ceq 'FAIL') `
+        'A screen that would not open should earn FAIL.'
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 9 -Crashes 0 -Problems @() -Full $false) -ceq 'PARTIAL') 'A skipped screen should earn PARTIAL.'
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 0 -Crashes 0 -Problems @() -Full $true) -ceq 'PARTIAL') 'A walk that opened no screen should earn PARTIAL.'
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 10 -Crashes 0 -Problems @() -Full $true) -ceq 'PASS') 'A whole clean walk should earn PASS.'
+    Assert-WalkApp ((Resolve-WalkOutcome -Screens 4 -Crashes 2 -Problems @() -Full $false) -ceq 'FAIL') 'A crash should outrank a skipped screen.'
+
+    # What counts as skipped: the settings pages, the chat, or any default screen.
+    Assert-WalkApp (@(Get-WalkSkips -SkipSettings $false -Thread '100000000000001' -Visit $WalkDefaultScreens).Count -eq 0) `
+        'The default walk with a chat should leave nothing out.'
+    $leftOut = @(Get-WalkSkips -SkipSettings $false -Thread '100000000000001' -Visit @($WalkDefaultScreens | Where-Object { $_ -ne 'fb-messenger://montage' }))
+    Assert-WalkApp ($leftOut.Count -eq 1 -and $leftOut[0] -ceq 'fb-messenger://montage') 'Dropping a default screen should count as a skip.'
+    Assert-WalkApp (@(Get-WalkSkips -SkipSettings $false -Thread '' -Visit $WalkDefaultScreens) -contains 'a chat (no -Thread)') 'A walk with no chat should count as a skip.'
+    Assert-WalkApp (@(Get-WalkSkips -SkipSettings $true -Thread '1' -Visit $WalkDefaultScreens) -contains 'the Hush settings pages') 'Skipping settings should count as a skip.'
+    Assert-WalkApp (@(Get-WalkSkips -SkipSettings $false -Thread '1' -Visit ($WalkDefaultScreens + 'fb-messenger://quicksnap')).Count -eq 0) `
+        'An extra screen on top of the defaults should not count as a skip.'
+
+    # Which crash buffer lines are a Messenger crash during the walk.
+    $buffer = @(
+        '1729560000.100  4321  4321 E AndroidRuntime: Process: com.facebook.orca, PID: 4321',
+        '1729570000.100  4400  4400 E AndroidRuntime: FATAL EXCEPTION: main',
+        '1729570000.101  4400  4400 E AndroidRuntime: Process: com.facebook.orca, PID: 4400',
+        '1729570001.200  4500  4510 F DEBUG   : pid: 4500, tid: 4510, name: RenderThread  >>> com.facebook.orca:videoplayer <<<',
+        '1729570002.300  4600  4600 E AndroidRuntime: Process: com.facebook.katana, PID: 4600',
+        '1729570003.400  4700  4700 E AndroidRuntime: Process: com.facebook.orca.clone, PID: 4700',
+        '--------- beginning of crash'
+    )
+    $seen = @(Select-WalkCrashes -Lines $buffer -Package 'com.facebook.orca' -SinceEpoch 1729569999)
+    Assert-WalkApp ($seen.Count -eq 2) "A Java crash and a native crash of Messenger during the walk should count, and nothing else ($($seen.Count) counted)."
+    Assert-WalkApp ($seen[0] -match 'PID: 4400' -and $seen[1] -match 'videoplayer') 'The counted crashes should be the walk-time Java and native ones.'
+    Assert-WalkApp (@(Select-WalkCrashes -Lines $buffer -Package 'com.facebook.orca' -SinceEpoch 1729580000).Count -eq 0) 'A crash before the walk started should not count.'
+
+    # The receipts those results produce, held to the gate the publish stage uses.
+    $walkedBundle = Join-Path $work 'patches-0.26.0.mpp'
+    [IO.File]::WriteAllText($walkedBundle, 'walk-app contract bundle')
+    $walkedSha256 = (Get-FileHash -LiteralPath $walkedBundle -Algorithm SHA256).Hash.ToLowerInvariant()
+    function Write-ContractReceipt([string]$Name, [string]$Result, [bool]$Full, [int]$Screens, [int]$Crashes, [string]$Sha, [string[]]$Problems) {
+        $receipt = New-WalkReceipt -Result $Result -Full $Full -Serial 'TESTPHONE01' -Device 'SM-S908U1' -AppVersion '584.0.0.49.98' `
+            -BundleSha256 $Sha -InstalledApkSha256 ('0' * 64) -Started '2026-10-22T00:00:00Z' -Finished '2026-10-22T00:06:00Z' `
+            -Screens $Screens -Crashes $Crashes -Problems $Problems
+        $receiptFile = Join-Path $work $Name
+        [IO.File]::WriteAllText($receiptFile, (ConvertTo-Json -InputObject $receipt -Depth 4) + "`n")
+        return $receiptFile
+    }
+    $clean = Write-ContractReceipt 'pass.json' (Resolve-WalkOutcome -Screens 10 -Crashes 0 -Full $true) $true 10 0 $walkedSha256 @()
+    Assert-WalkApp (Test-WalkReceipt -Path $clean -BundlePath $walkedBundle).Valid 'A whole clean walk of this bundle should back a release.'
+    $crashed = Write-ContractReceipt 'crash.json' (Resolve-WalkOutcome -Screens 10 -Crashes 1 -Full $false) $false 10 1 $walkedSha256 @('Messenger crashed during the walk')
+    $verdict = Test-WalkReceipt -Path $crashed -BundlePath $walkedBundle
+    Assert-WalkApp (-not $verdict.Valid -and $verdict.Reason -match 'FAIL') "A walk with a crash must not back a release ($($verdict.Reason))."
+    $partial = Write-ContractReceipt 'skip.json' (Resolve-WalkOutcome -Screens 9 -Crashes 0 -Full $false) $false 9 0 $walkedSha256 @()
+    $verdict = Test-WalkReceipt -Path $partial -BundlePath $walkedBundle
+    Assert-WalkApp (-not $verdict.Valid -and $verdict.Reason -match 'PARTIAL') "A walk that skipped a screen must not back a release ($($verdict.Reason))."
+    $elsewhere = Write-ContractReceipt 'other.json' 'PASS' $true 10 0 ('a' * 64) @()
+    Assert-WalkApp (-not (Test-WalkReceipt -Path $elsewhere -BundlePath $walkedBundle).Valid) 'A clean walk of a different bundle must not back this one.'
+
+    # A patched APK is used again only for the same bundle, stock APK and key, and only while it's unchanged.
+    $patchDir = Join-Path $work 'patched'
+    [void][IO.Directory]::CreateDirectory($patchDir)
+    $stockFile = Join-Path $work 'messenger-584-346814894.apk'
+    [IO.File]::WriteAllText($stockFile, 'stock contract apk')
+    $keyFile = Join-Path $work 'walk.keystore'
+    [IO.File]::WriteAllText($keyFile, 'contract key')
+    $patchedFile = Join-Path $patchDir 'hushmessenger-walk.apk'
+    [IO.File]::WriteAllText($patchedFile, 'patched contract apk')
+    $sameInputs = Get-WalkPatchInputs -BundlePath $walkedBundle -StockApk $stockFile -KeystorePath $keyFile -Alias 'Morphe'
+    Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $sameInputs)) 'An APK with no record of what made it should be patched again.'
+    Save-WalkPatchInputs -Destination $patchDir -Inputs $sameInputs
+    Assert-WalkApp (-not $sameInputs.Contains('apk')) 'Saving the record should leave the inputs it was given alone.'
+    Assert-WalkApp ((Find-WalkPatched -Destination $patchDir -Inputs $sameInputs) -ceq $patchedFile) 'The APK patched from the same inputs should be used again.'
+    $otherAlias = Get-WalkPatchInputs -BundlePath $walkedBundle -StockApk $stockFile -KeystorePath $keyFile -Alias 'Other'
+    Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $otherAlias)) 'Another key alias should patch again.'
+    $otherBundle = Join-Path $work 'patches-0.26.1.mpp'
+    [IO.File]::WriteAllText($otherBundle, 'another contract bundle')
+    $otherInputs = Get-WalkPatchInputs -BundlePath $otherBundle -StockApk $stockFile -KeystorePath $keyFile -Alias 'Morphe'
+    Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $otherInputs)) 'Another bundle should patch again.'
+    [IO.File]::WriteAllText($patchedFile, 'patched contract apk, changed')
+    Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $sameInputs)) 'An APK changed since its patch should be patched again.'
+    [IO.File]::WriteAllText((Join-Path $patchDir 'patch-inputs.json'), '{ not json')
+    Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $sameInputs)) 'An unreadable record should patch again.'
+
+    Write-Host "walk-app contracts passed ($checks checks)"
+} finally {
+    $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    if (-not ([IO.Path]::GetFullPath($work)).StartsWith($temp, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe walk-app fixture cleanup path.' }
+    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}

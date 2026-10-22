@@ -32,6 +32,7 @@
 ### Checks
 
 - A release can't go public until the whole app has been walked with that exact bundle on a release phone or an emulator. The publish stage now takes the walk's receipt as `-Walk` and stops before the tag or GitHub if the walk wasn't a full pass, saw a Messenger crash, ran on some other device, or patched with a different bundle.
+- `scripts/walk-app.ps1` does that walk. It patches Messenger from the bundle, installs it in place on a leased phone or an emulator, opens both settings pages, a chat and the patched screens, then reads the crash buffer and writes the receipt publish asks for. Any Messenger crash fails the walk. Leaving out a page or a screen makes it partial, and neither one backs a release. A walk that finds the device busy keeps the APK it patched, so the next try goes straight to the device instead of patching again.
 - The development release check, the one a held build goes through, fails when the source has no bundle timestamp. Before, a bundle and a source both missing one counted as a match there. The full release check already refused it, and now it says why.
 - A Gradle run through this PC's build wrapper fails when the wrapper itself errors out before Gradle starts. It used to exit 0 and read as a pass.
 
