@@ -289,6 +289,8 @@ class AnalyticsUploadsTest {
             "a static start" to listOf(uploadLogic(methods = listOf(uploadDispatcher(), inProcessStart(
                 body = "const/4 v0, 0x0\ninvoke-direct {v1, p0, v0, p1}, $UPLOAD_DISPATCH\nreturn-void",
                 flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)))),
+            "a start that takes other params" to listOf(uploadLogic(methods = listOf(uploadDispatcher(),
+                inProcessStart(IN_PROCESS_START.replace(UPLOAD_PARAMS, "LX/9zz;"))))),
             "two starts" to listOf(uploadLogic(methods = listOf(uploadDispatcher(), inProcessStart(),
                 inProcessStart(IN_PROCESS_START.replace("A05", "A06"))))),
             "a start in another class" to listOf(uploadLogic(methods = listOf(uploadDispatcher())),
