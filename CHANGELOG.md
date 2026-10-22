@@ -7,6 +7,7 @@
 - [#81](https://github.com/SysAdminDoc/HushMessenger/issues/81) New **Hide tab badges** switch under Navigation. It clears the red dots and counts from the tabs at the bottom and from the Facebook button at the top. Want one of them back, say the Chats count? Turn on its Keep switch right below. Restart Messenger after a change. It starts off.
 - [#85](https://github.com/SysAdminDoc/HushMessenger/issues/85) New **Hide the recent photo card** switch under Photos and videos. Take a screenshot or a photo and Messenger puts a card above the message box offering to send it. With this on, the card doesn't show up. Anything you took is still in the gallery button when you want to send it. It starts off.
 - [#64](https://github.com/SysAdminDoc/HushMessenger/issues/64) With two gallery apps on the phone and neither set as the default, **Open your gallery app** sent you to a Samsung Gallery that listed photos only. Videos show up there now too, and Android's list of apps to pick from still holds just your galleries.
+- [#64](https://github.com/SysAdminDoc/HushMessenger/issues/64) and [#82](https://github.com/SysAdminDoc/HushMessenger/issues/82) **Open your gallery app** lets you pick several photos and videos at once. Pick two or more and Messenger's Send to sheet opens with all of them and the chat you came from at the top, so one Send gets them there. Pick just one and it opens in Messenger's editor like before. Samsung's Gallery now asks for a tap on Done even when you pick a single photo.
 
 ### Changed and fixed
 

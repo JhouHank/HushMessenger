@@ -108,6 +108,7 @@ internal val PROFILE_346814894 = ControlProfile(
             "LX/6MA;->onActivityResult(IILandroid/content/Intent;)V",
             "LX/9DN;->BkO(Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/AZV;LX/6NI;Lcom/facebook/xapp/messaging/composer/event/ComposerEvent;)V",
             "LX/AaX;->C0w(Landroid/os/Bundle;LX/6NI;)Z", "LX/AwQ;->Bpf(LX/4Jq;Ljava/lang/String;)V",
+            "LX/B5V;->A00(Landroidx/fragment/app/Fragment;Lcom/facebook/auth/usersession/FbUserSession;Lcom/facebook/messaging/model/threadkey/ThreadKey;Lcom/facebook/xapp/messaging/composer/activity/event/ActivityResultEvent;LX/6NI;)V",
         ),
         "facebook" to setOf(
             "LX/2Qv;->A0C()Z", "LX/3qo;->A00()Z", "LX/3qp;->A00()Z", "LX/GGK;->A02()Z", "LX/GGK;->A05()Z",

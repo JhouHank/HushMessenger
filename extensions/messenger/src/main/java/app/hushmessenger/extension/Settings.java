@@ -626,6 +626,25 @@ public final class Settings {
         }
     }
     /**
+     * The chat's handler for a photo from another app asks this first, with the chat's thread and the result. It opens
+     * only one item in the editor, so a pick of several from the pick screen goes to Messenger's Send to sheet with that
+     * chat on top, and true tells the handler it's taken. False leaves the first item to the editor: one item, Off, Pause,
+     * or a sheet that didn't open.
+     */
+    public static boolean galleryItems(Object thread, android.content.Intent data) {
+        try {
+            Context context = appContext;
+            android.content.ClipData clip = data == null ? null : data.getClipData();
+            if (context == null || clip == null || clip.getItemCount() < 2 || !data.getBooleanExtra(GalleryPicker.ITEMS_MARK, false) ||
+                !enabled(GalleryPicker.KEY)) return false;
+            context.startActivity(GalleryPicker.sendIntent(context, thread, clip));
+            return true;
+        } catch (RuntimeException error) {
+            hookFailedPrivately(GalleryPicker.KEY, "Couldn't send everything you picked", error);
+            return false;
+        }
+    }
+    /**
      * Messenger 582's chat asks this before it copies a picked photo, and only copies from apps outside Meta's. The capture
      * screen's photo comes from a provider inside Messenger, so the one it just handed back is let through while its file
      * is there. It doesn't follow the switch, because a photo already on its way back must not close Messenger, and

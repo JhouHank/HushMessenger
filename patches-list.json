@@ -2330,7 +2330,7 @@
         },
         {
             "name": "Open your gallery app",
-            "description": "The gallery button in a chat opens your phone's own gallery app. What you pick then opens in Messenger's editor for that chat, ready to send. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "The gallery button in a chat opens your phone's own gallery app. One photo or video opens in Messenger's editor for that chat, ready to send. Pick several and Messenger's Send to sheet opens with all of them and that chat at the top. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Photos and videos",
             "dependencies": [

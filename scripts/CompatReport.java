@@ -3051,29 +3051,78 @@ public class CompatReport {
         return startsFromProvider(editor, providerType, iface + "->" + start.getName() + "(" + startParams + ")Z") ? field : null;
     }
 
+    static final String ACTIVITY_RESULT_EVENT = "Lcom/facebook/xapp/messaging/composer/activity/event/ActivityResultEvent;";
+
+    /** The p-number of the method's one parameter of this type, or -1 when it has none or several. */
+    static int onlyParameter(Method m, String type) {
+        int at = -1, found = 0, words = AccessFlags.STATIC.isSet(m.getAccessFlags()) ? 0 : 1;
+        for (var param : m.getParameterTypes()) {
+            if (type.contentEquals(param)) { found++; at = words; }
+            words += "J".contentEquals(param) || "D".contentEquals(param) ? 2 : 1;
+        }
+        return found == 1 ? at : -1;
+    }
+
+    /**
+     * The chat's static handler for a photo picked in another app: handed one thread and one result event, it checks for
+     * 1112 and reads the event's one intent field from that parameter, which it never writes. Mirrors galleryItemsIntent
+     * in ExternalGallery.kt.
+     */
+    static boolean isGalleryItemsHandler(Method m, Map<String, ClassDef> byType) {
+        if (!AccessFlags.STATIC.isSet(m.getAccessFlags()) || !"V".equals(m.getReturnType()) || m.getImplementation() == null ||
+            onlyParameter(m, THREAD_KEY) < 0 || onlyParameter(m, ACTIVITY_RESULT_EVENT) < 0 || !hasLiteral(m, 1112)) return false;
+        int event = galleryItemsRegister(m, ACTIVITY_RESULT_EVENT);
+        var intents = new LinkedHashMap<String, FieldReference>();
+        for (var i : instructions(m)) {
+            if (writesRegister(i, event)) return false;
+            if (i.getOpcode() == Opcode.IGET_OBJECT && ((TwoRegisterInstruction) i).getRegisterB() == event &&
+                ((ReferenceInstruction) i).getReference() instanceof FieldReference f && ACTIVITY_RESULT_EVENT.equals(f.getDefiningClass()) &&
+                "Landroid/content/Intent;".equals(f.getType())) intents.put(f.toString(), f);
+        }
+        if (intents.size() != 1) return false;
+        var intent = intents.values().iterator().next();
+        var eventClass = byType.get(ACTIVITY_RESULT_EVENT);
+        if (eventClass == null) return false;
+        int fields = 0;
+        for (var field : eventClass.getFields())
+            if (field.getName().equals(intent.getName()) && field.getType().equals(intent.getType()) && !AccessFlags.STATIC.isSet(field.getAccessFlags())) fields++;
+        return fields == 1;
+    }
+
+    /** The register that holds the static method's one parameter of this type. */
+    static int galleryItemsRegister(Method m, String type) {
+        int words = 0;
+        for (var param : m.getParameterTypes()) words += "J".contentEquals(param) || "D".contentEquals(param) ? 2 : 1;
+        return m.getImplementation().getRegisterCount() - words + onlyParameter(m, type);
+    }
+
     /**
      * external_gallery: the chat's gallery event handlers (at most one of each kind, every one routing), the chat camera
-     * launcher's start (the one way each handler's Edit branch reaches that launcher) and the chat's result reader,
-     * counted only while the reader is an instance method that reads the chat camera's request code and the launcher is
-     * the camera switch's own. Mirrors findExternalGallery in ExternalGallery.kt. Each handler needs three locals for its
-     * scratch registers.
+     * launcher's start (the one way each handler's Edit branch reaches that launcher), the chat's result reader and its
+     * one handler for a photo from another app, counted only while the reader is an instance method that reads the chat
+     * camera's request code and the launcher is the camera switch's own. Mirrors findExternalGallery in ExternalGallery.kt.
+     * Each gallery handler needs three locals for its scratch registers, and the photo handler's hook reaches its thread
+     * and event with plain instructions, so both sit below v16.
      */
     static List<Method> externalGalleryHooks(List<ClassDef> classes) {
         var readers = new ArrayList<Method>();
         var factories = new ArrayList<Method>();
         var handlers = new ArrayList<Method>();
+        var items = new ArrayList<Method>();
         var byType = new HashMap<String, ClassDef>();
+        for (var cls : classes) byType.put(cls.getType(), cls);
         for (var cls : classes) {
-            byType.put(cls.getType(), cls);
             for (var m : cls.getMethods()) {
                 if (m.getImplementation() == null) continue;
                 if (isComposerResult(m)) readers.add(m);
                 if (isChatCameraFactory(m)) factories.add(m);
                 if (isGalleryHandler(m)) handlers.add(m);
+                if (isGalleryItemsHandler(m, byType)) items.add(m);
             }
         }
         if (readers.size() != 1 || !hasLiteral(readers.get(0), 7376) || AccessFlags.STATIC.isSet(readers.get(0).getAccessFlags()) ||
-            factories.size() != 1 || handlers.isEmpty()) return List.of();
+            factories.size() != 1 || handlers.isEmpty() || items.size() != 1) return List.of();
+        if (galleryItemsRegister(items.get(0), THREAD_KEY) > 15 || galleryItemsRegister(items.get(0), ACTIVITY_RESULT_EVENT) > 15) return List.of();
         var kinds = new HashSet<String>();
         for (var handler : handlers) if (!kinds.add(galleryHandlerKind(handler))) return List.of();
         var factory = factories.get(0);
@@ -3106,6 +3155,7 @@ public class CompatReport {
         var hooks = new ArrayList<Method>(handlers);
         hooks.add(start);
         hooks.add(readers.get(0));
+        hooks.add(items.get(0));
         return hooks;
     }
 
