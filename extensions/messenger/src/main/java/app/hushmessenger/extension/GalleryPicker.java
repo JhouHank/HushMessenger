@@ -19,6 +19,8 @@ final class GalleryPicker {
     static final String KEY = "external_gallery";
     /** On a pick of more than one item, so the chat's result handler sends them all instead of opening the first. */
     static final String ITEMS_MARK = "app.hushmessenger.gallery_items";
+    /** Set on that result once its items went to the Send to sheet. */
+    static final String ITEMS_SENT = "app.hushmessenger.gallery_items_sent";
     /** Messenger's own share entry. It takes several items and opens the Send to sheet with any chats it's handed on top. */
     static final String SHARE_HANDLER = "com.facebook.messenger.intents.ShareIntentHandler";
     /** The share sheet reads the chats to put on top from this key as a list of threads or as user ids. */

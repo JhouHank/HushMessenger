@@ -390,10 +390,13 @@ public class ExternalGalleryTest {
         assertEquals(Arrays.asList(thread), send.getParcelableArrayListExtra(GalleryPicker.SHARE_TARGETS));
         int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK;
         assertEquals(flags, send.getFlags() & flags);
+        // Messenger's second caller with the same result takes it without a second sheet.
+        assertTrue(Settings.galleryItems(thread, mixed));
+        assertNull(started.getNextStartedActivity());
 
         // All photos is a photo share, and a thread that can't ride along leaves the sheet without a pinned chat.
-        Intent photos = GalleryPicker.handBack(app, withClip(new Intent(), photo, png));
         for (Object noPin : new Object[] {null, "100000000000042"}) {
+            Intent photos = GalleryPicker.handBack(app, withClip(new Intent(), photo, png));
             assertTrue(Settings.galleryItems(noPin, photos));
             Intent unpinned = started.getNextStartedActivity();
             assertEquals("image/*", unpinned.getType());

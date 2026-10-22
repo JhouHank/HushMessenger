@@ -637,7 +637,10 @@ public final class Settings {
             android.content.ClipData clip = data == null ? null : data.getClipData();
             if (context == null || clip == null || clip.getItemCount() < 2 || !data.getBooleanExtra(GalleryPicker.ITEMS_MARK, false) ||
                 !enabled(GalleryPicker.KEY)) return false;
+            // Two callers hand the handler the same result, so the second only takes it and opens no second sheet.
+            if (data.getBooleanExtra(GalleryPicker.ITEMS_SENT, false)) return true;
             context.startActivity(GalleryPicker.sendIntent(context, thread, clip));
+            data.putExtra(GalleryPicker.ITEMS_SENT, true);
             return true;
         } catch (RuntimeException error) {
             hookFailedPrivately(GalleryPicker.KEY, "Couldn't send everything you picked", error);
