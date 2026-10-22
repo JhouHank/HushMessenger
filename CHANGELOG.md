@@ -33,6 +33,7 @@
 - The two icon shortcuts now come from HushMessenger each time Messenger starts, on every install, which is what lets the new switch take them away. After updating, they show up again a moment after you first open Messenger. Messenger's own chat shortcuts can push them down that menu while it's open, so they move back to the top each time you leave Messenger. On a normal install, a copy you pinned to the home screen before this update stops working, so remove it and pin a new one. Copies pinned from now on turn gray while the shortcuts are hidden and work again once they're back.
 - When Messenger's chat shortcuts already fill everything Android lets one icon hold, the lowest of them now make room, so **Patch controls** and **Restart Messenger** still get on. Android refused to add them to a full icon before. Those are the same chat shortcuts Android drops when Messenger adds one to a full icon itself.
 - In the settings cards, the line between switches now sits below a switch's own buttons (Keep the Profile button, the bubble choices, the font file, message log and auto reply buttons) instead of between the switch and them. The last switch in a card no longer draws a second line just above the card's edge.
+- With a keyboard or a remote, the focus outline on a filled settings button (Restart Messenger, Save, the selected tab and filter) is now two rings, a dark and a light one, so it shows up against the button and the page in both themes. The single gray ring was hard to see on the button's own color.
 
 ### Docs
 

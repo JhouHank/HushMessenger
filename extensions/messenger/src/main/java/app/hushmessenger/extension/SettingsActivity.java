@@ -3037,7 +3037,7 @@ public final class SettingsActivity extends Activity {
             boolean selected = tab.getTag().equals("tab_" + page);
             tab.setSelected(selected);
             tab.setTextColor(selected ? ui.selectedText : ui.muted);
-            tab.setBackground(ui.interactive(selected ? ui.accent : ui.surface, 0, 10, selected ? ui.outline : ui.accent));
+            tab.setBackground(ui.interactive(selected ? ui.accent : ui.surface, 0, 10));
         }
     }
 
@@ -3098,8 +3098,7 @@ public final class SettingsActivity extends Activity {
             boolean selected = button.getTag().equals("category_" + category);
             button.setSelected(selected);
             button.setTextColor(selected ? ui.selectedText : ui.muted);
-            button.setBackground(ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 12,
-                selected ? ui.outline : ui.accent));
+            button.setBackground(ui.interactive(selected ? ui.selected : ui.background, selected ? 0 : ui.outline, 12));
             button.setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8));
         }
         searchStatus.setText(controlRows.isEmpty() ? text.get("none_installed") :
