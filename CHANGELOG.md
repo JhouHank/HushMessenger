@@ -35,6 +35,7 @@
 - In the settings cards, the line between switches now sits below a switch's own buttons (Keep the Profile button, the bubble choices, the font file, message log and auto reply buttons) instead of between the switch and them. The last switch in a card no longer draws a second line just above the card's edge.
 - With a keyboard or a remote, the focus outline on a filled settings button (Restart Messenger, Save, the selected tab and filter) is now two rings, a dark and a light one, so it shows up against the button and the page in both themes. The single gray ring was hard to see on the button's own color.
 - The settings call each thing by one name now. Controls are the switches, and your choices are what you set them to. The clipboard backup buttons are **Copy choices** and **Paste choices**, since Export and Import sat right next to the file buttons and sounded like them. The third bubble mode is **Android bubbles**, which is what Android calls them. Flipping a control pops up "Hide stories is on" instead of "Hide stories on", and **Fix videos that won't send** says what it does before it names the sound format.
+- Two patches got plainer names, in Morphe's patch list and in settings. **Turn off the swipe up for disappearing messages** is now **Ignore the swipe up for disappearing messages**, and **Stop MQTT logging** is now **Stop live connection logging**. Morphe remembers your picks by name, so if you'd left either one out, it'll be picked again. Uncheck it before you repatch.
 
 ### Docs
 
