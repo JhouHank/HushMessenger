@@ -193,7 +193,9 @@ class MaterialYouPatchTest {
                     assertEquals(if (register < 16) Opcode.INVOKE_STATIC else Opcode.INVOKE_STATIC_RANGE, code[helper].opcode)
                     assertEquals(listOf(Opcode.MOVE_RESULT, Opcode.RETURN), code.drop(helper + 1).take(2).map { it.opcode })
                     assertEquals(listOf(register, register), code.drop(helper + 1).take(2).map { (it as OneRegisterInstruction).registerA })
-                    for (at in code.indices.filter { code[it].opcode == Opcode.IF_EQZ || code[it].opcode == Opcode.GOTO }) {
+                    val branches = code.indices.filter { code[it].opcode == Opcode.IF_EQZ || code[it].opcode == Opcode.GOTO }
+                    assertTrue(branches.isNotEmpty(), cls.type)
+                    for (at in branches) {
                         assertEquals(helper, code.branchTarget(at), cls.type)
                     }
                     val switch = code.indexOfFirst { it.opcode == Opcode.PACKED_SWITCH }
