@@ -670,11 +670,11 @@ public class MessageLogTest {
         };
         MessageLog.storeNow("waiting", "t");
         assertEquals(List.of(MessageLog.RETRY_MS), retries);
-        // A write that fails while the retry waits doesn't set up a second one, and each failure in a row waits longer.
+        // A write that fails while the retry waits doesn't set up a second one, and each failed retry waits twice as long.
         MessageLog.storeNow("also waiting", "t");
         assertEquals(1, retries.size());
         MessageLog.retry();
-        assertEquals(List.of(MessageLog.RETRY_MS, 4 * MessageLog.RETRY_MS), retries);
+        assertEquals(List.of(MessageLog.RETRY_MS, 2 * MessageLog.RETRY_MS), retries);
         for (int i = 0; i < 8; i++) MessageLog.retry();
         assertEquals(MessageLog.RETRY_MAX_MS, (long) retries.get(retries.size() - 1));
         MessageLog.vault = softwareVault;
@@ -730,6 +730,35 @@ public class MessageLogTest {
         assertTrue(cleared.cleared);
         assertTrue(cleared.removed.isEmpty());
         assertFalse(logFile().exists());
+    }
+
+    /** Messages that keep failing to save during an outage don't push the next try out. Only failed tries do. */
+    @Test public void failedWritesWhileATryWaitsDontStretchTheNextOne() throws Exception {
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { throw new java.io.IOException("key store busy"); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.storeNow("first", "t");
+        for (int i = 0; i < 6; i++) MessageLog.storeNow("during the outage " + i, "t");
+        assertEquals(List.of(MessageLog.RETRY_MS), retries);
+        MessageLog.retry();
+        MessageLog.vault = softwareVault;
+        assertEquals(List.of(MessageLog.RETRY_MS, 2 * MessageLog.RETRY_MS), retries);
+    }
+
+    @Test public void aTryThatCantBeSetUpIsSetUpByTheNextFailure() throws Exception {
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { throw new java.io.IOException("key store busy"); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.retryLater = delay -> { throw new java.util.concurrent.RejectedExecutionException("shut down"); };
+        MessageLog.storeNow("first", "t");
+        MessageLog.retryLater = retries::add;
+        MessageLog.storeNow("second", "t");
+        MessageLog.vault = softwareVault;
+        assertEquals(1, retries.size());
     }
 
     @Test public void aBurstIsWrittenOnceAndTheQueueIsBounded() throws Exception {

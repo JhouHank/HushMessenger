@@ -329,14 +329,25 @@ public final class MessageLog {
                     for (int i = retry.size() - 1; i >= 0; i--) PENDING.addFirst(retry.get(i));
                     while (PENDING.size() > MAX_ENTRIES) PENDING.removeFirst();
                     // No other message may come to write them before the process ends, so they get a write of their own.
+                    // Only the retries count toward the wait, so a burst of messages during an outage doesn't stretch it.
                     if (!retryScheduled) {
                         retryScheduled = true;
                         delay = Math.min(RETRY_MAX_MS, RETRY_MS << Math.min(failedWrites, 6));
+                        failedWrites++;
                     }
-                    failedWrites++;
                 }
                 Settings.hookFailedPrivately(KEY, "Can't keep the message log", failure);
-                if (delay > 0) retryLater.accept(delay);
+                if (delay > 0) {
+                    try {
+                        retryLater.accept(delay);
+                    } catch (RuntimeException rejected) {
+                        // Otherwise no later failure would set one up either.
+                        synchronized (PENDING) {
+                            retryScheduled = false;
+                        }
+                        Settings.hookFailedPrivately(KEY, "Can't set up another try of the message log", rejected);
+                    }
+                }
             }
         }
     }
