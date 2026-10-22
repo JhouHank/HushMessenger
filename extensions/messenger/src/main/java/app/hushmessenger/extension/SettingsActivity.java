@@ -2451,7 +2451,11 @@ public final class SettingsActivity extends Activity {
         restoreResult(text.count("imported", supported.size()) + paused, autoReply + skipped);
     }
 
-    /** The headline goes in the toast. With notes after it, the whole result also stays on the card under the buttons. */
+    /**
+     * The headline goes in the toast. With notes after it, the whole result also stays on the card under the buttons.
+     * Both parts are whole SettingsText sentences, already translated, so joining them adds no untranslated text.
+     */
+    @android.annotation.SuppressLint("SetTextI18n")
     private void restoreResult(String headline, String notes) {
         feedback(headline, Toast.LENGTH_LONG);
         restoreStatus.setText(headline + notes);
