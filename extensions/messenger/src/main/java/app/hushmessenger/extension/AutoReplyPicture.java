@@ -39,12 +39,30 @@ final class AutoReplyPicture {
     /** A copy left half written by a crash is cleared once it's this old. */
     static final long STALE_PARTIAL_MS = 10 * 60_000L;
 
-    /** Sends one picture to a chat. Returns null once Messenger took it, or why it didn't go. Tests swap it. */
+    /**
+     * Sends one picture to a chat while [wanted] still says yes. Returns null once Messenger took it, or why it didn't
+     * go. Tests swap it.
+     */
     interface Sender {
-        String send(Context context, String thread, Uri picture);
+        String send(Context context, String thread, Uri picture, BooleanSupplier wanted);
+    }
+
+    /** Messenger's photo message factory and send, which the patch fills in. Tests swap them. */
+    interface Messenger {
+        Object build(Context context, String thread, Uri picture);
+        Object send(Object message);
     }
 
     static volatile Sender sender = AutoReplyPicture::throughMessenger;
+    static volatile Messenger messenger = new Messenger() {
+        @Override public Object build(Context context, String thread, Uri picture) {
+            return Settings.autoReplyPictureMessages(context, thread, picture);
+        }
+
+        @Override public Object send(Object message) {
+            return Settings.autoReplySendMessage(message);
+        }
+    };
     /** Whether the patch filled in the media send on this build. Tests swap it. */
     static volatile BooleanSupplier bridge = Settings::autoReplyPictures;
 
@@ -66,14 +84,17 @@ final class AutoReplyPicture {
         return validName(name) ? new File(directory(context), name) : null;
     }
 
-    /** Sends the picture [name] to the chat [thread] (a thread key string). Returns null once it went, or why not. */
-    static String send(Context context, String thread, String name) {
+    /**
+     * Sends the picture [name] to the chat [thread] (a thread key string) while [wanted] still says yes. Returns null
+     * once it went, or why not.
+     */
+    static String send(Context context, String thread, String name, BooleanSupplier wanted) {
         File file = fileFor(context, name);
         if (file == null) return "the picture's name isn't one this app wrote";
         if (!file.isFile()) return "the picture file is gone";
         if (!bridge.getAsBoolean()) return "this Messenger's media send didn't match";
         try {
-            return sender.send(context, thread, Uri.fromFile(file));
+            return sender.send(context, thread, Uri.fromFile(file), wanted);
         } catch (Throwable failure) {
             // The class only: a message can carry a path or a chat.
             return "sending failed with " + failure.getClass().getName();
@@ -81,8 +102,8 @@ final class AutoReplyPicture {
     }
 
     /** Builds the photo message with Messenger's factory and sends each one the factory returns. */
-    static String throughMessenger(Context context, String thread, Uri picture) {
-        Object built = Settings.autoReplyPictureMessages(context, thread, picture);
+    static String throughMessenger(Context context, String thread, Uri picture, BooleanSupplier wanted) {
+        Object built = messenger.build(context, thread, picture);
         if (!(built instanceof Future)) return "Messenger didn't build the picture message";
         Object messages;
         try {
@@ -99,7 +120,9 @@ final class AutoReplyPicture {
         int sent = 0;
         for (Object message : (Iterable<?>) messages) {
             if (message == null) continue;
-            Object sending = Settings.autoReplySendMessage(message);
+            // Building can take seconds, so Off, Pause or edited replies in the meantime still stop the picture.
+            if (!wanted.getAsBoolean()) return "the auto reply changed or went off before the picture went";
+            Object sending = messenger.send(message);
             if (sending == null) return "Messenger didn't take the picture message";
             sent++;
             if (!(sending instanceof Future)) continue;

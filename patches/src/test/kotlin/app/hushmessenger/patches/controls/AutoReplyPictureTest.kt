@@ -76,7 +76,12 @@ private fun serviceBody(trigger: String = "const-string v7, \"direct_reply_inten
 """.trimIndent()
 
 /** The reply: reads the chat from the intent, makes the trigger from its name, and sends with a kind and its own flag. */
-private fun replyBody(kind: String = "sget-object v0, $KIND_FIELD", flag: String = "move/from16 v4, v13") = """
+private fun replyBody(
+    kind: String = "sget-object v0, $KIND_FIELD",
+    flag: String = "move/from16 v4, v13",
+    send: String = SEND,
+    result: String = "move-result-object v0",
+) = """
     invoke-static {v8}, $READ
     move-result-object v5
     invoke-static {v12}, $TRIGGER_OF
@@ -86,8 +91,8 @@ private fun replyBody(kind: String = "sget-object v0, $KIND_FIELD", flag: String
     const/4 v3, 0x0
     $kind
     $flag
-    invoke-virtual {v2, v0, v3, v1, v4}, $SEND
-    move-result-object v0
+    invoke-virtual {v2, v0, v3, v1, v4}, $send
+    $result
     return-object v0
 """.trimIndent()
 
@@ -128,8 +133,9 @@ private fun ctor(id: String, registers: Int) = fixtureMethod(id, "return-void", 
 
 /** Every class the picture send touches, cut down to what discovery reads. Each argument moves one piece. */
 private fun pictureClasses(
+    send: String = SEND,
     service: String = serviceBody(),
-    reply: String = replyBody(),
+    reply: String = replyBody(send = send),
     media: String = mediaBody(),
     builderFields: Int = PUBLIC,
     senderFlags: Int = PUBLIC,
@@ -150,7 +156,8 @@ private fun pictureClasses(
         """.trimIndent(), 3, STATIC))),
         fixtureClass(THREAD_KEY_TYPE, listOf(nullMethod(PARSE, 2, STATIC))),
         fixtureClass(SESSIONS, listOf(nullMethod(SESSION_GET, 1, STATIC))),
-        fixtureClass(SENDER, listOf(ctor(SENDER_INIT, 2), nullMethod(SEND, 6, PUBLIC)), flags = senderFlags),
+        fixtureClass(SENDER, listOf(ctor(SENDER_INIT, 2), fixtureMethod(send, if (send.endsWith(")V")) "return-void" else NULL_BODY, 6, PUBLIC)),
+            flags = senderFlags),
         fixtureClass(KIND, superclass = enum, extraFields = listOf(field(KIND, "A19", KIND, CONSTANT))),
         fixtureClass(TRIGGER, listOf(nullMethod(TRIGGER_OF, 2, STATIC))),
         fixtureClass(MESSAGE),
@@ -189,6 +196,10 @@ class AutoReplyPictureTest {
             "a sender outside public reach" to pictureClasses(senderFlags = AccessFlags.FINAL.value),
             "no PHOTO entry" to pictureClasses(photo = "ALBUM"),
             "a factory without its orientation" to pictureClasses(factory = FACTORY_BUILD.replace("Ljava/util/List;I)", "Ljava/util/List;)")),
+            // The built stub reads the send's result as an object, so a send that returns nothing would fail verification.
+            "a send that returns nothing" to SEND.replace(")$SENDING", ")V").let {
+                pictureClasses(send = it, reply = replyBody(send = it, result = "const/4 v0, 0x0"))
+            },
         )
         for ((case, classes) in cases) assertNull(resolveAutoReplyPictureRecipe(classes), case)
     }

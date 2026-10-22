@@ -2542,7 +2542,9 @@ public final class SettingsActivity extends Activity {
         };
         when.addTextChangedListener(clearError);
         reply.addTextChangedListener(clearError);
+        // Without the row the card still carries its picture, so Save doesn't drop it and prune doesn't delete the file.
         if (AutoReplyPicture.supported()) autoReplyPictureRow(card, rule.picture);
+        else setAutoReplyPicture(card, rule.picture);
         LinearLayout row = ui.row();
         row.setGravity(Gravity.END);
         Button remove = ui.button(text.get("auto_reply_remove"));

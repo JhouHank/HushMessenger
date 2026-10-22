@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import org.junit.After;
 import org.junit.Before;
@@ -36,6 +37,7 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.shadows.ShadowDialog;
+import org.robolectric.shadows.ShadowLog;
 import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -52,6 +54,7 @@ public class AutoReplyPictureTest {
     private AutoReply.Scheduler realScheduler;
     private AutoReplyPicture.Sender realSender;
     private BooleanSupplier realBridge;
+    private AutoReplyPicture.Messenger realMessenger;
     private Context context;
     private NotificationManager manager;
 
@@ -69,7 +72,8 @@ public class AutoReplyPictureTest {
         AutoReply.clock = () -> 1_000_000;
         realSender = AutoReplyPicture.sender;
         realBridge = AutoReplyPicture.bridge;
-        AutoReplyPicture.sender = (ctx, thread, picture) -> {
+        realMessenger = AutoReplyPicture.messenger;
+        AutoReplyPicture.sender = (ctx, thread, picture, wanted) -> {
             pictures.add(thread + " " + picture);
             return null;
         };
@@ -87,6 +91,7 @@ public class AutoReplyPictureTest {
         AutoReply.forgetQueued();
         AutoReplyPicture.sender = realSender;
         AutoReplyPicture.bridge = realBridge;
+        AutoReplyPicture.messenger = realMessenger;
         File[] left = AutoReplyPicture.directory(context).listFiles();
         if (left != null) for (File file : left) Files.deleteIfExists(file.toPath());
     }
@@ -156,6 +161,32 @@ public class AutoReplyPictureTest {
         AutoReply.save(Settings.preferences, List.of(new AutoReply.Rule("", "Away", picture)), false);
     }
 
+    /** Whether HushMessenger logged [line] as a warning. */
+    private static boolean logged(String line) {
+        for (ShadowLog.LogItem item : ShadowLog.getLogsForTag("HushMessenger")) {
+            if (item.type == android.util.Log.WARN && line.equals(item.msg)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Stands in for Messenger's factory and send. The factory runs [whileBuilding], then builds one message naming the
+     * chat and file, and the send keeps what it was handed in [posted].
+     */
+    private static AutoReplyPicture.Messenger messenger(List<Object> posted, Runnable whileBuilding) {
+        return new AutoReplyPicture.Messenger() {
+            @Override public Object build(Context ctx, String thread, Uri picture) {
+                whileBuilding.run();
+                return CompletableFuture.completedFuture(List.of(thread + " " + picture));
+            }
+
+            @Override public Object send(Object message) {
+                posted.add(message);
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+    }
+
     @Test public void aReplyKeepsItsPictureAndOnlyNamesThisAppWrites() {
         AutoReply.save(Settings.preferences, List.of(new AutoReply.Rule("hi", "Hey", PICTURE),
             new AutoReply.Rule("lunch", "At noon", "../shared_prefs/hushmessenger.xml"),
@@ -202,10 +233,12 @@ public class AutoReplyPictureTest {
         notification(CHAT);
         AutoReply.received("hello", CHAT, "mid.1");
         runQueued();
+        assertEquals(List.of(AutoReply.PICTURE_DELAY_MS), delays);
         runQueued();
         assertEquals("Away", sent());
         assertTrue(pictures.isEmpty());
-        assertEquals("the picture file is gone", AutoReplyPicture.send(context, CHAT, PICTURE));
+        assertTrue(logged("auto_reply: sent the text without the picture, the picture file is gone"));
+        assertEquals("the picture file is gone", AutoReplyPicture.send(context, CHAT, PICTURE, () -> true));
         assertTrue(Settings.hookErrors.isEmpty());
     }
 
@@ -216,9 +249,11 @@ public class AutoReplyPictureTest {
         notification(CHAT);
         AutoReply.received("hello", CHAT, "mid.1");
         runQueued();
+        assertEquals(List.of(AutoReply.PICTURE_DELAY_MS), delays);
         runQueued();
         assertEquals("Away", sent());
         assertTrue(pictures.isEmpty());
+        assertTrue(logged("auto_reply: sent the text without the picture, this Messenger's media send didn't match"));
         boolean preview = Settings.preview;
         try {
             Settings.preview = false;
@@ -238,6 +273,7 @@ public class AutoReplyPictureTest {
         AutoReply.received("hello", CHAT, "mid.1");
         runQueued();
         assertEquals("Away", sent());
+        assertEquals(List.of(AutoReply.PICTURE_DELAY_MS), delays);
         Settings.preferences.edit().putBoolean(AutoReply.KEY, false).commit();
         Settings.preferences.edit().putBoolean(AutoReply.KEY, true).commit();
         runQueued();
@@ -247,24 +283,58 @@ public class AutoReplyPictureTest {
         notification(CHAT);
         AutoReply.received("hello again", CHAT, "mid.2");
         runQueued();
+        assertEquals(List.of(AutoReply.PICTURE_DELAY_MS), delays);
         Settings.preferences.edit().putBoolean("paused", true).commit();
         runQueued();
         assertTrue(pictures.isEmpty());
     }
 
+    /** The real send hands each message Messenger's factory built to Messenger's own send. */
+    @Test public void thePictureGoesThroughMessengersOwnSend() throws IOException {
+        File file = savedFile(PICTURE);
+        List<Object> posted = new ArrayList<>();
+        AutoReplyPicture.sender = realSender;
+        AutoReplyPicture.messenger = messenger(posted, () -> { });
+        reply(PICTURE);
+        notification(CHAT);
+        AutoReply.received("hello", CHAT, "mid.1");
+        runQueued();
+        runQueued();
+        assertEquals("Away", sent());
+        assertEquals(List.of(CHAT + " " + Uri.fromFile(file)), posted);
+        assertTrue(Settings.hookErrors.isEmpty());
+    }
+
+    /** Building can take seconds, so turning replies off in the meantime stops the picture before Messenger's send. */
+    @Test public void turningRepliesOffWhileThePictureIsBuiltSendsNothing() throws IOException {
+        savedFile(PICTURE);
+        List<Object> posted = new ArrayList<>();
+        AutoReplyPicture.sender = realSender;
+        AutoReplyPicture.messenger = messenger(posted, () -> Settings.preferences.edit().putBoolean(AutoReply.KEY, false).commit());
+        reply(PICTURE);
+        notification(CHAT);
+        AutoReply.received("hello", CHAT, "mid.1");
+        runQueued();
+        runQueued();
+        assertEquals("Away", sent());
+        assertTrue(posted.isEmpty());
+        assertTrue(logged("auto_reply: sent the text without the picture, the auto reply changed or went off before the picture went"));
+    }
+
     @Test public void aSenderThatFailsCostsOnlyThePicture() throws IOException {
         savedFile(PICTURE);
-        AutoReplyPicture.sender = (ctx, thread, picture) -> { throw new IllegalStateException("/data/user/0/secret " + thread); };
-        String why = AutoReplyPicture.send(context, CHAT, PICTURE);
+        AutoReplyPicture.sender = (ctx, thread, picture, wanted) -> { throw new IllegalStateException("/data/user/0/secret " + thread); };
+        String why = AutoReplyPicture.send(context, CHAT, PICTURE, () -> true);
         assertEquals("sending failed with java.lang.IllegalStateException", why);
-        assertEquals("the picture's name isn't one this app wrote", AutoReplyPicture.send(context, CHAT, "../" + PICTURE));
-        assertEquals("the picture's name isn't one this app wrote", AutoReplyPicture.send(context, CHAT, null));
+        assertEquals("the picture's name isn't one this app wrote", AutoReplyPicture.send(context, CHAT, "../" + PICTURE, () -> true));
+        assertEquals("the picture's name isn't one this app wrote", AutoReplyPicture.send(context, CHAT, null, () -> true));
     }
 
     /** An unpatched extension has no media factory, so the real send says so instead of throwing. */
     @Test public void anUnpatchedBuildCantBuildThePictureMessage() throws IOException {
         File file = savedFile(PICTURE);
-        assertEquals("Messenger didn't build the picture message", AutoReplyPicture.throughMessenger(context, CHAT, Uri.fromFile(file)));
+        assertEquals("Messenger didn't build the picture message",
+            AutoReplyPicture.throughMessenger(context, CHAT, Uri.fromFile(file), () -> true));
     }
 
     @Test public void theDecodeNeverGoesUnderTheLongSide() {
@@ -378,5 +448,29 @@ public class AutoReplyPictureTest {
         }
         assertNull(AutoReply.rules(Settings.preferences).get(0).picture);
         assertFalse(file.exists());
+    }
+
+    /** A build the picture send didn't match hides the picture row, and saving the replies there still keeps the picture. */
+    @Test @Config(sdk = 36) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void savingWhereThePictureRowIsHiddenKeepsThePicture() throws IOException {
+        File file = picture(new File(AutoReplyPicture.directory(context), PICTURE), 80, 60, Bitmap.CompressFormat.JPEG);
+        reply(PICTURE);
+        AutoReplyPicture.bridge = () -> false;
+        boolean preview = Settings.preview;
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            // Starting the screen reads hush.preview from this build's manifest again, so it goes off after that.
+            Settings.preview = false;
+            assertFalse(AutoReplyPicture.supported());
+            View root = openReplies(screen.get());
+            assertNull(root.findViewWithTag("auto_reply_picture_thumb"));
+            ((EditText) root.findViewWithTag("auto_reply_reply")).setText("Back at two");
+            root.findViewWithTag("auto_reply_save").performClick();
+        } finally {
+            Settings.preview = preview;
+        }
+        AutoReply.Rule saved = AutoReply.rules(Settings.preferences).get(0);
+        assertEquals("Back at two", saved.reply);
+        assertEquals(PICTURE, saved.picture);
+        assertTrue(file.exists());
     }
 }

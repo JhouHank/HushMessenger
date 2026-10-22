@@ -298,8 +298,9 @@ public final class AutoReply {
     /** Sends a reply's picture once, after its text. Dropped when the switch, Pause or the replies changed since. */
     private static void sendPicture(Context context, String thread, String picture, long generation) {
         try {
-            if (generation != GENERATION.get() || !Settings.wouldUse(KEY)) return;
-            String why = AutoReplyPicture.send(context, thread, picture);
+            java.util.function.BooleanSupplier wanted = () -> generation == GENERATION.get() && Settings.wouldUse(KEY);
+            if (!wanted.getAsBoolean()) return;
+            String why = AutoReplyPicture.send(context, thread, picture, wanted);
             if (why != null) android.util.Log.w("HushMessenger", "auto_reply: sent the text without the picture, " + why);
         } catch (Throwable failure) {
             Settings.hookFailedPrivately(KEY, "Can't send the auto reply picture", failure);

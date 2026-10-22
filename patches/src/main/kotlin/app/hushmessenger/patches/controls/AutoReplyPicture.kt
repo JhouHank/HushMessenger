@@ -137,10 +137,12 @@ private fun resolvePictureRecipe(byType: Map<String, ClassDef>): AutoReplyPictur
     val reply = method((serviceCode[replyAt].pictureRef() as MethodReference).toString()) ?: return null
     val replyCode = reply.pictureCode()
     val replyFlow = ReadFlow(reply)
+    // The built stub keeps the send's result with move-result-object, so the send must return an object.
     val sends = replyCode.indices.filter { i ->
-        val p = (replyCode[i].pictureRef() as? MethodReference)?.pictureParams()
+        val ref = replyCode[i].pictureRef() as? MethodReference
+        val p = ref?.pictureParams()
         replyCode[i].opcode in PICTURE_VIRTUAL_CALLS && p != null && p.size == 4 && p[0].startsWith("L") && p[1] == MESSAGE &&
-            p[2].startsWith("L") && p[3] == "Z"
+            p[2].startsWith("L") && p[3] == "Z" && ref.returnType.startsWith("L")
     }
     val sendRef = sends.map { replyCode[it].pictureRef() as MethodReference }.distinctBy { it.toString() }.singleOrNull() ?: return null
     val kindType = sendRef.pictureParams()[0]
