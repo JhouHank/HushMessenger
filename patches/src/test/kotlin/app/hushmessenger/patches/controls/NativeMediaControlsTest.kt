@@ -1,5 +1,6 @@
 package app.hushmessenger.patches.controls
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
@@ -97,6 +98,9 @@ internal fun aiStickerCellFixture(
     sourceCount: Int = aiCells.single { it.render == id }.sources,
     superclass: String = aiCells.single { it.render == id }.superclass,
     size: Int = aiCells.single { it.render == id }.size,
+    // An older release's render isn't in aiCells, so it gets 584's menu label.
+    menu: Int = aiCells.singleOrNull { it.render == id }?.menu ?: GENERATE_MENU_LABEL,
+    menuSources: Int = aiCells.singleOrNull { it.render == id }?.menuSources ?: AI_MENU_SOURCES,
 ): List<MutableClass> {
     val type = id.substringBefore("->")
     val render = fixtureMethod(id, "const/4 v0, 0x0\n" + List(size - 2) { "nop" }.joinToString("\n") + "\nreturn-object v0", AI_CELL_REGISTERS)
@@ -118,7 +122,23 @@ internal fun aiStickerCellFixture(
             return-object v0
         """.trimIndent(), 14)))
     }
-    return listOf(cell) + sources
+    // 584's CZ2.render: the music sticker branch jumps into the Generate menu cell's constructor call.
+    val menus = (0 until menuSources).map { index ->
+        val source = "LX/MenuSource$index;"
+        fixtureClass(source, listOf(fixtureMethod("$source->render(LX/Scope;)LX/Component;", """
+            if-eqz p1, :music
+            const v11, 0x${menu.toString(16)}
+            :joined
+            new-instance v0, $type
+            invoke-direct/range {v0 .. v11}, $ctorId
+            const/4 v0, 0x0
+            return-object v0
+            :music
+            const v11, 0x7f14398b
+            goto :joined
+        """.trimIndent(), 14)))
+    }
+    return listOf(cell) + sources + menus
 }
 
 private fun MethodImplementation.tryLocations() = tryBlocks.map { block ->
@@ -216,9 +236,23 @@ class NativeMediaControlsTest {
             // An older release's label for the same row: 583's and 582's.
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f140560)).isEmpty())
             assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, label = 0x7f14051c)).isEmpty())
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, menuSources = cell.menuSources - 1)).isEmpty())
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, menuSources = cell.menuSources + 1)).isEmpty())
+            // "Generate custom stickers" in the menu label's place: the custom sticker cell isn't the AI menu.
+            assertTrue(findAiStickerCells(aiStickerCellFixture(cell.render, menu = 0x7f14128f)).isEmpty())
         }
-        // 584's cell offers its label from four renders.
-        assertEquals(listOf(Triple(GENERATE_AI_LABEL, 4, 107)), aiCells.map { Triple(it.label, it.sources, it.size) })
+        // 584's cell offers its AI label from four renders and its Generate menu label from one.
+        assertEquals(listOf(listOf(GENERATE_AI_LABEL, 4, 107, GENERATE_MENU_LABEL, 1)),
+            aiCells.map { listOf(it.label, it.sources, it.size, it.menu, it.menuSources) })
+    }
+
+    @Test fun aMenuLabelThatBranchesBeforeTheCellIsNotASource() {
+        val fixture = aiStickerCellFixture().toMutableList()
+        val menu = fixture.last().methods.single()
+        // A branch between the menu label and the constructor call means the label may not reach the cell.
+        menu.addInstructionsWithLabels(2, "if-eqz p1, :skip\nnop\n:skip\nnop")
+        assertTrue(findAiStickerCells(fixture).isEmpty())
+        assertFailsWith<PatchException> { validateControls(mirroredControls(fixture), setOf("ai_sticker_cell")) }
     }
 
     @Test fun a582CellIsNoLongerFound() {
@@ -252,7 +286,7 @@ class NativeMediaControlsTest {
         assertEquals(before, listOf(original, viewer).map { it.implementation!!.instructions.toList() })
     }
 
-    @Test fun onlyTheProvenAiLabelCanBypassTheOriginalCellRender() {
+    @Test fun onlyTheProvenAiLabelsCanBypassTheOriginalCellRender() {
         for (profile in controlProfiles.values.toSet()) {
             activeProfile = profile
             val fixture = aiStickerCellFixture()
@@ -263,16 +297,22 @@ class NativeMediaControlsTest {
             val tries = method.implementation!!.tryLocations()
             method.injectAiStickerCell()
             val after = method.implementation!!.instructions.toList()
-            assertEquals(before, after.drop(10))
+            val cell = aiCells.single { it.render == method.hookId() }
+            assertEquals(before, after.drop(12))
             assertEquals("${method.definingClass}->A00:I", (after[1] as ReferenceInstruction).reference.toString())
-            assertEquals(aiCells.single { it.render == method.hookId() }.label, (after[2] as NarrowLiteralInstruction).narrowLiteral)
-            assertEquals(10, after.branchTarget(3))
-            assertEquals(10, after.branchTarget(7))
-            assertEquals(Opcode.IF_NE, after[3].opcode)
-            assertEquals(Opcode.IF_EQZ, after[7].opcode)
-            assertEquals("ai_stickers", ((after[4] as ReferenceInstruction).reference as StringReference).string)
-            assertEquals("$SETTINGS->enabled(Ljava/lang/String;)Z", (after[5] as ReferenceInstruction).reference.toString())
-            assertShiftedTries(tries, method, after.take(10).sumOf { it.codeUnits })
+            // The AI label goes to the switch check, the Generate menu label too, any other label straight to the stock render.
+            assertEquals(cell.label, (after[2] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(Opcode.IF_EQ, after[3].opcode)
+            assertEquals(6, after.branchTarget(3))
+            assertEquals(cell.menu, (after[4] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(Opcode.IF_NE, after[5].opcode)
+            assertEquals(12, after.branchTarget(5))
+            assertEquals("ai_stickers", ((after[6] as ReferenceInstruction).reference as StringReference).string)
+            assertEquals("$SETTINGS->enabled(Ljava/lang/String;)Z", (after[7] as ReferenceInstruction).reference.toString())
+            assertEquals(Opcode.IF_EQZ, after[9].opcode)
+            assertEquals(12, after.branchTarget(9))
+            assertEquals(Opcode.RETURN_OBJECT, after[11].opcode)
+            assertShiftedTries(tries, method, after.take(12).sumOf { it.codeUnits })
         }
     }
 
@@ -289,10 +329,12 @@ class NativeMediaControlsTest {
             val before = method.implementation!!.instructions.toList()
             method.injectAiStickerCell()
             val after = method.implementation!!.instructions.toList()
-            assertEquals(before, after.drop(10), cell.type)
+            assertEquals(before, after.drop(12), cell.type)
             assertEquals(GENERATE_AI_LABEL, (after[2] as NarrowLiteralInstruction).narrowLiteral)
-            assertEquals(10, after.branchTarget(3))
-            assertEquals(10, after.branchTarget(7))
+            assertEquals(GENERATE_MENU_LABEL, (after[4] as NarrowLiteralInstruction).narrowLiteral)
+            assertEquals(6, after.branchTarget(3))
+            assertEquals(12, after.branchTarget(5))
+            assertEquals(12, after.branchTarget(9))
         }
     }
 
@@ -370,8 +412,8 @@ class NativeMediaControlsTest {
             val tries = render.implementation!!.tryLocations()
             render.injectAiStickerCell()
             val after = render.implementation!!.instructions.toList()
-            assertEquals(before, after.drop(10), code)
-            assertShiftedTries(tries, render, after.take(10).sumOf { it.codeUnits })
+            assertEquals(before, after.drop(12), code)
+            assertShiftedTries(tries, render, after.take(12).sumOf { it.codeUnits })
             assertEquals(4, render.implementation!!.tryBlocks.size)
         }
     }

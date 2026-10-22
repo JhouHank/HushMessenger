@@ -17,6 +17,11 @@ internal const val EPHEMERAL_VIEWER = "Lcom/facebook/messaging/media/ephemeralme
 internal const val QUICKSNAP_VIEWER = "Lcom/facebook/messaging/quicksnap/consumption/viewer/MsgrQuicksnapViewerFragment;"
 /** "Generate AI stickers" in Messenger 584's string pack (0x7f140560 in 583). */
 internal const val GENERATE_AI_LABEL = 0x7f140559
+/**
+ * "Generate" in 584's string pack: the same cell when an account gets more than one sticker maker. Its tap opens a menu of
+ * custom, AI and music stickers, so it fronts the AI maker too.
+ */
+internal const val GENERATE_MENU_LABEL = 0x7f141bd3
 /** The viewer's onCreateDialog override, A1K in 584 (A1F in 583). */
 internal const val EPHEMERAL_DIALOG = "A1K"
 private const val WINDOW = "Landroid/view/Window;"
@@ -114,12 +119,13 @@ internal fun MutableMethod.injectScreenshotViewer() {
 }
 
 /**
- * The cell under 584's naming, the label it shows, how many renders offer that label and how many instructions its own
- * render has (24 registers). Four renders offer the label.
+ * The cell under 584's naming, the label it shows, how many renders offer that label, the same for its Generate menu label,
+ * and how many instructions its own render has (24 registers). Four renders offer the AI label and one the menu label.
  */
 internal data class AiCell(
     val type: String, val superclass: String, val scope: String, val component: String,
     val label: Int = GENERATE_AI_LABEL, val sources: Int = AI_CELL_SOURCES, val size: Int = AI_CELL_SIZE,
+    val menu: Int = GENERATE_MENU_LABEL, val menuSources: Int = AI_MENU_SOURCES,
 ) {
     val render = "$type->render($scope)$component"
 }
@@ -129,6 +135,7 @@ internal val aiCells = listOf(
 internal const val AI_CELL_SIZE = 107
 internal const val AI_CELL_REGISTERS = 24
 internal const val AI_CELL_SOURCES = 4
+internal const val AI_MENU_SOURCES = 1
 
 /** This is a single icon/click prefix cell, not the result grid. A00 is its label resource. */
 internal fun findAiStickerCells(classes: Iterable<ClassDef>): List<Method> {
@@ -146,6 +153,7 @@ internal fun findAiStickerCells(classes: Iterable<ClassDef>): List<Method> {
             body.count { it.mediaRef() == "${shape.type}->A00:I" } != 1 || body.take(5).any { it.writes(0) || it.writes(11) } ||
             body.any { it is OffsetInstruction } || ctor.implementation!!.tryBlocks.isNotEmpty()) continue
         var sources = 0
+        var menus = 0
         for (sourceClass in classes) for (source in sourceClass.methods) {
             if (source.name != "render") continue
             val code = source.mediaCode()
@@ -153,11 +161,14 @@ internal fun findAiStickerCells(classes: Iterable<ClassDef>): List<Method> {
                 if (code[at].opcode !in setOf(Opcode.INVOKE_DIRECT, Opcode.INVOKE_DIRECT_RANGE) || code[at].mediaRef() != ctor.hookId()) continue
                 val arg = code[at].mediaArgs().lastOrNull() ?: continue
                 val literal = (at - 1 downTo maxOf(0, at - 24)).firstOrNull { code[it].writes(arg) } ?: continue
-                if ((code[literal] as? NarrowLiteralInstruction)?.narrowLiteral == shape.label &&
-                    (literal + 1 until at).none { code[it] is OffsetInstruction } && source.jumpTargets().none { it in literal + 1..at }) sources++
+                val value = (code[literal] as? NarrowLiteralInstruction)?.narrowLiteral ?: continue
+                if ((literal + 1 until at).any { code[it] is OffsetInstruction }) continue
+                if (value == shape.label && source.jumpTargets().none { it in literal + 1..at }) sources++
+                // The music sticker branch jumps into the menu cell's constructor call, so only the straight run from the literal counts.
+                if (value == shape.menu) menus++
             }
         }
-        if (sources != shape.sources) continue
+        if (sources != shape.sources || menus != shape.menuSources) continue
         val render = cls.methods.singleOrNull { it.hookId() == shape.render } ?: continue
         if (!AccessFlags.STATIC.isSet(render.accessFlags) && render.implementation?.registerCount == AI_CELL_REGISTERS &&
             render.mediaCode().size == shape.size && render.implementation!!.tryBlocks.size == 4) found.add(render)
@@ -174,12 +185,15 @@ internal fun MutableMethod.validateAiStickerCell(): AiCell {
 }
 
 internal fun MutableMethod.injectAiStickerCell() {
-    val label = validateAiStickerCell().label
+    val cell = validateAiStickerCell()
     addInstructionsWithLabels(0, """
         move-object/from16 v0, p0
         iget v0, v0, $definingClass->A00:I
-        const v1, 0x${label.toString(16)}
+        const v1, 0x${cell.label.toString(16)}
+        if-eq v0, v1, :ai_cell
+        const v1, 0x${cell.menu.toString(16)}
         if-ne v0, v1, :stock_behavior
+        :ai_cell
         const-string v0, "ai_stickers"
         invoke-static {v0}, $SETTINGS->enabled(Ljava/lang/String;)Z
         move-result v0

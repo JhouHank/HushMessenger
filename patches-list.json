@@ -405,7 +405,7 @@
         },
         {
             "name": "Hide AI sticker tools",
-            "description": "Hides the Generate AI sticker buttons, the AI sticker tab and AI sticker suggestions. Starts off. Turn it on in HushMessenger settings > Controls.",
+            "description": "Hides the Generate and Generate AI sticker buttons, the AI sticker tab and AI sticker suggestions. Custom and music stickers in the Generate menu go with it. Starts off. Turn it on in HushMessenger settings > Controls.",
             "default": true,
             "category": "Stickers",
             "dependencies": [

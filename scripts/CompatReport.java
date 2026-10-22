@@ -1718,6 +1718,8 @@ public class CompatReport {
     static final String WINDOW = "Landroid/view/Window;";
     static final String SET_FLAGS = WINDOW + "->setFlags(II)V", ADD_FLAGS = WINDOW + "->addFlags(I)V";
     static final int GENERATE_AI_LABEL = 0x7f140559;
+    // "Generate": the same cell's label when its tap opens the custom, AI and music sticker menu
+    static final int GENERATE_MENU_LABEL = 0x7f141bd3;
     // The viewer's onCreateDialog override, A1K in 584
     static final String EPHEMERAL_DIALOG = "A1K";
 
@@ -1805,14 +1807,14 @@ public class CompatReport {
     }
 
     /**
-     * Mirrors NativeMediaControls.kt: 584's cell, its label, how many renders offer that label and its render's size
-     * (24 registers). Four renders offer the label.
+     * Mirrors NativeMediaControls.kt: 584's cell, its label, how many renders offer that label, the same for its Generate
+     * menu label, and its render's size (24 registers). Four renders offer the AI label and one the menu label.
      */
-    record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size) {
+    record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size, int menu, int menuSources) {
         String render() { return type + "->render(" + scope + ")" + component; }
     }
     static List<Method> findAiStickerCells(List<ClassDef> classes) {
-        var shapes = List.of(new AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;", GENERATE_AI_LABEL, 4, 107));
+        var shapes = List.of(new AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;", GENERATE_AI_LABEL, 4, 107, GENERATE_MENU_LABEL, 1));
         var result = new ArrayList<Method>();
         for (var shape : shapes) {
             var matching = classes.stream().filter(c -> c.getType().equals(shape.type())).toList();
@@ -1832,7 +1834,7 @@ public class CompatReport {
                     !Objects.equals(ref(b.get(5)), shape.type() + "->A00:I") || b.stream().filter(i -> Objects.equals(ref(i), shape.type() + "->A00:I")).count() != 1 ||
                     b.subList(0, 5).stream().anyMatch(i -> mediaWrites(i, 0) || mediaWrites(i, 11)) ||
                     b.stream().anyMatch(i -> i instanceof OffsetInstruction) || !ctor.getImplementation().getTryBlocks().isEmpty()) continue;
-            int sources = 0;
+            int sources = 0, menus = 0;
             for (var sourceClass : classes) for (var source : sourceClass.getMethods()) {
                 if (!source.getName().equals("render")) continue;
                 var c = instructions(source);
@@ -1840,13 +1842,16 @@ public class CompatReport {
                     if (!Set.of(Opcode.INVOKE_DIRECT, Opcode.INVOKE_DIRECT_RANGE).contains(c.get(at).getOpcode()) || !Objects.equals(ref(c.get(at)), hookId(ctor))) continue;
                     var args = bubbleArgs(c.get(at)); if (args.isEmpty()) continue; int arg = args.getLast(), literal = -1;
                     for (int j = at - 1; j >= Math.max(0, at - 24); j--) if (mediaWrites(c.get(j), arg)) { literal = j; break; }
-                    if (literal < 0 || !(c.get(literal) instanceof NarrowLiteralInstruction n) || n.getNarrowLiteral() != shape.label()) continue;
-                    boolean straight = true; for (int j = literal + 1; j < at; j++) if (c.get(j) instanceof OffsetInstruction) straight = false;
-                    for (int t : mediaTargets(source)) if (t > literal && t <= at) straight = false;
-                    if (straight) sources++;
+                    if (literal < 0 || !(c.get(literal) instanceof NarrowLiteralInstruction n)) continue;
+                    boolean branchFree = true; for (int j = literal + 1; j < at; j++) if (c.get(j) instanceof OffsetInstruction) branchFree = false;
+                    if (!branchFree) continue;
+                    boolean joined = false; for (int t : mediaTargets(source)) if (t > literal && t <= at) joined = true;
+                    if (n.getNarrowLiteral() == shape.label() && !joined) sources++;
+                    // The music sticker branch jumps into the menu cell's constructor call, so only the straight run from the literal counts.
+                    if (n.getNarrowLiteral() == shape.menu()) menus++;
                 }
             }
-            if (sources != shape.sources()) continue;
+            if (sources != shape.sources() || menus != shape.menuSources()) continue;
             for (var m : cls.getMethods()) if (hookId(m).equals(shape.render()) && !AccessFlags.STATIC.isSet(m.getAccessFlags()) && m.getImplementation() != null &&
                     m.getImplementation().getRegisterCount() == 24 && instructions(m).size() == shape.size() && m.getImplementation().getTryBlocks().size() == 4) result.add(m);
         }

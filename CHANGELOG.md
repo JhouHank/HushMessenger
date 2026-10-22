@@ -41,6 +41,7 @@
 - With **Hide People tab**, **Hide Notifications tab** or **Hide Meta AI** on, the bar at the bottom now lights up the tab you're actually on. With People hidden, opening Notifications used to light up Menu instead.
 - Some accounts get Meta's newer AI agent tab in the bar where the Meta AI tab usually sits. **Hide Meta AI** now hides that one too, and the bar still lights up the right tab. Restart Messenger to see it go.
 - On a new install of a patched Messenger, **Bold** and **Italic** no longer show up in the text selection menu while **Bold and italic text** is off. Messenger's very first start turned them on, and they stayed there until you opened Messenger a second time. Updating over an existing install never did this.
+- **Hide AI sticker tools** now hides the plain **Generate** button at the start of the sticker keyboard's Suggested row too. Accounts that get more than one sticker maker see that button instead of **Generate AI stickers**, and it opens a menu with AI stickers in it, so the switch used to miss it. The custom and music stickers in that menu are hidden along with it while the switch is on.
 
 ### Docs
 
