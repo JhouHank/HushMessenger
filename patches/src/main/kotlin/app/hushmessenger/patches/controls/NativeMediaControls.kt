@@ -202,3 +202,118 @@ internal fun MutableMethod.injectAiStickerCell() {
         return-object v0
     """.trimIndent(), ExternalLabel("stock_behavior", getInstruction(0)))
 }
+
+private val GOTOS = setOf(Opcode.GOTO, Opcode.GOTO_16, Opcode.GOTO_32)
+private val EXITS = setOf(Opcode.RETURN_VOID, Opcode.RETURN, Opcode.RETURN_WIDE, Opcode.RETURN_OBJECT, Opcode.THROW)
+private const val HAS_NEXT = "Ljava/util/Iterator;->hasNext()Z"
+private const val NEXT = "Ljava/util/Iterator;->next()Ljava/lang/Object;"
+
+/**
+ * The Suggested sticker grid around [AiCell]. Its render loops over the grid items and sends each through an instance-of
+ * chain; the Generate menu item's branch and the Generate AI item's branch both build the cell. [sites] are where those
+ * two branch bodies start, [skip] is the loop's continue step (`move index, next` before the one goto back to the loop
+ * head) and [flag] is the register the chain's instance-of results land in.
+ */
+internal data class AiGrid(val sites: List<Int>, val skip: Int, val flag: Int)
+
+/** Whether the label constant at [at] reaches [cell]'s constructor as its label, following plain gotos only. */
+private fun List<Instruction>.feedsAiCell(at: Int, cell: AiCell): Boolean {
+    val register = this[at].mediaRegister() ?: return false
+    var i = at + 1
+    repeat(48) {
+        val instruction = getOrNull(i) ?: return false
+        if (instruction.opcode in GOTOS) { i = branchTarget(i).takeIf { it >= 0 } ?: return false; return@repeat }
+        val ref = (instruction as? ReferenceInstruction)?.reference as? MethodReference
+        if (instruction.opcode in setOf(Opcode.INVOKE_DIRECT, Opcode.INVOKE_DIRECT_RANGE) && ref?.definingClass == cell.type && ref.name == "<init>")
+            return ref.parameterTypes.size == 11 && ref.parameterTypes.last().toString() == "I" && instruction.mediaArgs().lastOrNull() == register
+        if (instruction is OffsetInstruction || instruction.writes(register) || instruction.opcode in EXITS) return false
+        i++
+    }
+    return false
+}
+
+internal fun Method.aiStickerGrid(cell: AiCell): AiGrid? {
+    if (name != "render" || AccessFlags.STATIC.isSet(accessFlags)) return null
+    val code = mediaCode()
+    fun labelled(at: Int) = code[at].opcode == Opcode.CONST && (code[at] as NarrowLiteralInstruction).narrowLiteral in setOf(cell.menu, cell.label)
+    val labels = code.indices.filter(::labelled)
+    if (labels.isEmpty() || code.none { it.mediaRef() == HAS_NEXT }) return null
+    fun op(at: Int, vararg opcodes: Opcode) = code.getOrNull(at)?.opcode in opcodes
+    fun reg(at: Int) = code.getOrNull(at)?.mediaRegister()
+    val found = mutableListOf<AiGrid>()
+    for (head in code.indices) {
+        if (!op(head, Opcode.INVOKE_INTERFACE, Opcode.INVOKE_INTERFACE_RANGE) || code[head].mediaRef() != HAS_NEXT) continue
+        val iterator = code[head].mediaArgs().singleOrNull() ?: continue
+        val more = reg(head + 1)
+        val item = reg(head + 4)
+        val step = code.getOrNull(head + 5) as? TwoRegisterInstruction
+        if (!op(head + 1, Opcode.MOVE_RESULT) || !op(head + 2, Opcode.IF_EQZ) || reg(head + 2) != more ||
+            !op(head + 3, Opcode.INVOKE_INTERFACE, Opcode.INVOKE_INTERFACE_RANGE) || code[head + 3].mediaRef() != NEXT ||
+            code[head + 3].mediaArgs() != listOf(iterator) || !op(head + 4, Opcode.MOVE_RESULT_OBJECT) ||
+            !op(head + 5, Opcode.ADD_INT_LIT8) || step == null || (step as NarrowLiteralInstruction).narrowLiteral != 1 ||
+            !op(head + 6, Opcode.IF_LTZ) || reg(head + 6) != step.registerB || !op(head + 7, Opcode.CHECK_CAST) || reg(head + 7) != item) continue
+        val index = step.registerB
+        val next = step.registerA
+        // Every item goes back to the head through one goto, right after the index takes its next value.
+        val back = code.indices.filter { code[it] is OffsetInstruction && code.branchTarget(it) == head }.singleOrNull() ?: continue
+        val move = code.getOrNull(back - 1) as? TwoRegisterInstruction
+        if (code[back].opcode !in GOTOS || !op(back - 1, Opcode.MOVE, Opcode.MOVE_FROM16, Opcode.MOVE_16) ||
+            move?.registerA != index || move.registerB != next) continue
+        var link = head + 8
+        var flag: Int? = null
+        val menus = mutableListOf<Int>()
+        val ais = mutableListOf<Int>()
+        val bodies = mutableListOf<IntRange>()
+        while (op(link, Opcode.INSTANCE_OF)) {
+            val test = code[link] as TwoRegisterInstruction
+            if (test.registerB != item || (flag != null && test.registerA != flag)) break
+            flag = test.registerA
+            val end = code.branchTarget(link + 1)
+            if (!op(link + 1, Opcode.IF_EQZ) || reg(link + 1) != flag || end <= link + 2) break
+            val body = link + 2 until end
+            for (at in body.filter(::labelled)) {
+                if (!code.feedsAiCell(at, cell)) continue
+                if ((code[at] as NarrowLiteralInstruction).narrowLiteral == cell.menu) menus += link + 2 else ais += link + 2
+                bodies += body
+            }
+            link = end
+        }
+        val sites = (menus + ais).sorted()
+        // One branch per label, each entered only from its own instance-of test, and no label outside them.
+        if (flag == null || flag > 15 || menus.size != 1 || ais.size != 1 || menus == ais ||
+            flag in setOf(item, index, next, iterator) || sites.any { it in jumpTargets() } ||
+            labels.any { at -> bodies.none { at in it } }) continue
+        found += AiGrid(sites, back - 1, flag)
+    }
+    return found.singleOrNull()
+}
+
+/** The Suggested grid renders that skip the Generate items, found by the loop around the cell rather than by name. */
+internal fun findAiStickerGrids(classes: Iterable<ClassDef>): List<Method> =
+    classes.flatMap { it.methods }.filter { method -> aiCells.any { method.aiStickerGrid(it) != null } }
+
+internal fun MutableMethod.validateAiStickerGrid(): AiGrid {
+    if (hookId() !in activeProfile.hooks.getValue("ai_sticker_grid")) mediaFailure(this)
+    return aiCells.mapNotNull { aiStickerGrid(it) }.singleOrNull() ?: mediaFailure(this)
+}
+
+/**
+ * Skips a Generate item before the grid gets it, so the stickers after it move up instead of leaving its slot blank.
+ * The flag register is the branch's own instance-of result: zero on the way out (a zero merges with whatever the other
+ * items leave there), and back to the one it held on the way in.
+ */
+internal fun MutableMethod.injectAiStickerGrid() {
+    val grid = validateAiStickerGrid()
+    val skip = getInstruction(grid.skip)
+    val flag = "v${grid.flag}"
+    for (at in grid.sites.sortedDescending()) addInstructionsWithLabels(at, """
+        const-string $flag, "ai_stickers"
+        invoke-static {$flag}, $SETTINGS->enabled(Ljava/lang/String;)Z
+        move-result $flag
+        if-eqz $flag, :stock_behavior
+        const/4 $flag, 0x0
+        goto/16 :skip_item
+        :stock_behavior
+        const/4 $flag, 0x1
+    """.trimIndent(), ExternalLabel("skip_item", skip))
+}

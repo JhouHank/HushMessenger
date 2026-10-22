@@ -101,6 +101,9 @@ internal fun aiStickerCellFixture(
     // An older release's render isn't in aiCells, so it gets 584's menu label.
     menu: Int = aiCells.singleOrNull { it.render == id }?.menu ?: GENERATE_MENU_LABEL,
     menuSources: Int = aiCells.singleOrNull { it.render == id }?.menuSources ?: AI_MENU_SOURCES,
+    // The first menu source as 584's Suggested grid loop instead of a bare render, and what to break in it.
+    grid: Boolean = false,
+    gridChange: String? = null,
 ): List<MutableClass> {
     val type = id.substringBefore("->")
     val render = fixtureMethod(id, "const/4 v0, 0x0\n" + List(size - 2) { "nop" }.joinToString("\n") + "\nreturn-object v0", AI_CELL_REGISTERS)
@@ -124,6 +127,7 @@ internal fun aiStickerCellFixture(
     }
     // 584's CZ2.render: the music sticker branch jumps into the Generate menu cell's constructor call.
     val menus = (0 until menuSources).map { index ->
+        if (index == 0 && (grid || gridChange != null)) return@map aiStickerGridClass(type, ctorId, menu, label, gridChange)
         val source = "LX/MenuSource$index;"
         fixtureClass(source, listOf(fixtureMethod("$source->render(LX/Scope;)LX/Component;", """
             if-eqz p1, :music
@@ -139,6 +143,76 @@ internal fun aiStickerCellFixture(
         """.trimIndent(), 14)))
     }
     return listOf(cell) + sources + menus
+}
+
+/**
+ * 584's CZ2.render as the Suggested grid: a loop over the items whose instance-of chain builds the Generate menu cell
+ * straight from its label, the custom cell, the Generate AI cell (its label jumps into the custom cell's constructor call)
+ * and the music cell (it jumps into the menu cell's). [change] breaks one part of that for the refusal tests.
+ */
+private fun aiStickerGridClass(type: String, ctorId: String, menu: Int, ai: Int, change: String?): MutableClass {
+    val id = activeProfile.hooks.getValue("ai_sticker_grid").single()
+    val aiFlag = if (change == "flag") "v5" else "v4"
+    val body = """
+        invoke-static {}, LX/GridItems;->get()Ljava/util/List;
+        move-result-object v12
+        invoke-interface {v12}, Ljava/util/List;->iterator()Ljava/util/Iterator;
+        move-result-object v12
+        const/4 v13, 0x0
+        :head
+        invoke-interface {v12}, Ljava/util/Iterator;->hasNext()Z
+        move-result v1
+        if-eqz v1, :done
+        invoke-interface {v12}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+        move-result-object v1
+        add-int/lit8 v2, v13, 0x1
+        if-ltz v13, :overflow
+        check-cast v1, LX/GridItem;
+        instance-of v4, v1, LX/StickerItem;
+        if-eqz v4, :menu_item
+        invoke-static {v1}, LX/Grid;->add(Ljava/lang/Object;)V
+        :next
+        ${if (change == "continue") "move v13, v3" else "move v13, v2"}
+        goto :head
+        :menu_item
+        instance-of v4, v1, LX/MenuItem;
+        if-eqz v4, :custom_item
+        :menu_site
+        const v11, 0x${(if (change == "menu_label") 0x7f14128f else menu).toString(16)}
+        :menu_cell
+        new-instance v0, $type
+        invoke-direct/range {v0 .. v11}, $ctorId
+        :added
+        invoke-static {v0}, LX/Grid;->add(Ljava/lang/Object;)V
+        goto :next
+        :custom_item
+        instance-of v4, v1, LX/CustomItem;
+        if-eqz v4, :ai_item
+        const v11, 0x7f14128f
+        :custom_cell
+        new-instance v0, $type
+        invoke-direct/range {v0 .. v11}, $ctorId
+        ${if (change == "back_edge") "goto :head" else "goto :added"}
+        :ai_item
+        instance-of $aiFlag, v1, LX/AiItem;
+        if-eqz $aiFlag, :music_item
+        :ai_site
+        const v11, 0x${(if (change == "ai_label") 0x7f140560 else ai).toString(16)}
+        ${if (change == "unfed") "const/4 v11, 0x0" else ""}
+        goto :custom_cell
+        :music_item
+        instance-of v4, v1, LX/MusicItem;
+        if-eqz v4, :next
+        const v11, 0x7f14398b
+        ${when (change) { "entered" -> "goto :menu_site"; "ai_entered" -> "goto :ai_site"; else -> "goto :menu_cell" }}
+        :overflow
+        invoke-static {}, LX/Grid;->overflow()V
+        :done
+        ${if (change == "stray") "const v11, 0x${menu.toString(16)}" else ""}
+        const/4 v0, 0x0
+        return-object v0
+    """.trimIndent().lines().filter { it.isNotBlank() }.joinToString("\n")
+    return fixtureClass(id.substringBefore("->"), listOf(fixtureMethod(id, body, 16)))
 }
 
 private fun MethodImplementation.tryLocations() = tryBlocks.map { block ->
@@ -356,6 +430,91 @@ class NativeMediaControlsTest {
             }
             assertTrue(findAiStickerCells(fixture).isEmpty(), change)
             assertFailsWith<PatchException>(change) { validateControls(mirroredControls(fixture), setOf("ai_sticker_cell")) }
+        }
+    }
+
+    /** Checks [method]'s grid injection keeps every original instruction in order and every original branch on its target. */
+    private fun assertGridInjected(method: MutableMethod, where: String) {
+        val before = method.implementation!!.instructions.toList()
+        val targets = before.indices.filter { before[it] is OffsetInstruction }.associateWith { before.branchTarget(it) }
+        val grid = method.validateAiStickerGrid()
+        assertEquals(2, grid.sites.size, where)
+        assertEquals(Opcode.INSTANCE_OF, before[grid.sites[0] - 2].opcode, where)
+        assertEquals(Opcode.INSTANCE_OF, before[grid.sites[1] - 2].opcode, where)
+        method.injectAiStickerGrid()
+        val after = method.implementation!!.instructions.toList()
+        fun moved(at: Int) = at + 7 * grid.sites.count { it <= at }
+        assertEquals(before.size + 14, after.size, where)
+        val addresses = after.runningFold(0) { sum, instruction -> sum + instruction.codeUnits }
+        for (at in before.indices) {
+            val now = after[moved(at)]
+            // dexlib2 widens a goto whose jump grew past 8 bits (584 has one), and only that one; the target check below still pins it.
+            if (before[at].opcode == Opcode.GOTO && now.opcode in setOf(Opcode.GOTO_16, Opcode.GOTO_32)) {
+                assertTrue(addresses[after.branchTarget(moved(at))] - addresses[moved(at)] !in -128..127, "$where goto $at widened")
+                continue
+            }
+            assertSame(before[at], now, "$where instruction $at")
+        }
+        for ((at, target) in targets) assertEquals(moved(target), after.branchTarget(moved(at)), "$where branch $at")
+        for (site in grid.sites) {
+            val block = site + 7 * grid.sites.count { it < site }
+            assertEquals("ai_stickers", ((after[block] as ReferenceInstruction).reference as StringReference).string, where)
+            assertEquals(grid.flag, (after[block] as OneRegisterInstruction).registerA, where)
+            assertEquals("$SETTINGS->enabled(Ljava/lang/String;)Z", (after[block + 1] as ReferenceInstruction).reference.toString(), where)
+            assertEquals(Opcode.MOVE_RESULT, after[block + 2].opcode, where)
+            assertEquals(Opcode.IF_EQZ, after[block + 3].opcode, where)
+            assertEquals(block + 6, after.branchTarget(block + 3), where)
+            assertEquals(0, (after[block + 4] as NarrowLiteralInstruction).narrowLiteral, where)
+            // On: straight to the loop's continue step, so the item never reaches the grid.
+            assertEquals(Opcode.GOTO_16, after[block + 5].opcode, where)
+            assertEquals(moved(grid.skip), after.branchTarget(block + 5), where)
+            // Off: the flag gets back the instance-of result it held, then the branch runs as it shipped.
+            assertEquals(1, (after[block + 6] as NarrowLiteralInstruction).narrowLiteral, where)
+            assertSame(before[site], after[block + 7], where)
+        }
+    }
+
+    @Test fun theGridSkipsOnlyTheGenerateItemsAndEveryOtherBranchKeepsItsTarget() {
+        for (profile in controlProfiles.values.toSet()) {
+            activeProfile = profile
+            val fixture = aiStickerCellFixture(grid = true)
+            val discovered = mirroredControls(fixture)
+            // The grid stays the cell's one Generate menu source, so the cell hook is found alongside it.
+            validateControls(discovered, setOf("ai_sticker_cell", "ai_sticker_grid"))
+            val method = discovered.getValue("ai_sticker_grid").single() as MutableMethod
+            val code = method.implementation!!.instructions.toList()
+            val grid = method.validateAiStickerGrid()
+            assertEquals(4, grid.flag)
+            assertEquals(Opcode.MOVE, code[grid.skip].opcode)
+            assertEquals(listOf(GENERATE_MENU_LABEL, GENERATE_AI_LABEL), grid.sites.map { (code[it] as NarrowLiteralInstruction).narrowLiteral })
+            assertGridInjected(method, "fixture")
+        }
+        // A bare render that builds the menu cell with no loop around it is no grid.
+        assertTrue(findAiStickerGrids(aiStickerCellFixture()).isEmpty())
+    }
+
+    @Test fun aGridThatChangesShapeIsRefused() {
+        for (change in listOf("menu_label", "ai_label", "flag", "continue", "back_edge", "entered", "ai_entered", "unfed", "stray")) {
+            val fixture = aiStickerCellFixture(gridChange = change)
+            assertTrue(findAiStickerGrids(fixture).isEmpty(), change)
+            assertFailsWith<PatchException>(change) { validateControls(mirroredControls(fixture), setOf("ai_sticker_grid")) }
+        }
+        // The stock grid passes the same checks, so each refusal above is the change's own.
+        validateControls(mirroredControls(aiStickerCellFixture(grid = true)), setOf("ai_sticker_grid"))
+    }
+
+    @Test fun exactStockGridSkipsOnlyItsTwoGenerateBranches() {
+        val root = System.getenv("HUSH_NATIVE_FIXTURES")
+        assumeTrue(root != null, "Set HUSH_NATIVE_FIXTURES to the exact stock fixture directory")
+        val apks = Files.list(Path.of(root!!)).use { it.filter { p -> p.toString().endsWith(".apk") }.sorted().toList() }
+        assertEquals(controlProfiles.size, apks.size)
+        for (apk in apks) {
+            val code = apk.fileName.toString().substringBeforeLast(".apk").substringAfterLast('-')
+            activeProfile = controlProfileFor(code)
+            val dex = DexFileFactory.loadDexContainer(apk.toFile(), Opcodes.forApi(35))
+            val grids = findAiStickerGrids(dex.dexEntryNames.flatMap { dex.getEntry(it)!!.dexFile.classes })
+            assertEquals(activeProfile.hooks.getValue("ai_sticker_grid"), grids.map { it.hookId() }.toSet(), code)
+            assertGridInjected(MutableMethod(grids.single()), code)
         }
     }
 

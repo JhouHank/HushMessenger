@@ -128,6 +128,7 @@ internal fun MutableMethod.validateHook(hook: String) {
     if (hook in pluginGates) validatePluginGate()
     when (hook) {
         "ai_sticker_cell" -> validateAiStickerCell()
+        "ai_sticker_grid" -> validateAiStickerGrid()
         "screenshot_viewers" -> validateScreenshotViewer()
         "subtabs" -> validateSubtabs()
         "browser" -> validateBrowserPreference()
@@ -192,6 +193,7 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
     for ((hook, selectedMethods) in methods) for (method in selectedMethods) {
         when (hook) {
             "ai_sticker_cell" -> method.injectAiStickerCell()
+            "ai_sticker_grid" -> method.injectAiStickerGrid()
             "screenshot_viewers" -> method.injectScreenshotViewer()
             "subtabs" -> method.injectSubtabs()
             "browser" -> method.injectBrowserPreference()
@@ -402,7 +404,7 @@ val hideTabBadgesPatch = controlPatch("tab_badges", "Hide tab badges", "Hides th
 @Suppress("unused")
 val holdStoriesPatch = controlPatch("story_hold", "Hold stories at the end", "Keeps a story on screen when it ends instead of moving on to the next one, so you go on with a tap or a swipe. Photos and videos both wait, and the last story stays open until you close it.", "Navigation")
 @Suppress("unused")
-val hideAiStickersPatch = controlPatch("ai_stickers", "Hide AI sticker tools", "Hides the Generate and Generate AI sticker buttons, the AI sticker tab and AI sticker suggestions. Custom and music stickers in the Generate menu go with it.", "Stickers", "ai_stickers", "ai_sticker_cell")
+val hideAiStickersPatch = controlPatch("ai_stickers", "Hide AI sticker tools", "Hides the Generate and Generate AI sticker buttons, the AI sticker tab and AI sticker suggestions. Custom and music stickers in the Generate menu go with it.", "Stickers", "ai_stickers", "ai_sticker_cell", "ai_sticker_grid")
 @Suppress("unused")
 val hideAvatarStickersPatch = controlPatch("avatar_stickers", "Hide avatar stickers", "Hides the avatar tab in the sticker keyboard.", "Stickers", "avatar_stickers", "avatar_tabs")
 @Suppress("unused")

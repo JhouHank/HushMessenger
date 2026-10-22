@@ -180,7 +180,7 @@ public class CompatReport {
         PATCHES.put("Hide Notifications tab", List.of("tab_notifications", "tab_config"));
         PATCHES.put("Hide tab badges", List.of("tab_badges", "facebook_badge"));
         PATCHES.put("Hold stories at the end", List.of("story_hold"));
-        PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
+        PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell", "ai_sticker_grid"));
         PATCHES.put("Hide avatar stickers", List.of("avatar_stickers", "avatar_tabs"));
         PATCHES.put("Restore old emoji drawer", List.of("emoji_drawer"));
         PATCHES.put("Keep emoji search on emoji", List.of("emoji_search"));
@@ -1813,10 +1813,10 @@ public class CompatReport {
     record AiCell(String type, String superclass, String scope, String component, int label, int sources, int size, int menu, int menuSources) {
         String render() { return type + "->render(" + scope + ")" + component; }
     }
+    static final List<AiCell> AI_CELLS = List.of(new AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;", GENERATE_AI_LABEL, 4, 107, GENERATE_MENU_LABEL, 1));
     static List<Method> findAiStickerCells(List<ClassDef> classes) {
-        var shapes = List.of(new AiCell("LX/CVr;", "LX/1Nj;", "LX/2DF;", "LX/1J7;", GENERATE_AI_LABEL, 4, 107, GENERATE_MENU_LABEL, 1));
         var result = new ArrayList<Method>();
-        for (var shape : shapes) {
+        for (var shape : AI_CELLS) {
             var matching = classes.stream().filter(c -> c.getType().equals(shape.type())).toList();
             if (matching.size() != 1) continue;
             var cls = matching.getFirst();
@@ -1855,6 +1855,102 @@ public class CompatReport {
             for (var m : cls.getMethods()) if (hookId(m).equals(shape.render()) && !AccessFlags.STATIC.isSet(m.getAccessFlags()) && m.getImplementation() != null &&
                     m.getImplementation().getRegisterCount() == 24 && instructions(m).size() == shape.size() && m.getImplementation().getTryBlocks().size() == 4) result.add(m);
         }
+        return result;
+    }
+
+    static final Set<Opcode> MEDIA_GOTOS = Set.of(Opcode.GOTO, Opcode.GOTO_16, Opcode.GOTO_32);
+    static final Set<Opcode> MEDIA_EXITS = Set.of(Opcode.RETURN_VOID, Opcode.RETURN, Opcode.RETURN_WIDE, Opcode.RETURN_OBJECT, Opcode.THROW);
+    static final String ITERATOR_HAS_NEXT = "Ljava/util/Iterator;->hasNext()Z", ITERATOR_NEXT = "Ljava/util/Iterator;->next()Ljava/lang/Object;";
+    static boolean mediaIs(List<Instruction> c, int at, Opcode... ops) {
+        return at >= 0 && at < c.size() && Arrays.asList(ops).contains(c.get(at).getOpcode());
+    }
+
+    /** Mirrors NativeMediaControls.kt feedsAiCell: the label at {@code at} reaches the cell's constructor, following plain gotos only. */
+    static boolean feedsAiCell(List<Instruction> c, int at, AiCell cell) {
+        int register = register(c.get(at));
+        if (register < 0) return false;
+        int i = at + 1;
+        for (int step = 0; step < 48; step++) {
+            if (i < 0 || i >= c.size()) return false;
+            var instruction = c.get(i);
+            if (MEDIA_GOTOS.contains(instruction.getOpcode())) { i = mediaTarget(c, i); continue; }
+            if (Set.of(Opcode.INVOKE_DIRECT, Opcode.INVOKE_DIRECT_RANGE).contains(instruction.getOpcode()) && instruction instanceof ReferenceInstruction r &&
+                    r.getReference() instanceof MethodReference m && m.getDefiningClass().equals(cell.type()) && m.getName().equals("<init>")) {
+                var args = bubbleArgs(instruction);
+                return m.getParameterTypes().size() == 11 && m.getParameterTypes().getLast().toString().equals("I") && !args.isEmpty() && args.getLast() == register;
+            }
+            if (instruction instanceof OffsetInstruction || mediaWrites(instruction, register) || MEDIA_EXITS.contains(instruction.getOpcode())) return false;
+            i++;
+        }
+        return false;
+    }
+
+    /**
+     * Mirrors NativeMediaControls.kt aiStickerGrid: the Suggested grid loop whose instance-of chain sends the Generate menu
+     * item and the Generate AI item to the cell. Sites are where those two branch bodies start, skip is the loop's continue step.
+     */
+    record AiGrid(List<Integer> sites, int skip, int flag) {}
+    static AiGrid aiStickerGrid(Method method, AiCell cell) {
+        if (!method.getName().equals("render") || AccessFlags.STATIC.isSet(method.getAccessFlags())) return null;
+        var c = instructions(method);
+        java.util.function.IntPredicate labelled = at -> c.get(at).getOpcode() == Opcode.CONST && c.get(at) instanceof NarrowLiteralInstruction n &&
+                (n.getNarrowLiteral() == cell.menu() || n.getNarrowLiteral() == cell.label());
+        var labels = new ArrayList<Integer>();
+        for (int at = 0; at < c.size(); at++) if (labelled.test(at)) labels.add(at);
+        if (labels.isEmpty() || c.stream().noneMatch(i -> ITERATOR_HAS_NEXT.equals(ref(i)))) return null;
+        var found = new ArrayList<AiGrid>();
+        for (int head = 0; head < c.size(); head++) {
+            if (!mediaIs(c, head, Opcode.INVOKE_INTERFACE, Opcode.INVOKE_INTERFACE_RANGE) || !ITERATOR_HAS_NEXT.equals(ref(c.get(head)))) continue;
+            var iterators = bubbleArgs(c.get(head));
+            if (iterators.size() != 1 || head + 7 >= c.size() || !(c.get(head + 5) instanceof TwoRegisterInstruction step)) continue;
+            int iterator = iterators.getFirst(), more = register(c.get(head + 1)), item = register(c.get(head + 4));
+            if (!mediaIs(c, head + 1, Opcode.MOVE_RESULT) || !mediaIs(c, head + 2, Opcode.IF_EQZ) || register(c.get(head + 2)) != more ||
+                    !mediaIs(c, head + 3, Opcode.INVOKE_INTERFACE, Opcode.INVOKE_INTERFACE_RANGE) || !ITERATOR_NEXT.equals(ref(c.get(head + 3))) ||
+                    !bubbleArgs(c.get(head + 3)).equals(List.of(iterator)) || !mediaIs(c, head + 4, Opcode.MOVE_RESULT_OBJECT) ||
+                    !mediaIs(c, head + 5, Opcode.ADD_INT_LIT8) || ((NarrowLiteralInstruction) step).getNarrowLiteral() != 1 ||
+                    !mediaIs(c, head + 6, Opcode.IF_LTZ) || register(c.get(head + 6)) != step.getRegisterB() ||
+                    !mediaIs(c, head + 7, Opcode.CHECK_CAST) || register(c.get(head + 7)) != item) continue;
+            int index = step.getRegisterB(), next = step.getRegisterA();
+            var backs = new ArrayList<Integer>();
+            for (int i = 0; i < c.size(); i++) if (c.get(i) instanceof OffsetInstruction && mediaTarget(c, i) == head) backs.add(i);
+            if (backs.size() != 1) continue;
+            int back = backs.getFirst();
+            if (!MEDIA_GOTOS.contains(c.get(back).getOpcode()) || !mediaIs(c, back - 1, Opcode.MOVE, Opcode.MOVE_FROM16, Opcode.MOVE_16) ||
+                    !(c.get(back - 1) instanceof TwoRegisterInstruction move) || move.getRegisterA() != index || move.getRegisterB() != next) continue;
+            int link = head + 8;
+            Integer flag = null;
+            var menus = new ArrayList<Integer>();
+            var ais = new ArrayList<Integer>();
+            var bodies = new ArrayList<int[]>();
+            while (mediaIs(c, link, Opcode.INSTANCE_OF)) {
+                var test = (TwoRegisterInstruction) c.get(link);
+                if (test.getRegisterB() != item || (flag != null && test.getRegisterA() != flag)) break;
+                flag = test.getRegisterA();
+                if (!mediaIs(c, link + 1, Opcode.IF_EQZ) || register(c.get(link + 1)) != flag) break;
+                int end = mediaTarget(c, link + 1);
+                if (end <= link + 2) break;
+                for (int at = link + 2; at < end; at++) {
+                    if (!labelled.test(at) || !feedsAiCell(c, at, cell)) continue;
+                    if (((NarrowLiteralInstruction) c.get(at)).getNarrowLiteral() == cell.menu()) menus.add(link + 2); else ais.add(link + 2);
+                    bodies.add(new int[] {link + 2, end});
+                }
+                link = end;
+            }
+            var sites = new ArrayList<Integer>(menus);
+            sites.addAll(ais);
+            Collections.sort(sites);
+            var targets = mediaTargets(method);
+            // One branch per label, each entered only from its own instance-of test, and no label outside them.
+            if (flag == null || flag > 15 || menus.size() != 1 || ais.size() != 1 || menus.equals(ais) ||
+                    List.of(item, index, next, iterator).contains(flag) || sites.stream().anyMatch(targets::contains) ||
+                    labels.stream().anyMatch(at -> bodies.stream().noneMatch(b -> at >= b[0] && at < b[1]))) continue;
+            found.add(new AiGrid(sites, back - 1, flag));
+        }
+        return found.size() == 1 ? found.getFirst() : null;
+    }
+    static List<Method> findAiStickerGrids(List<ClassDef> classes) {
+        var result = new ArrayList<Method>();
+        for (var cls : classes) for (var m : cls.getMethods()) if (AI_CELLS.stream().anyMatch(cell -> aiStickerGrid(m, cell) != null)) result.add(m);
         return result;
     }
 
@@ -4907,6 +5003,7 @@ public class CompatReport {
         var inboxTypes = new HashMap<String, ClassDef>();
         classes.forEach(c -> inboxTypes.put(c.getType(), c));
         found.get("ai_sticker_cell").addAll(findAiStickerCells(classes));
+        found.get("ai_sticker_grid").addAll(findAiStickerGrids(classes));
         var community = communityInbox(classes);
         if (community != null) found.get("community_inbox").add(community.render());
         found.get("emoji_drawer").addAll(emojiDrawerReaders(classes));
