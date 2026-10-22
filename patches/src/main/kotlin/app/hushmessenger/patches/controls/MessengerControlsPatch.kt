@@ -166,6 +166,8 @@ internal fun MutableMethod.validateHook(hook: String) {
         WIFI_IDENTITY -> validateWifiIdentity()
         PHONE_ID_SYNC -> validatePhoneIdSync()
         STORY_HOLD -> validateStoryHold()
+        QUIET_CALL_RING -> validateQuietCallRing()
+        QUIET_CALL_NOTIFICATION -> validateQuietCallNotification()
         TEXT_STYLE -> validateTextStyleField()
         MESSAGE_LOG, AUTO_REPLY -> validateMessageLog()
         "original_photo" -> validateOriginalPhoto()
@@ -240,6 +242,8 @@ internal fun injectControl(key: String, methods: Map<String, List<MutableMethod>
             WIFI_IDENTITY -> method.injectWifiIdentity()
             PHONE_ID_SYNC -> method.injectPhoneIdSync()
             STORY_HOLD -> method.injectStoryHold()
+            QUIET_CALL_RING -> method.injectQuietCallRing()
+            QUIET_CALL_NOTIFICATION -> method.injectQuietCallNotification()
             TEXT_STYLE -> method.injectTextStyleField()
             MESSAGE_LOG -> method.injectMessageLog()
             AUTO_REPLY -> method.injectAutoReply()
@@ -446,6 +450,10 @@ val keepMessageLogPatch = controlPatch("message_log", "Keep a message log",
 @Suppress("unused")
 val autoReplyPatch = controlPatch("auto_reply", "Auto reply",
     "Answers messages with replies you write in HushMessenger settings, when they have words you pick or any message at all. Replies go out through Messenger's own notification reply, encrypted chats too, at most once every five minutes per chat.", "Conversations")
+@Suppress("unused")
+val quietIncomingCallsPatch = controlPatch("quiet_calls", "Quiet incoming calls",
+    "Calls still come in, but Messenger doesn't ring, vibrate or pop the call up over your screen. The call waits in the notification shade with Answer and Decline. A call you miss still shows in the chat. If the Facebook app is on your phone, it can still ring for the same call.", "Conversations",
+    QUIET_CALL_RING, QUIET_CALL_NOTIFICATION)
 @Suppress("unused")
 val systemCameraPatch = controlPatch("system_camera", "Use the phone's camera app",
     "The camera button in a chat opens your phone's own camera app. The photo then opens in Messenger's editor, ready to send. Photos only.", "Photos and videos",

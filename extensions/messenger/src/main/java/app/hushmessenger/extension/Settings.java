@@ -490,6 +490,12 @@ public final class Settings {
      */
     public static boolean holdStoryAtEnd() { return enabled("story_hold"); }
 
+    /**
+     * Asked when a call starts ringing, before Messenger decides to ring and vibrate, and again for the call's
+     * notification. True takes Messenger's own ringtone-off path and posts the notification without the pop-up.
+     */
+    public static boolean quietIncomingCalls() { return enabled("quiet_calls"); }
+
     /** What Android tells an app that can't see the phone's location about the Wi-Fi network it's on. */
     static final String HIDDEN_WIFI_NAME = "<unknown ssid>";
     static final String HIDDEN_WIFI_BSSID = "02:00:00:00:00:00";

@@ -208,6 +208,7 @@ public class CompatReport {
         PATCHES.put("Stop app list and device ID sharing", List.of("phone_id_sync"));
         PATCHES.put("Keep a message log", List.of("message_log"));
         PATCHES.put("Auto reply", List.of("auto_reply"));
+        PATCHES.put("Quiet incoming calls", List.of("quiet_call_ring", "quiet_call_notification"));
         PATCHES.put("Allow screenshots", List.of("allow_screenshot", "screenshot_viewers"));
         PATCHES.put("Hide read receipts", List.of("hide_read_receipts", "reply_read"));
         PATCHES.put("Mark as read button", List.of("mark_read_bar", "mark_read_click"));
@@ -4286,6 +4287,83 @@ public class CompatReport {
         return List.of();
     }
 
+    static final String RTC_NOTIFICATION_SERVICE = "Lcom/facebook/rtc/notification/RtcNotificationForegroundService;";
+
+    /** The one register a String.valueOf(boolean) call reads, in either invoke form, or -1. */
+    static int booleanText(Instruction i) {
+        if (!"Ljava/lang/String;->valueOf(Z)Ljava/lang/String;".equals(ref(i))) return -1;
+        if (i.getOpcode() == Opcode.INVOKE_STATIC && i instanceof FiveRegisterInstruction call && call.getRegisterCount() == 1) return call.getRegisterC();
+        if (i.getOpcode() == Opcode.INVOKE_STATIC_RANGE && i instanceof RegisterRangeInstruction range && range.getRegisterCount() == 1) return range.getStartRegister();
+        return -1;
+    }
+
+    /** Index of the one const-string with this text, or -1 when there are none or several. */
+    static int onlyString(List<Instruction> code, String text) {
+        int at = -1;
+        for (int i = 0; i < code.size(); i++) {
+            if (code.get(i) instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr && text.equals(sr.getString())) {
+                if (at >= 0) return -1;
+                at = i;
+            }
+        }
+        return at;
+    }
+
+    /**
+     * quiet_call_ring: the app's only method naming "Maybe start ringing", an instance run()V that also names
+     * ringtone_disabled and notifications_blocked once each. The register String.valueOf(Z) reads right after
+     * ringtone_disabled has exactly one if-nez before "Maybe start ringing" that lands after it and at or before that
+     * log, and nothing jumps to the instruction after that branch. Mirrors QuietCalls.kt.
+     */
+    static List<Method> quietCallRing(List<ClassDef> classes) {
+        var deciders = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) if (literals(method).contains("Maybe start ringing")) deciders.add(method);
+        if (deciders.size() != 1) return List.of();
+        var decider = deciders.get(0);
+        if (AccessFlags.STATIC.isSet(decider.getAccessFlags()) || !"run".equals(decider.getName()) ||
+            !decider.getParameterTypes().isEmpty() || !"V".equals(decider.getReturnType())) return List.of();
+        var code = instructions(decider);
+        int ring = onlyString(code, "Maybe start ringing"), logged = onlyString(code, "ringtone_disabled");
+        if (ring < 0 || logged < 0 || onlyString(code, "notifications_blocked") < 0 || logged + 1 >= code.size()) return List.of();
+        int flag = booleanText(code.get(logged + 1));
+        if (flag < 0) return List.of();
+        var branches = new ArrayList<Integer>();
+        for (int i = 0; i < ring; i++) {
+            if (code.get(i).getOpcode() != Opcode.IF_NEZ || register(code.get(i)) != flag) continue;
+            int target = mediaTarget(code, i);
+            if (target > ring && target <= logged) branches.add(i);
+        }
+        if (branches.size() != 1 || mediaTargets(decider).contains(branches.get(0) + 1)) return List.of();
+        return List.of(decider);
+    }
+
+    /**
+     * quiet_call_notification: the call service's only instance (Notification, Context, ...)V method that makes an
+     * invoke-virtual startForeground(int, Notification...) call, when nothing jumps to its first instruction. Mirrors
+     * QuietCalls.kt.
+     */
+    static List<Method> quietCallNotification(List<ClassDef> classes) {
+        var posters = new ArrayList<Method>();
+        for (var cls : classes) {
+            if (!RTC_NOTIFICATION_SERVICE.equals(cls.getType())) continue;
+            for (var method : cls.getMethods()) {
+                var types = params(method);
+                if (method.getImplementation() == null || AccessFlags.STATIC.isSet(method.getAccessFlags()) || !"V".equals(method.getReturnType()) ||
+                    types.size() < 2 || !"Landroid/app/Notification;".equals(types.get(0)) || !"Landroid/content/Context;".equals(types.get(1))) continue;
+                for (var i : instructions(method)) {
+                    if (i.getOpcode() == Opcode.INVOKE_VIRTUAL && i instanceof ReferenceInstruction ri && ri.getReference() instanceof MethodReference target &&
+                        "startForeground".equals(target.getName()) && target.getParameterTypes().size() >= 2 &&
+                        "I".contentEquals(target.getParameterTypes().get(0)) && "Landroid/app/Notification;".contentEquals(target.getParameterTypes().get(1))) {
+                        posters.add(method);
+                        break;
+                    }
+                }
+            }
+        }
+        if (posters.size() != 1 || mediaTargets(posters.get(0)).contains(0)) return List.of();
+        return posters;
+    }
+
     static final String PHONE_ID_PROVIDER = ".provider.phoneid";
     static final String GET_PHONE_ID = "com.facebook.GET_PHONE_ID";
     static final String INSTALLED_PACKAGES = "Landroid/content/pm/PackageManager;->getInstalledPackages(I)Ljava/util/List;";
@@ -4852,6 +4930,8 @@ public class CompatReport {
         found.get("wifi_identity").addAll(wifiIdentityReads(classes));
         found.get("phone_id_sync").addAll(phoneIdSync(classes));
         found.get("story_hold").addAll(storyHold(classes));
+        found.get("quiet_call_ring").addAll(quietCallRing(classes));
+        found.get("quiet_call_notification").addAll(quietCallNotification(classes));
         var markRead = markReadButton(classes);
         if (!markRead.isEmpty()) {
             found.get("mark_read_bar").add(markRead.get(0));

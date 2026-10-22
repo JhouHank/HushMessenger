@@ -391,6 +391,8 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(WIFI_IDENTITY).addAll(findWifiIdentityReads(classes))
     found.getValue(PHONE_ID_SYNC).addAll(findPhoneIdSync(classes))
     found.getValue(STORY_HOLD).addAll(findStoryHold(classes))
+    found.getValue(QUIET_CALL_RING).addAll(findQuietCallRing(classes))
+    found.getValue(QUIET_CALL_NOTIFICATION).addAll(findQuietCallNotification(classes))
     found.getValue(TEXT_STYLE).addAll(findTextStyleField(classes))
     found.getValue(MESSAGE_LOG).addAll(findMessageLogHook(classes))
     found.getValue(AUTO_REPLY).addAll(findMessageLogHook(classes))

@@ -154,6 +154,8 @@ hook people_tab LX/FYa;->A01(LX/FYa;)V
 hook phone_id_sync LX/1HB;->A03(LX/1HB;)Ljava/util/ArrayList;
 hook phone_id_sync LX/1HB;->A06(Ljava/lang/String;)V
 hook pinned_chats LX/2qf;->A00(Lcom/facebook/auth/usersession/FbUserSession;)I
+hook quiet_call_notification Lcom/facebook/rtc/notification/RtcNotificationForegroundService;->A00(Landroid/app/Notification;Landroid/content/Context;LX/AZg;LX/Ahb;LX/AFu;LX/R8C;Ljava/lang/Integer;Ljava/lang/String;IZZZ)V
+hook quiet_call_ring LX/AES;->run()V
 hook recent_media LX/9eA;->A01(LX/6NI;Lkotlin/jvm/functions/Function0;)V
 hook reels_badge LX/4WJ;->A09(LX/4WJ;)Z
 hook reply_read LX/9Tt;->A01(Lcom/facebook/auth/usersession/FbUserSession;LX/8hs;LX/9BR;Lcom/facebook/xapp/messaging/capability/vector/Capabilities;LX/Bga;LX/99n;LX/9BQ;LX/Bdg;LX/AZV;LX/6NI;LX/97B;Lcom/facebook/xapp/messaging/composer/send/event/SendMessageEvent;Lcom/facebook/xapp/messaging/map/HeterogeneousMap;LX/5gq;Ljava/lang/String;)V
