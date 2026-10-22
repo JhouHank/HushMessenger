@@ -43,11 +43,20 @@ try {
     Assert-WalkApp ($null -eq (Get-WalkApkProblem -Installed $patchedHash -Patched $patchedHash)) 'The patched APK on the device should raise nothing.'
     Assert-WalkApp ((Get-WalkApkProblem -Installed ('d' * 64) -Patched $patchedHash) -like "the installed APK (dddd*) isn't the one patched*") `
         'Another APK on the device should be a problem.'
-    foreach ($unread in @('', '/system/bin/sh: sha256sum: not found', ('C' * 64))) {
+    foreach ($unread in @('', '/system/bin/sh: sha256sum: not found', ('C' * 64), ($patchedHash + "`n"))) {
         Assert-WalkApp ((Get-WalkApkProblem -Installed $unread -Patched $patchedHash) -like "couldn't read the installed APK's SHA-256*") `
             "An installed hash of '$unread' should read as unreadable."
     }
     Assert-WalkApp ($null -eq (Get-WalkApkProblem -Installed '' -Patched '')) 'With no patched APK to hold it to, the skip covers it, not a problem.'
+
+    # Reading the hash off sha256sum's output.
+    $hashOut = "$patchedHash  /data/app/~~x==/com.facebook.orca-y==/base.apk"
+    Assert-WalkApp ((Read-WalkSha256 @($hashOut)) -ceq $patchedHash) 'The hash line should give its hash.'
+    Assert-WalkApp ((Read-WalkSha256 @('WARNING: linker: something adb printed first', $hashOut)) -ceq $patchedHash) `
+        'A line before the hash should not hide it.'
+    foreach ($noHash in @(@(), @('/system/bin/sh: sha256sum: not found'), @(('C' * 64) + '  base.apk'))) {
+        Assert-WalkApp ((Read-WalkSha256 $noHash) -ceq '') "Output without a lowercase hash line ($($noHash -join ' | ')) should give no hash."
+    }
 
     # The exit code each result ends with.
     Assert-WalkApp ((Get-WalkExitCode 'PASS') -eq 0 -and (Get-WalkExitCode 'PARTIAL') -eq 2 -and (Get-WalkExitCode 'FAIL') -eq 1) `
@@ -118,6 +127,10 @@ try {
         'A -SkipPatch walk should find the APK patched from its bundle.'
     Assert-WalkApp ((Find-WalkPatchRecord -Destination $patchDir -BundleSha256 ('a' * 64)) -ceq '') 'A -SkipPatch walk of another bundle should find no patch record.'
     Assert-WalkApp ((Find-WalkPatchRecord -Destination $work -BundleSha256 $walkedSha256) -ceq '') 'A folder with no patch record should give none.'
+    $newlineDir = Join-Path $work 'newline-record'
+    New-Item -ItemType Directory -Path $newlineDir | Out-Null
+    [IO.File]::WriteAllText((Join-Path $newlineDir 'patch-inputs.json'), (@{ bundle = $walkedSha256; apk = $recordedApk + "`n" } | ConvertTo-Json))
+    Assert-WalkApp ((Find-WalkPatchRecord -Destination $newlineDir -BundleSha256 $walkedSha256) -ceq '') 'A recorded APK hash with a newline after it should prove nothing.'
     $otherAlias = Get-WalkPatchInputs -BundlePath $walkedBundle -StockApk $stockFile -KeystorePath $keyFile -Alias 'Other'
     Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $otherAlias)) 'Another key alias should patch again.'
     $otherBundle = Join-Path $work 'patches-0.26.1.mpp'

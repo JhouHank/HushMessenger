@@ -140,9 +140,21 @@ function Get-WalkApkProblem {
     #>
     param([string]$Installed, [string]$Patched)
     if (-not $Patched) { return $null }
-    if ($Installed -cnotmatch '^[0-9a-f]{64}$') { return "couldn't read the installed APK's SHA-256, so nothing shows it's the one patched from -Bundle" }
+    # \z, not $: $ also matches before a final newline.
+    if ($Installed -cnotmatch '^[0-9a-f]{64}\z') { return "couldn't read the installed APK's SHA-256, so nothing shows it's the one patched from -Bundle" }
     if ($Installed -cne $Patched) { return "the installed APK ($Installed) isn't the one patched from -Bundle ($Patched)" }
     return $null
+}
+
+function Read-WalkSha256([string[]]$Lines) {
+    <#
+    .SYNOPSIS
+        The hash from sha256sum's output, or '' when no line carries one. adb can print a warning
+        first, and a missing sha256sum answers with an error line, never a hash.
+    #>
+    $hashLine = @($Lines | Where-Object { $_ -cmatch '^[0-9a-f]{64}\s' }) | Select-Object -First 1
+    if ($hashLine) { return $hashLine.Substring(0, 64) }
+    return ''
 }
 
 function Get-WalkExitCode([string]$Result) {
@@ -223,7 +235,7 @@ function Find-WalkPatchRecord {
     $inputsFile = Join-Path $Destination 'patch-inputs.json'
     if (-not (Test-Path -LiteralPath $inputsFile -PathType Leaf)) { return '' }
     try { $kept = Get-Content -LiteralPath $inputsFile -Raw | ConvertFrom-Json } catch { return '' }
-    if ([string]$kept.bundle -cne $BundleSha256 -or [string]$kept.apk -cnotmatch '^[0-9a-f]{64}$') { return '' }
+    if ([string]$kept.bundle -cne $BundleSha256 -or [string]$kept.apk -cnotmatch '^[0-9a-f]{64}\z') { return '' }
     return [string]$kept.apk
 }
 
@@ -400,9 +412,7 @@ function Invoke-WalkApp {
             Where-Object { $_ -match 'versionName=(.+)$' } | ForEach-Object { $Matches[1].Trim() }) | Select-Object -First 1
         $apkPath = @((Invoke-WalkAdb @('shell', 'pm', 'path', $Package)).Stdout | Where-Object { $_ -like 'package:*base.apk' }) | Select-Object -First 1
         $installedSha = ''
-        if ($apkPath) { $installedSha = (@((Invoke-WalkAdb @('shell', 'sha256sum', $apkPath.Substring(8))).Stdout)[0] -split '\s+')[0] }
-        # A missing sha256sum answers with an error line, never a hash.
-        if ($installedSha -cnotmatch '^[0-9a-f]{64}$') { $installedSha = '' }
+        if ($apkPath) { $installedSha = Read-WalkSha256 @((Invoke-WalkAdb @('shell', 'sha256sum', $apkPath.Substring(8))).Stdout) }
         $apkProblem = Get-WalkApkProblem -Installed $installedSha -Patched $patchedSha
         if ($apkProblem) { $problems.Add($apkProblem) }
 

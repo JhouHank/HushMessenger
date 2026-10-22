@@ -85,7 +85,8 @@ function Test-WalkReceipt {
     if ($receipt.bundleSha256 -isnot [string] -or $receipt.bundleSha256 -cne $bundleSha256) {
         return Fail "the walked APK was patched with bundle '$($receipt.bundleSha256)', and this one is '$bundleSha256'"
     }
-    if ($receipt.patchedApkSha256 -isnot [string] -or $receipt.patchedApkSha256 -cnotmatch '^[0-9a-f]{64}$') {
+    # \z, not $: $ also matches before a final newline.
+    if ($receipt.patchedApkSha256 -isnot [string] -or $receipt.patchedApkSha256 -cnotmatch '^[0-9a-f]{64}\z') {
         return Fail "the walk receipt doesn't name the APK patched from this bundle, so nothing shows the walked app came from it"
     }
     if ($receipt.installedApkSha256 -isnot [string] -or $receipt.installedApkSha256 -cne $receipt.patchedApkSha256) {

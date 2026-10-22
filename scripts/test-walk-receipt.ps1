@@ -44,6 +44,7 @@ try {
             # A -SkipPatch walk of whatever was installed, with nothing tying it to this bundle.
             @(@{ patchedApkSha256 = '' }, "*doesn't name the APK patched from this bundle*"),
             @(@{ patchedApkSha256 = $null }, "*doesn't name the APK patched from this bundle*"),
+            @(@{ patchedApkSha256 = ('4' * 64) + "`n"; installedApkSha256 = ('4' * 64) + "`n" }, "*doesn't name the APK patched from this bundle*"),
             @(@{ installedApkSha256 = ('6' * 64) }, "*the walk ran APK '6666*', not '4444*', the one patched from this bundle*"),
             @(@{ installedApkSha256 = '' }, '*the walk ran APK*the one patched from this bundle*'),
             @(@{ installedApkSha256 = '/system/bin/sh: sha256sum: not found' }, '*the walk ran APK*the one patched from this bundle*'),
