@@ -291,6 +291,8 @@ class CommunityInboxTest {
                 activeProfile = profile
                 val contract = assertNotNull(findCommunityInbox(communityInboxFixture()))
                 val helpers = injectCommunityInbox(contract, contract.render as MutableMethod, MutableMethod(joined), MutableMethod(scope))
+                // all {} holds for an empty list too.
+                assertTrue(helpers.isNotEmpty())
                 assertTrue(helpers.all { AccessFlags.STATIC.isSet(it.accessFlags) && !AccessFlags.PRIVATE.isSet(it.accessFlags) })
             }
         } finally { Files.deleteIfExists(extension) }

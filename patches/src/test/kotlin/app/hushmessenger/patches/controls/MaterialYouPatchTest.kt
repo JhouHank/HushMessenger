@@ -182,7 +182,10 @@ class MaterialYouPatchTest {
             withThemeContext(temporary.resolve("register-$register"), classes) { context, _ ->
                 materialYouPatch.execute(context)
                 val dex = DexBackedDexFile(Opcodes.forApi(28), java.nio.ByteBuffer.wrap(lifecycleDex(classes.map { context.classDefBy(it.type) })))
-                for (cls in dex.classes.filter { it.type in routes }) {
+                val routed = dex.classes.filter { it.type in routes }
+                // Otherwise a dex without these classes would check nothing and pass.
+                assertEquals(routes.keys, routed.map { it.type }.toSet())
+                for (cls in routed) {
                     val code = cls.methods.single().implementation!!.instructions.toList()
                     val helper = code.indexOfFirst { (it as? ReferenceInstruction)?.reference.toString() ==
                         "Lapp/hushmessenger/extension/MaterialYouTheme;->${routes.getValue(cls.type)}" }
