@@ -251,6 +251,8 @@ final class SettingsText {
         // Only some of the backup's choices differed from this phone's; always two or more in all, so plural.
         ENGLISH.put("imported_partial", "Changed %1$d of %2$d choices.");
         ENGLISH.put("import_same", "Your choices already match that backup.");
+        // Nothing changed, but the backup had more in it than this phone took, so it doesn't match.
+        ENGLISH.put("import_none_changed", "None of your choices changed.");
         ENGLISH.put("import_auto_reply_off", "Auto reply stays off. Backups don't carry replies.");
         ENGLISH.put("import_empty", "Nothing to paste. Copy your choices first.");
         ENGLISH.put("import_invalid", "Not a choices backup. Nothing changed.");

@@ -2610,19 +2610,29 @@ public final class SettingsActivity extends Activity {
             restoreResult(autoReplyLeftOff ? text.get("import_auto_reply_off") : text.get("import_no_choices"), skipped);
             return;
         }
-        // Every choice starts off, so a value the backup shares with this phone isn't news, and the count says so.
-        int changed = 0;
+        // Every choice starts off, so a value the backup shares with this phone isn't news, and the count says so. The
+        // pause isn't a choice; it gets its own sentence.
+        int changed = 0, total = 0;
+        boolean wasPaused = Settings.preferences.getBoolean("paused", false);
         SharedPreferences.Editor editor = Settings.preferences.edit();
         for (Map.Entry<String, Boolean> choice : supported.entrySet()) {
-            if (Settings.preferences.getBoolean(choice.getKey(), false) != choice.getValue()) changed++;
+            if (!"paused".equals(choice.getKey())) {
+                total++;
+                if (Settings.preferences.getBoolean(choice.getKey(), false) != choice.getValue()) changed++;
+            }
             editor.putBoolean(choice.getKey(), choice.getValue());
         }
         editor.apply();
         refreshChoices();
-        // A backup can carry the pause, and a restored pause is easy to miss, so it stays in the toast.
-        String paused = Boolean.TRUE.equals(supported.get("paused")) ? " " + text.get("changes_paused") + "." : "";
-        String headline = changed == supported.size() ? text.count("imported", changed)
-            : changed == 0 ? text.get("import_same") : text.get("imported_partial", changed, supported.size());
+        // A backup can carry the pause, and a restored pause is easy to miss, so it stays in the toast, and so does a
+        // pause the backup lifted.
+        Boolean pause = supported.get("paused");
+        String paused = Boolean.TRUE.equals(pause) ? " " + text.get("changes_paused") + "."
+            : Boolean.FALSE.equals(pause) && wasPaused ? " " + text.get("changes_resumed") + "." : "";
+        // The choices only match the backup when nothing in it was skipped, held back or left the pause different.
+        boolean whole = total > 0 && skipped.isEmpty() && autoReply.isEmpty() && (pause == null || pause == wasPaused);
+        String headline = changed == 0 ? text.get(whole ? "import_same" : "import_none_changed")
+            : changed == total ? text.count("imported", changed) : text.get("imported_partial", changed, total);
         restoreResult(headline + paused, autoReply + skipped);
     }
 

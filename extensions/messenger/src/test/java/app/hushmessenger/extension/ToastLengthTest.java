@@ -40,15 +40,18 @@ public class ToastLengthTest {
         check(cut, "quick_setups_hidden", words.get("quick_setups_hidden", words.format("quick_setups_home"), words.format("choices")));
         check(cut, "font_file_too_large", words.get("font_file_too_large", FontFile.MAX_MEGABYTES));
         check(cut, "auto_reply_saved", words.get("auto_reply_saved", 12));
-        // A restored pause adds its own sentence to the restore toast.
-        String paused = " " + words.get("changes_paused") + ".";
+        // A restored or lifted pause adds its own sentence to the restore toast.
+        for (String paused : new String[] {" " + words.get("changes_paused") + ".", " " + words.get("changes_resumed") + "."}) {
+            for (int count : new int[] {1, 12}) check(cut, "imported", words.count("imported", count) + paused);
+            check(cut, "imported_partial", words.get("imported_partial", 57, 58) + paused);
+            check(cut, "import_none_changed", words.get("import_none_changed") + paused);
+        }
+        // The choices only match a backup that left the pause as it was, so a match never says the pause lifted.
+        check(cut, "import_same", words.get("import_same") + " " + words.get("changes_paused") + ".");
         for (int count : new int[] {1, 12}) {
             check(cut, "quick_changed", words.count("quick_changed", count));
             check(cut, "quick_undone", words.count("quick_undone", count));
-            check(cut, "imported", words.count("imported", count) + paused);
         }
-        check(cut, "imported_partial", words.get("imported_partial", 57, 58) + paused);
-        check(cut, "import_same", words.get("import_same") + paused);
         for (String mode : new String[] {"stock", "chat_heads", "native"})
             check(cut, "bubble_changed " + mode, words.get("bubble_changed", words.base("bubble_" + mode)));
         for (String[] control : SettingsActivity.CONTROLS) {

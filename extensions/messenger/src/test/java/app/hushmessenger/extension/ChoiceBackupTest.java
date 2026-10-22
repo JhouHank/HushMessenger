@@ -241,8 +241,8 @@ public class ChoiceBackupTest {
             clipboard(backup.toString());
             screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
             String toast = ShadowToast.getTextOfLatestToast();
-            // The eleven switches restore off, as they already were, so only the pause counts as a change.
-            assertEquals("Changed 1 of 12 choices. Changes paused.", toast);
+            // The eleven switches restore off, as they already were, and the pause has its own sentence.
+            assertEquals("None of your choices changed. Changes paused.", toast);
             assertTrue(toast, ToastLengthTest.lines(toast) <= 2);
             TextView result = screen.get().getWindow().getDecorView().findViewWithTag("choices_restore_status");
             SettingsText words = new SettingsText(screen.get());
@@ -268,6 +268,18 @@ public class ChoiceBackupTest {
             screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
             assertFalse(Settings.preferences.getBoolean("stories", true));
             assertEquals("Restored 2 choices.", ShadowToast.getTextOfLatestToast());
+
+            // A skipped entry or a pause the backup lifts means the backup and this phone don't match after all.
+            clipboard(ChoiceCodec.HEADER + "\nstories=false\nnew_control=true\n");
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertEquals("None of your choices changed.", ShadowToast.getTextOfLatestToast());
+            Settings.preferences.edit().putBoolean("paused", true).commit();
+            clipboard(ChoiceCodec.HEADER + "\nstories=false\npaused=false\n");
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertFalse(Settings.preferences.getBoolean("paused", true));
+            assertEquals("None of your choices changed. Changes resumed.", ShadowToast.getTextOfLatestToast());
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertEquals("Your choices already match that backup.", ShadowToast.getTextOfLatestToast());
         }
     }
 
@@ -738,7 +750,8 @@ public class ChoiceBackupTest {
             Shadows.shadowOf(activity.getContentResolver()).registerInputStream(uri,
                 new ByteArrayInputStream((ChoiceCodec.HEADER + "\npaused=true\n").getBytes(StandardCharsets.UTF_8)));
             startFile(activity, false, uri);
-            awaitToast("Restored 1 choice");
+            // The backup only pauses, and the pause isn't a choice.
+            awaitToast("None of your choices changed. Changes paused.");
             assertTrue(Settings.preferences.getBoolean("paused", false));
         } finally {
             release.countDown();
