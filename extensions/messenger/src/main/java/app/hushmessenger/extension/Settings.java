@@ -1713,7 +1713,7 @@ public final class Settings {
      * toolbar's context. Messenger hands the press to a title shortcut plugin that only its internal builds have, so for
      * everyone else it did nothing but vibrate. Like the Menu rows, this doesn't ask Pause or safe mode first: it's a way back into settings to undo
      * either. A launch Android refuses gets the same toasts as the side menu row, pointing at the launcher shortcut.
-     * Turn off the logo long press leaves the press to Messenger.
+     * Ignore the logo long press leaves the press to Messenger.
      */
     public static void logoLongPressed(Context context) {
         // Only the switch counts here: a press can come before settings have read what the patch put in.

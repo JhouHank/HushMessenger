@@ -131,7 +131,7 @@ final class SettingsText {
         // What Android shows on a copy pinned to the home screen while the icon shortcuts are hidden.
         ENGLISH.put("shortcut_turned_off", "Turned off in HushMessenger settings");
         ENGLISH.put("hide_icon_shortcuts_help","Takes Patch controls and Restart Messenger out of the menu you get by long-pressing Messenger's home screen icon. A copy pinned to your home screen turns gray until you turn this off.");
-        ENGLISH.put("hide_logo_press", "Turn off the logo long press");
+        ENGLISH.put("hide_logo_press", "Ignore the logo long press");
         ENGLISH.put("hide_logo_press_help", "A long press on the Messenger logo at the top of Chats, or on the Menu tab's title, stops opening these settings.");
         ENGLISH.put("last_way_in", "This is the last way into these settings that's still on. Turn another one on first.");
         ENGLISH.put("menu_row_needs_logo", "Open these settings once with a long press on the Messenger logo at the top of Chats, so you have a way back without the row.");

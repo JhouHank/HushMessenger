@@ -101,7 +101,7 @@ public class LogoLongPressTest {
     }
 
     /**
-     * HushFacebook#146: Turn off the logo long press leaves the press to Messenger, and only a press that opened settings
+     * HushFacebook#146: Ignore the logo long press leaves the press to Messenger, and only a press that opened settings
      * proves the logo is a way back in.
      */
     @Test public void aTurnedOffLogoPressIsLeftToMessenger() {
