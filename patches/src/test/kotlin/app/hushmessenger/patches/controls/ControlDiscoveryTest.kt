@@ -5,6 +5,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.iface.ClassDef
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -306,6 +307,21 @@ class ControlDiscoveryTest {
         assertEquals(listOf("LX/1iN;->A0D(LX/1iN;)Z"), found.getValue(TAB_PEOPLE).map { it.hookId() })
         assertEquals(listOf("LX/1iN;->A08(LX/1iN;)Z"), found.getValue(TAB_NOTIFICATIONS).map { it.hookId() })
         validateControls(found, setOf(TAB_PEOPLE, TAB_NOTIFICATIONS, "ai_tab"))
+    }
+
+    // Some accounts get MUSE, an AI agent tab, where the Meta AI tab goes. The bar builds it behind a gate of its own,
+    // so Hide Meta AI takes that gate too, with the same held answer as the Meta AI tab.
+    @Test fun hideMetaAiTakesTheMuseTabsGateAsWellAsTheMetaAiTabs() {
+        val found = mirroredControls(completeFixture())
+        assertEquals(listOf("LX/1iN;->A01(LX/1iN;)Z"), found.getValue(AI_MUSE_TAB).map { it.hookId() })
+        assertEquals(listOf("LX/1iN;->A02(LX/1iN;)Z"), found.getValue("ai_tab").map { it.hookId() })
+        validateControls(found, setOf("ai_tab", AI_MUSE_TAB))
+        assertTrue(listOf("ai_tab", AI_MUSE_TAB, TAB_CONFIG).all { it in controlHooks.getValue("meta_ai") })
+        val gate = fixtureMethod("LX/1iN;->A01(LX/1iN;)Z", pluginBody(pluginGates.getValue(AI_MUSE_TAB).anchors.single()),
+            flags = AccessFlags.PUBLIC.value or AccessFlags.STATIC.value)
+        injectControl("meta_ai", mapOf(AI_MUSE_TAB to listOf(gate)))
+        val first = gate.implementation!!.instructions.first() as ReferenceInstruction
+        assertEquals("$SETTINGS->hideMetaAiTab()Z", first.reference.toString())
     }
 
     // Messenger's Menu tab gives Meta's subscriptions (Facebook Plus, Meta Verified, Meta One) a section of their own next to

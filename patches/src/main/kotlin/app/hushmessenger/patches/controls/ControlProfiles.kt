@@ -50,6 +50,7 @@ internal val PROFILE_346814894 = ControlProfile(
             "LX/6OL;->A7A(LX/M1O;Lcom/google/common/collect/ImmutableList\$Builder;)V",
         ),
         "ai_menu" to setOf("LX/GGI;->A00()Z", "LX/GGI;->A01()Z", "LX/I5w;->A00()Z", "LX/I5w;->A01()Z"),
+        "ai_muse_tab" to setOf("LX/1n0;->A02(LX/1n0;)Z"),
         "ai_search" to setOf("LX/9ig;->A0A(LX/9ig;)Z", "LX/9ig;->A0B(LX/9ig;)Z"),
         "ai_search_chip" to setOf("LX/CDF;->render(LX/2DF;)LX/1J7;"),
         "ai_search_hint" to setOf("LX/28z;->A00(LX/1S0;LX/1yn;Lcom/facebook/mig/scheme/interfaces/MigColorScheme;Z)LX/1J7;"),

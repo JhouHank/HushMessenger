@@ -138,6 +138,7 @@ public class CompatReport {
         Map.entry("reels_badge", Set.of("com.facebook.messaging.reels.plugins.badge.ReelsBadgeKillSwitch")),
         Map.entry("ai_toolbar", Set.of("com.facebook.messaging.inbox.tab.plugins.core.tabtoolbarbutton.aihomebutton.AiHomeButtonKillSwitch")),
         Map.entry("ai_tab", Set.of("com.facebook.messaging.aibot.plugins.tab.tabcontent.MetaAiTabContentImplementation")),
+        Map.entry("ai_muse_tab", Set.of("com.facebook.messaging.aiagent.plugins.tab.tabcontent.MuseTabContentImplementation")),
         Map.entry("tab_people", Set.of("com.facebook.messaging.peopletab.plugins.tab.tabcontent.PeopleTabContentImplementation")),
         Map.entry("tab_notifications", Set.of("com.facebook.messaging.inbox.jewel.jeweltab.plugins.core.tabcontent.JewelTabContentImplementation")),
         Map.entry("mark_read_action", Set.of("com.facebook.messaging.threadlist.threaditemmenu.plugins.core.markreadmenuitem.MarkReadMenuItemImplementation"))
@@ -172,7 +173,7 @@ public class CompatReport {
         PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
         PATCHES.put("Pin more chats", List.of("pinned_chats"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook", "facebook_profile"));
-        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows", "tab_config"));
+        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_muse_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows", "tab_config"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
         PATCHES.put("Hide People tab", List.of("tab_people", "tab_config"));
@@ -3415,7 +3416,7 @@ public class CompatReport {
     }
 
     static final String TAB_CONFIG_TRACE = "MessengerTabConfigurationCreator.createTabConfiguration";
-    static final Set<String> HIDABLE_TABS = Set.of("PEOPLE", "JEWEL", "AI");
+    static final Set<String> HIDABLE_TABS = Set.of("PEOPLE", "JEWEL", "AI", "MUSE");
 
     /**
      * tab_config: the bottom bar's tab-list builder, an instance (Context, FbUserSession) method naming its trace. Every
@@ -3444,7 +3445,7 @@ public class CompatReport {
 
     /**
      * Index of the new-instance right before the builder's one (List, List) configuration constructor, or -1. The builder
-     * must read PEOPLE, JEWEL and AI as constants of one enum.
+     * must read PEOPLE, JEWEL, AI and MUSE as constants of one enum.
      */
     static int tabConfigSite(Method method) {
         var code = instructions(method);

@@ -33,6 +33,7 @@ private const val ADD = "invoke-virtual {v4, v0}, Ljava/util/ArrayList;->add(Lja
 private fun builder(
     id: String = SYNTHETIC_TAB_CONFIG,
     ai: String = "sget-object v0, $TABS->AI:$TABS",
+    muse: String = "sget-object v0, $TABS->MUSE:$TABS",
     meet: String = ":config\nsget-object v0, LX/0Rk;->A00:LX/0Rk;",
     start: String = NEW_CONFIG,
     build: String = CONFIG_INIT,
@@ -45,6 +46,8 @@ private fun builder(
     sget-object v0, $TABS->JEWEL:$TABS
     $ADD
     $ai
+    $ADD
+    $muse
     $ADD
     if-eqz p2, :config
     sget-object v0, $TABS->SEARCH:$TABS
@@ -121,6 +124,9 @@ class TabConfigTest {
     @Test fun aShapeThatMovedStopsBeforeAnyEdit() {
         val cases = mapOf(
             "no Meta AI tab" to builder(ai = "sget-object v0, $TABS->SEARCH:$TABS"),
+            // Hide Meta AI maps MUSE by name, so a builder that no longer reads it would leave that tab's index off.
+            "no MUSE tab" to builder(muse = "sget-object v0, $TABS->SEARCH:$TABS"),
+            "MUSE from another enum" to builder(muse = "sget-object v0, LX/1nh;->MUSE:LX/1nh;"),
             "tabs from two enums" to builder(ai = "sget-object v0, LX/1nh;->AI:LX/1nh;"),
             "a second configuration" to builder(build = "$CONFIG_INIT\n$NEW_CONFIG\n$CONFIG_INIT"),
             "configuration takes one list" to builder(build = "invoke-direct {v1, v4}, LX/1oC;-><init>(Ljava/util/List;)V"),

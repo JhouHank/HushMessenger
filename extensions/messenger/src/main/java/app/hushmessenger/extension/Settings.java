@@ -268,12 +268,16 @@ public final class Settings {
     /** Every switch that takes a tab off the bottom bar, so each one's list goes through {@link #visibleTabs}. */
     static final List<String> TAB_CONTROLS = Collections.unmodifiableList(Arrays.asList("tab_people", "tab_notifications", "meta_ai"));
 
-    /** The switch that hides a bottom tab, by the tab's constant in Messenger's tab enum, or null for a tab with none. */
+    /**
+     * The switch that hides a bottom tab, by the tab's constant in Messenger's tab enum, or null for a tab with none. MUSE
+     * is the AI agent tab some accounts get in Meta AI's place, so Hide Meta AI takes it too.
+     */
     static String barTabKey(String name) {
         switch (name) {
             case "PEOPLE": return "tab_people";
             case "JEWEL": return "tab_notifications";
-            case "AI": return "meta_ai";
+            case "AI":
+            case "MUSE": return "meta_ai";
             default: return null;
         }
     }

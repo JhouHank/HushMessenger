@@ -21,8 +21,11 @@ internal const val TAB_CONFIG = "tab_config"
 internal const val TAB_CONFIG_TRACE = "MessengerTabConfigurationCreator.createTabConfiguration"
 internal const val VISIBLE_TABS_HELPER = "$SETTINGS->visibleTabs(Ljava/util/List;)Ljava/util/List;"
 
-/** The constants of Messenger's tab enum that a Hush switch takes off the bottom bar: People, Notifications, Meta AI. */
-private val HIDABLE_TABS = setOf("PEOPLE", "JEWEL", "AI")
+/**
+ * The constants of Messenger's tab enum that a Hush switch takes off the bottom bar: People, Notifications, Meta AI, and
+ * MUSE, the AI agent tab some accounts get in Meta AI's place. The extension maps each one by its enum name.
+ */
+private val HIDABLE_TABS = setOf("PEOPLE", "JEWEL", "AI", "MUSE")
 private val TWO_LISTS = listOf("Ljava/util/List;", "Ljava/util/List;")
 
 private fun tabsChanged(detail: String): Nothing =
@@ -43,7 +46,7 @@ internal fun findTabConfig(classes: Iterable<ClassDef>): List<Method> = classes.
  * Index of the `new-instance` that starts the configuration the builder returns, or null. The builder reads every
  * hidable tab as a constant of one enum and hands the finished tab list to the configuration as its first argument:
  *
- *     sget-object vX, Tabs;->PEOPLE:Tabs;            (and JEWEL, AI)
+ *     sget-object vX, Tabs;->PEOPLE:Tabs;            (and JEWEL, AI, MUSE)
  *     ...
  *     new-instance vC, Configuration                 <-
  *     invoke-direct {vC, vTabs, vOther}, Configuration;-><init>(List, List)V

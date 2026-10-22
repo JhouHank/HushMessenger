@@ -86,6 +86,25 @@ public class TabListTest {
         assertEquals("Without the patch nothing is hidden", bar(), Settings.visibleTabs(bar()));
     }
 
+    /** The bar on accounts where Messenger puts MUSE, its AI agent tab, in Meta AI's place. */
+    enum MuseBar { INBOX, PEOPLE, MUSE, JEWEL, SEARCH, MORE }
+
+    private static List<MuseBar> museBar() { return new ArrayList<>(Arrays.asList(MuseBar.values())); }
+
+    @Test public void hideMetaAiTakesTheMuseVersionOfTheTabToo() {
+        List<MuseBar> stock = museBar();
+        assertSame("Off leaves the MUSE tab where Messenger put it", stock, Settings.visibleTabs(stock));
+
+        restart();
+        Settings.preferences.edit().putBoolean("meta_ai", true).commit();
+        assertEquals(List.of(MuseBar.INBOX, MuseBar.PEOPLE, MuseBar.JEWEL, MuseBar.SEARCH, MuseBar.MORE), Settings.visibleTabs(museBar()));
+        assertTrue(Settings.lastActive("meta_ai") > 0);
+
+        restart();
+        Settings.preferences.edit().putBoolean("paused", true).commit();
+        assertEquals("Pause keeps it after the restart", museBar(), Settings.visibleTabs(museBar()));
+    }
+
     @Test public void somethingThatIsntATabConstantStays() {
         Settings.preferences.edit().putBoolean("tab_people", true).commit();
         List<Object> odd = new ArrayList<>(Arrays.asList("PEOPLE", null, Tab.PEOPLE));

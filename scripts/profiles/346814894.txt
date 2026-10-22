@@ -19,6 +19,7 @@ hook ai_menu LX/GGI;->A00()Z
 hook ai_menu LX/GGI;->A01()Z
 hook ai_menu LX/I5w;->A00()Z
 hook ai_menu LX/I5w;->A01()Z
+hook ai_muse_tab LX/1n0;->A02(LX/1n0;)Z
 hook ai_search LX/9ig;->A0A(LX/9ig;)Z
 hook ai_search LX/9ig;->A0B(LX/9ig;)Z
 hook ai_search_chip LX/CDF;->render(LX/2DF;)LX/1J7;
