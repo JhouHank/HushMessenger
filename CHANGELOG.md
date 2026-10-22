@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed and fixed
+
+- **Hide Meta AI** now reaches the search screen too. Tap the search bar and the box at the top used to say "Ask Meta AI or search" even with the switch on. Now it shows the plain search hint, like the bar on the Chats list. Search still finds people and chats the same way.
+
 ## 0.26.0 (2026-10-22)
 
 ### Reported issues
