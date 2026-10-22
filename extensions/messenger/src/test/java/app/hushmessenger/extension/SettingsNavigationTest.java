@@ -45,6 +45,27 @@ public class SettingsNavigationTest {
         }
     }
 
+    @Test public void photoAndVideoControlsHaveTheirOwnSectionUnderChats() {
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            android.widget.LinearLayout group = root.findViewWithTag("photos_videos");
+            android.widget.LinearLayout heading = (android.widget.LinearLayout) group.getChildAt(0);
+            assertEquals("PHOTOS AND VIDEOS", ((TextView) heading.getChildAt(0)).getText().toString());
+            for (String key : new String[] {"original_photo", "original_video", "xhe_audio", "recent_media", "system_camera", "external_gallery"})
+                assertTrue(key + " should sit in Photos and videos", inside(root.findViewWithTag(key), group));
+            assertFalse(inside(root.findViewWithTag("typing"), group));
+            root.findViewWithTag("category_chats").performClick();
+            assertEquals(View.VISIBLE, group.getVisibility());
+            assertEquals("6", ((TextView) heading.getChildAt(1)).getText().toString());
+        }
+    }
+
+    private static boolean inside(View view, View group) {
+        for (android.view.ViewParent parent = view.getParent(); parent != null; parent = parent.getParent())
+            if (parent == group) return true;
+        return false;
+    }
+
     @Test public void selectedChipIsFilledInBothThemesAndTheWordmarkStaysOnOneLine() {
         for (boolean light : new boolean[] {false, true}) {
             Settings.preferences.edit().putBoolean("light", light).commit();

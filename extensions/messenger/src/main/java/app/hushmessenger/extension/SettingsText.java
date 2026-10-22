@@ -93,6 +93,7 @@ final class SettingsText {
         ENGLISH.put("navigation", "Navigation");
         ENGLISH.put("stickers", "Stickers");
         ENGLISH.put("conversations", "Conversations");
+        ENGLISH.put("photos_videos", "Photos and videos");
         ENGLISH.put("links_bubbles", "Links and bubbles");
         ENGLISH.put("privacy", "Privacy");
         ENGLISH.put("theme", "Theme");

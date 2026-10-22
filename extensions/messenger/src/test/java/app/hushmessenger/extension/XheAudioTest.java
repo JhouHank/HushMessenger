@@ -1136,11 +1136,11 @@ public class XheAudioTest {
         assertEquals("a second of sound when the track doesn't say", 1000 + 2 * secondOfSound, XheAudio.converting(untimed));
     }
 
-    @Test public void theSwitchSitsUnderConversationsAndStartsOff() {
+    @Test public void theSwitchSitsUnderPhotosAndVideosAndStartsOff() {
         assertTrue(Settings.installed.contains(XheAudio.KEY));
         String[] row = Arrays.stream(SettingsActivity.CONTROLS).filter(c -> c[0].equals(XheAudio.KEY)).findFirst().orElseThrow();
         assertEquals("Fix videos that won't send", row[1]);
-        assertEquals("conversations", row[3]);
+        assertEquals("photos_videos", row[3]);
         assertFalse(Settings.preferences.contains(XheAudio.KEY));
         assertFalse(Settings.wouldUse(XheAudio.KEY));
     }
