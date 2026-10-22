@@ -81,6 +81,15 @@ public final class SettingsActivity extends Activity {
     /** Shown above both pages while a change waits for Messenger to restart. */
     private LinearLayout restartRow;
     private TextView restartWaiting;
+    /** Shown above both pages for a few seconds after a Quick setup or Clear log, which act at once with no dialog. */
+    private Button undoButton;
+    /** What Undo does and when its time runs out. Main thread only, null when nothing can be taken back. */
+    private Runnable undoAction, undoExpiry;
+    /** While Undo can still put back the log a Clear took, the log's empty page shows an Undo too. */
+    private boolean messageLogUndo;
+    /** Between onStart and onStop. A Clear that finishes while settings are out of sight is final at once. */
+    private boolean started;
+    static final int UNDO_MILLIS = 10_000;
     static final int SAVE_CHOICES = 7101, READ_CHOICES = 7102, PICK_FONT = 7103;
     /** The names providers give fonts, and plain bytes for one that doesn't know a font. The copy checks what it really is. */
     static final String[] FONT_TYPES = {"font/ttf", "font/otf", "font/collection", "font/sfnt", "application/x-font-ttf",
@@ -344,6 +353,7 @@ public final class SettingsActivity extends Activity {
 
     @Override protected void onStart() {
         super.onStart();
+        started = true;
         Settings.preferences.registerOnSharedPreferenceChangeListener(preferenceListener);
     }
 
@@ -354,6 +364,9 @@ public final class SettingsActivity extends Activity {
     }
 
     @Override protected void onStop() {
+        // Leaving settings makes a Quick setup or a Clear final, one still running included.
+        started = false;
+        endUndo();
         Settings.preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener);
         super.onStop();
     }
@@ -547,6 +560,49 @@ public final class SettingsActivity extends Activity {
         restartRow.addView(restartNow, restartParams);
         restartRow.setVisibility(View.GONE);
         ui.add(header, restartRow, 12);
+        undoButton = ui.button("");
+        undoButton.setTag("undo");
+        undoButton.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        undoButton.setOnClickListener(view -> undo());
+        undoButton.setVisibility(View.GONE);
+        ui.add(header, undoButton, 12);
+    }
+
+    /** Shows Undo for [what] until it's tapped, its time runs out, something else takes its place or settings close. */
+    private void offerUndo(String what, Runnable action) {
+        endUndo();
+        undoAction = action;
+        undoButton.setText(text.get("undo_action", what));
+        undoButton.setVisibility(View.VISIBLE);
+        long millis = UNDO_MILLIS;
+        // TalkBack and Switch Access users can ask for longer, and this timeout takes a button away.
+        android.view.accessibility.AccessibilityManager access = getSystemService(android.view.accessibility.AccessibilityManager.class);
+        if (Build.VERSION.SDK_INT >= 29 && access != null) millis = access.getRecommendedTimeoutMillis(UNDO_MILLIS,
+            android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT | android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS);
+        undoExpiry = this::endUndo;
+        undoButton.postDelayed(undoExpiry, millis);
+    }
+
+    private void undo() {
+        Runnable action = undoAction;
+        // The log's page shows what the undo brings back once it's written, not an empty page in between.
+        messageLogUndo = false;
+        View sheetUndo = messageLogList == null ? null : messageLogList.findViewWithTag("message_log_undo");
+        if (sheetUndo != null) sheetUndo.setEnabled(false);
+        endUndo();
+        if (action != null) action.run();
+    }
+
+    /** Lets go of what Undo held, so the change stands, and hides the button. */
+    private void endUndo() {
+        if (undoExpiry != null) undoButton.removeCallbacks(undoExpiry);
+        undoExpiry = null;
+        undoAction = null;
+        if (undoButton != null) undoButton.setVisibility(View.GONE);
+        if (messageLogUndo) {
+            messageLogUndo = false;
+            if (messageLogList != null) loadMessageLog();
+        }
     }
 
     /**
@@ -1623,6 +1679,9 @@ public final class SettingsActivity extends Activity {
         java.util.function.Predicate<String> settable = "defaults".equals(name) ? Settings.installed::contains
             : key -> Settings.installed.contains(key) && Settings.available(key);
         java.util.Map<String, Boolean> changes = QuickSetups.changes(values, Settings.preferences, settable);
+        // What each changed key held, null for one never saved, so Undo puts back exactly that.
+        java.util.Map<String, Boolean> before = new java.util.HashMap<>();
+        for (String key : changes.keySet()) before.put(key, Settings.preferences.contains(key) ? Settings.preferences.getBoolean(key, false) : null);
         if (!changes.isEmpty()) {
             SharedPreferences.Editor edit = Settings.preferences.edit();
             for (java.util.Map.Entry<String, Boolean> change : changes.entrySet()) edit.putBoolean(change.getKey(), change.getValue());
@@ -1631,6 +1690,25 @@ public final class SettingsActivity extends Activity {
         refreshChoices();
         feedback(!changes.isEmpty() ? text.count("quick_changed", changes.size())
             : text.get(QuickSetups.anySettable(values, settable) ? "quick_unchanged" : "quick_missing"), Toast.LENGTH_SHORT);
+        if (!changes.isEmpty()) offerUndo(text.format("quick_" + name), () -> undoQuickSetup(changes, before));
+    }
+
+    /** Puts back what a Quick setup changed, except a switch flipped again since, which stays as it is now. */
+    private void undoQuickSetup(java.util.Map<String, Boolean> changes, java.util.Map<String, Boolean> before) {
+        SharedPreferences.Editor edit = Settings.preferences.edit();
+        int restored = 0;
+        for (java.util.Map.Entry<String, Boolean> change : changes.entrySet()) {
+            String key = change.getKey();
+            boolean set = change.getValue();
+            if (Settings.preferences.getBoolean(key, !set) != set) continue;
+            Boolean old = before.get(key);
+            if (old == null) edit.remove(key);
+            else edit.putBoolean(key, old);
+            restored++;
+        }
+        edit.apply();
+        refreshChoices();
+        feedback(text.count("quick_undone", restored), Toast.LENGTH_SHORT);
     }
 
     private void copySetup() {
@@ -2029,6 +2107,13 @@ public final class SettingsActivity extends Activity {
                         empty.addView(accent, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(4)));
                         ui.add(empty, ui.text(text.get("message_log_empty"), 18, ui.text, true), 16);
                         ui.add(empty, ui.text(text.get(Settings.wouldUse(MessageLog.KEY) ? "message_log_empty_on" : "message_log_empty_off"), 14, ui.muted, false), 8);
+                        // The settings page's Undo sits behind this sheet.
+                        if (messageLogUndo) {
+                            Button undo = ui.button(text.get("undo"));
+                            undo.setTag("message_log_undo");
+                            undo.setOnClickListener(view -> undo());
+                            ui.add(empty, undo, 16);
+                        }
                         ui.add(list, empty, result.setAside ? 12 : 0);
                     }
                 }
@@ -2343,27 +2428,56 @@ public final class SettingsActivity extends Activity {
         if (!job.notified) {
             job.notified = true;
             feedback(text.get(job.cleared ? "message_log_cleared" : "message_log_clear_failed"), Toast.LENGTH_LONG);
+            // Undo gets the only copy of what went, and nothing is offered after a failed or empty clear.
+            List<MessageLog.Entry> removed = job.removed;
+            job.removed = null;
+            if (started && job.cleared && removed != null && !removed.isEmpty()) {
+                offerUndo(text.format("message_log_clear"), () -> restoreMessageLog(removed));
+                messageLogUndo = true;
+            }
         }
         if (messageLogList != null) loadMessageLog();
     }
+
+    /** Undo for Clear log: writes back the copy the clear kept, off the main thread, ahead of anything logged since. */
+    private void restoreMessageLog(List<MessageLog.Entry> removed) {
+        MESSAGE_LOG_WORK.execute(() -> {
+            boolean restored = MessageLog.restore(removed);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                feedback(text.get(restored ? "message_log_restored" : "message_log_restore_failed"), Toast.LENGTH_LONG);
+                if (messageLogList != null) loadMessageLog();
+            });
+        });
+    }
+
+    /** Clears and their Undos run one at a time in the order they were tapped, so a Clear right after Undo stays cleared. */
+    private static final java.util.concurrent.ExecutorService MESSAGE_LOG_WORK = java.util.concurrent.Executors.newSingleThreadExecutor(work -> {
+        Thread thread = new Thread(work, "HushMessageLogWork");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /** Only the work and its outcome survive rotation. The worker never owns a screen or chat text. */
     private static final class MessageLogClearJob {
         java.lang.ref.WeakReference<SettingsActivity> owner;
         boolean finished, cleared, notified;
+        /** What the clear took, until the page hands it to Undo. */
+        List<MessageLog.Entry> removed;
 
         MessageLogClearJob(SettingsActivity activity) { owner = new java.lang.ref.WeakReference<>(activity); }
 
         void start() {
-            new Thread(() -> {
-                boolean result = MessageLog.clear();
+            MESSAGE_LOG_WORK.execute(() -> {
+                MessageLog.Cleared result = MessageLog.clearForUndo();
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                    cleared = result;
+                    cleared = result.cleared;
+                    removed = result.removed;
                     finished = true;
                     SettingsActivity activity = owner.get();
                     if (activity != null) activity.messageLogCleared(this);
                 });
-            }, "HushMessageLogClear").start();
+            });
         }
     }
 

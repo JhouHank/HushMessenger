@@ -117,6 +117,64 @@ public class QuickSetupsTest {
         }
     }
 
+    /**
+     * Undo puts back exactly what was saved before, so a switch that was never set goes back to never set, and leaves alone
+     * one flipped again since.
+     */
+    @Test public void undoPutsBackWhatAQuickSetupChangedButNotASwitchFlippedSince() {
+        Settings.preferences.edit().putBoolean("analytics_uploads", true).commit();
+        List<String> changed = new java.util.ArrayList<>(QuickSetups.PRIVACY);
+        changed.remove("analytics_uploads");
+        String flipped = changed.get(0);
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            SettingsText text = new SettingsText(screen.get());
+            android.widget.Button undo = root.findViewWithTag("undo");
+            assertEquals(View.GONE, undo.getVisibility());
+            root.findViewWithTag("tab_app").performClick();
+            root.findViewWithTag("quick_privacy").performClick();
+            assertEquals(text.count("quick_changed", changed.size()), ShadowToast.getTextOfLatestToast());
+            assertTrue(undo.isShown());
+            assertEquals("Undo Privacy", undo.getText().toString());
+            Settings.preferences.edit().putBoolean(flipped, false).commit();
+            undo.performClick();
+            assertEquals(text.count("quick_undone", changed.size() - 1), ShadowToast.getTextOfLatestToast());
+            assertEquals(View.GONE, undo.getVisibility());
+            assertTrue(Settings.preferences.getBoolean("analytics_uploads", false));
+            assertTrue(Settings.preferences.contains(flipped));
+            for (String key : changed) {
+                if (!key.equals(flipped)) assertFalse(key, Settings.preferences.contains(key));
+                assertFalse(key, ((Switch) root.findViewWithTag(key)).isChecked());
+            }
+        }
+    }
+
+    @Test public void backToDefaultsIsFinalOnceUndoRunsOutOrSettingsClose() {
+        Settings.preferences.edit().putBoolean("growth", true).commit();
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            View root = screen.get().getWindow().getDecorView();
+            View undo = root.findViewWithTag("undo");
+            root.findViewWithTag("tab_app").performClick();
+            root.findViewWithTag("quick_defaults").performClick();
+            assertEquals("Undo Back to defaults", ((TextView) undo).getText().toString());
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(SettingsActivity.UNDO_MILLIS - 1));
+            assertTrue(undo.isShown());
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));
+            assertEquals(View.GONE, undo.getVisibility());
+            // A hidden button still takes performClick, so these show the saved values are gone, not just the button.
+            undo.performClick();
+            assertFalse(Settings.preferences.getBoolean("growth", true));
+            Settings.preferences.edit().putBoolean("growth", true).commit();
+            root.findViewWithTag("quick_defaults").performClick();
+            assertTrue(undo.isShown());
+            screen.pause().stop();
+            screen.start().resume();
+            assertEquals(View.GONE, undo.getVisibility());
+            undo.performClick();
+            assertFalse(Settings.preferences.getBoolean("growth", true));
+        }
+    }
+
     private static void installedFeatures(String... keys) throws Exception {
         var app = RuntimeEnvironment.getApplication();
         var info = app.getPackageManager().getPackageInfo(app.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);

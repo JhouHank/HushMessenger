@@ -29,7 +29,7 @@ public class ToastLengthTest {
         "import_auto_reply_off", "open_help", "no_browser", "page_blocked", "camera_missing", "camera_failed",
         "camera_permission", "gallery_missing", "gallery_failed", "restart_save_failed", "restart_unavailable",
         "text_style_read_only", "text_style_bold_none", "text_style_italic_none", "mark_read_done", "mark_read_nothing",
-        "settings_open_failed", "settings_open_instead",
+        "settings_open_failed", "settings_open_instead", "message_log_restored", "message_log_restore_failed",
     };
 
     @Test public void everyToastFitsOnTwoLines() {
@@ -41,6 +41,7 @@ public class ToastLengthTest {
         check(cut, "auto_reply_saved", words.get("auto_reply_saved", 12));
         for (int count : new int[] {1, 12}) {
             check(cut, "quick_changed", words.count("quick_changed", count));
+            check(cut, "quick_undone", words.count("quick_undone", count));
             check(cut, "imported", words.count("imported", count));
         }
         for (String mode : new String[] {"stock", "chat_heads", "native"})

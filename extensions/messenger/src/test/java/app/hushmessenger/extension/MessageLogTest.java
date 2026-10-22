@@ -653,6 +653,43 @@ public class MessageLogTest {
         assertEquals("arrived after clear", MessageLog.entries().get(0).text);
     }
 
+    /** Undo's copy holds the file and the queue, a message that arrives while the file is read included. */
+    @Test public void aClearForUndoTakesWhatArrivesWhileTheLogIsRead() throws Exception {
+        MessageLog.storeNow("in the file", "t");
+        MessageLog.queue("queued", "t");
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { return softwareVault.seal(plain); }
+            @Override public byte[] open(byte[] blob) throws Exception {
+                MessageLog.queue("arrived during the read", "t");
+                return softwareVault.open(blob);
+            }
+            @Override public void forget() throws Exception { softwareVault.forget(); }
+        };
+        MessageLog.Cleared cleared = MessageLog.clearForUndo();
+        MessageLog.vault = softwareVault;
+        assertTrue(cleared.cleared);
+        List<String> taken = new java.util.ArrayList<>();
+        for (MessageLog.Entry entry : cleared.removed) taken.add(entry.text);
+        assertEquals(List.of("in the file", "queued", "arrived during the read"), taken);
+        assertTrue(MessageLog.restore(cleared.removed));
+        assertEquals(3, MessageLog.entries().size());
+    }
+
+    @Test public void aLogThatCantBeReadIsClearedWithNothingForUndo() throws Exception {
+        MessageLog.storeNow("unreadable", "t");
+        MessageLog.queue("queued", "t");
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { return softwareVault.seal(plain); }
+            @Override public byte[] open(byte[] blob) throws Exception { throw new java.io.IOException("unavailable"); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.Cleared cleared = MessageLog.clearForUndo();
+        MessageLog.vault = softwareVault;
+        assertTrue(cleared.cleared);
+        assertTrue(cleared.removed.isEmpty());
+        assertFalse(logFile().exists());
+    }
+
     @Test public void aBurstIsWrittenOnceAndTheQueueIsBounded() throws Exception {
         assertTrue(MessageLog.queue("first", "t"));
         // Already scheduled: the next ones ride the same write.

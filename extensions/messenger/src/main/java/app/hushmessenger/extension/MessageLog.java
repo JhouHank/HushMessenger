@@ -438,10 +438,16 @@ public final class MessageLog {
 
     /** Deletes the file, anything set aside and the key, and drops messages still waiting to be written. */
     static boolean clear() {
+        return clear(null);
+    }
+
+    /** {@link #clear} that adds the messages it drops from the queue to [taken], in the same step as dropping them. */
+    private static boolean clear(List<Entry> taken) {
         Context context = Settings.appContext;
         boolean cleared = context != null;
         synchronized (LOCK) {
             synchronized (PENDING) {
+                if (taken != null) taken.addAll(PENDING);
                 PENDING.clear();
             }
             // Names Auto reply noted for messages not written yet go with them.
@@ -466,6 +472,55 @@ public final class MessageLog {
             }
         }
         return cleared;
+    }
+
+    /** A clear's outcome, with what it took, oldest first. */
+    static final class Cleared {
+        final boolean cleared;
+        final List<Entry> removed;
+        Cleared(boolean cleared, List<Entry> removed) {
+            this.cleared = cleared;
+            this.removed = removed;
+        }
+    }
+
+    /**
+     * {@link #clear} that hands back what it took, the file's messages then the ones waiting to be written, for the
+     * settings screen's Undo. The copy lives in memory only. A log that can't be read comes back with nothing to put back.
+     */
+    static Cleared clearForUndo() {
+        Context context = Settings.appContext;
+        List<Entry> removed = new ArrayList<>();
+        synchronized (LOCK) {
+            if (context != null) {
+                try {
+                    removed.addAll(load(context));
+                } catch (Throwable unreadable) {
+                    // Putting back only the queued few would read as the whole log coming back.
+                    return new Cleared(clear(), new ArrayList<>());
+                }
+            }
+            // A message queued while the file was read is taken with the rest, never dropped unseen.
+            return new Cleared(clear(removed), removed);
+        }
+    }
+
+    /** Puts back what a clear took, ahead of anything logged since, within the usual limits and under a new key. */
+    static boolean restore(List<Entry> removed) {
+        Context context = Settings.appContext;
+        if (context == null) return false;
+        synchronized (LOCK) {
+            try {
+                List<Entry> entries = new ArrayList<>(removed);
+                entries.addAll(load(context));
+                prune(entries, System.currentTimeMillis());
+                save(context, entries);
+                return true;
+            } catch (Throwable failure) {
+                Settings.hookFailedPrivately(KEY, "Can't put the message log back", failure);
+                return false;
+            }
+        }
     }
 
     /**

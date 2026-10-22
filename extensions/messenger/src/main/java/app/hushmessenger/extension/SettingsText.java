@@ -208,6 +208,10 @@ final class SettingsText {
         ENGLISH.put("quick_changed_many", "Changed %d settings");
         ENGLISH.put("quick_unchanged", "Nothing to change. Those settings were already set.");
         ENGLISH.put("quick_missing", "Those switches aren't installed. Nothing changed.");
+        ENGLISH.put("quick_undone_one", "Put back %d setting");
+        ENGLISH.put("quick_undone_many", "Put back %d settings");
+        ENGLISH.put("undo", "Undo");
+        ENGLISH.put("undo_action", "Undo %s");
         ENGLISH.put("credits", "GPL-3.0. Includes work from De-Vanced, ReVanced, Doom and Messenger Cleaner.");
         ENGLISH.put("independent", "Independent of Meta and Morphe.");
         ENGLISH.put("clipboard", "HushMessenger setup");
@@ -323,6 +327,8 @@ final class SettingsText {
         ENGLISH.put("message_log_in_group", "%s in %s");
         ENGLISH.put("message_log_no_text", "(no text)");
         ENGLISH.put("message_log_cleared", "Message log cleared");
+        ENGLISH.put("message_log_restored", "Message log put back");
+        ENGLISH.put("message_log_restore_failed", "Couldn't put the log back");
         ENGLISH.put("message_log_now", "Just now");
         ENGLISH.put("message_log_ago", "%s ago");
         ENGLISH.put("auto_reply_edit", "Edit replies");
