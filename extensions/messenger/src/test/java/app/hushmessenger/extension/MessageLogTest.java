@@ -27,6 +27,8 @@ import static org.junit.Assert.*;
 @Config(sdk = {28, 36})
 public class MessageLogTest {
     private SoftwareVault softwareVault;
+    private java.util.function.LongConsumer retryLater;
+    private final List<Long> retries = new ArrayList<>();
 
     @Before public void reset() throws Exception {
         Settings.initialize(RuntimeEnvironment.getApplication());
@@ -34,8 +36,12 @@ public class MessageLogTest {
         Settings.activeAt.clear();
         CrashGuard.resetForTests();
         CrashGuard.onProcessStart(RuntimeEnvironment.getApplication());
-        // With the switch still off, this drops anything an earlier test left queued.
-        MessageLog.drain();
+        // A failed write's retry is caught here, so none fires in the middle of a later test.
+        retryLater = MessageLog.retryLater;
+        retries.clear();
+        MessageLog.retryLater = retries::add;
+        // With the switch still off, this drops anything an earlier test left queued, and a retry left waiting.
+        MessageLog.retry();
         MessageLog.forgetCaptures();
         Settings.hookErrors.clear();
         softwareVault = new SoftwareVault();
@@ -46,6 +52,7 @@ public class MessageLogTest {
     }
 
     @After public void tidy() {
+        MessageLog.retryLater = retryLater;
         MessageLog.vault = null;
         logFile().delete();
         damagedFile().delete();
@@ -651,6 +658,41 @@ public class MessageLogTest {
         MessageLog.queue("arrived after clear", "t");
         MessageLog.drain();
         assertEquals("arrived after clear", MessageLog.entries().get(0).text);
+    }
+
+    /** Messages a failed write put back get a write of their own, so they don't wait on a next notification that may not come. */
+    @Test public void aFailedWriteIsTriedAgainWithoutAnotherMessage() throws Exception {
+        MessageLog.storeNow("kept", "t");
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { throw new java.io.IOException("disk full"); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.storeNow("waiting", "t");
+        assertEquals(List.of(MessageLog.RETRY_MS), retries);
+        // A write that fails while the retry waits doesn't set up a second one, and each failure in a row waits longer.
+        MessageLog.storeNow("also waiting", "t");
+        assertEquals(1, retries.size());
+        MessageLog.retry();
+        assertEquals(List.of(MessageLog.RETRY_MS, 4 * MessageLog.RETRY_MS), retries);
+        for (int i = 0; i < 8; i++) MessageLog.retry();
+        assertEquals(MessageLog.RETRY_MAX_MS, (long) retries.get(retries.size() - 1));
+        MessageLog.vault = softwareVault;
+        int before = retries.size();
+        MessageLog.retry();
+        List<String> kept = new ArrayList<>();
+        for (MessageLog.Entry entry : MessageLog.entries()) kept.add(entry.text);
+        assertEquals(List.of("also waiting", "waiting", "kept"), kept);
+        assertEquals("nothing left to retry", before, retries.size());
+        // A good write starts the wait over.
+        MessageLog.vault = new MessageLog.Vault() {
+            @Override public byte[] seal(byte[] plain) throws Exception { throw new java.io.IOException("disk full"); }
+            @Override public byte[] open(byte[] blob) throws Exception { return softwareVault.open(blob); }
+            @Override public void forget() { softwareVault.forget(); }
+        };
+        MessageLog.storeNow("later", "t");
+        MessageLog.vault = softwareVault;
+        assertEquals(MessageLog.RETRY_MS, (long) retries.get(retries.size() - 1));
     }
 
     /** Undo's copy holds the file and the queue, a message that arrives while the file is read included. */

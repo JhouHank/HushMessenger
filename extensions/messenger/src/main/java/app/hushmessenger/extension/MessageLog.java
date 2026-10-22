@@ -85,6 +85,13 @@ public final class MessageLog {
     /** Messages captured but not yet written, oldest first. Guarded by itself. */
     private static final ArrayDeque<Entry> PENDING = new ArrayDeque<>();
     private static boolean drainScheduled;
+    /** How long after a failed write the queue is written again, doubled for each failure in a row up to RETRY_MAX_MS. */
+    static final long RETRY_MS = 30_000, RETRY_MAX_MS = 30L * 60 * 1000;
+    /** Sets up the write that follows a failed one. Tests take the delay here instead. */
+    static java.util.function.LongConsumer retryLater = delay -> WRITER.schedule(MessageLog::retry, delay, TimeUnit.MILLISECONDS);
+    /** Whether that write is set up, and how many writes failed in a row. Guarded by PENDING. */
+    private static boolean retryScheduled;
+    private static int failedWrites;
     /** When each recent capture came in, by chat and message id or a digest of its words, oldest first. Guarded by PENDING. */
     private static final LinkedHashMap<String, Long> RECENT = new LinkedHashMap<>();
     /** Sender and group name auto reply read before answering, by chat and message id. Guarded by itself. */
@@ -311,16 +318,35 @@ public final class MessageLog {
                 entries.addAll(withNames);
                 prune(entries, System.currentTimeMillis());
                 save(context, entries);
+                synchronized (PENDING) {
+                    failedWrites = 0;
+                }
                 Settings.activeAt.put(KEY, System.currentTimeMillis());
             } catch (Throwable failure) {
-                // Back in front of the queue, so the next notification's write tries them again. The cap still holds.
+                long delay = 0;
+                // Back in front of the queue, so the next write tries them again. The cap still holds.
                 synchronized (PENDING) {
                     for (int i = retry.size() - 1; i >= 0; i--) PENDING.addFirst(retry.get(i));
                     while (PENDING.size() > MAX_ENTRIES) PENDING.removeFirst();
+                    // No other message may come to write them before the process ends, so they get a write of their own.
+                    if (!retryScheduled) {
+                        retryScheduled = true;
+                        delay = Math.min(RETRY_MAX_MS, RETRY_MS << Math.min(failedWrites, 6));
+                    }
+                    failedWrites++;
                 }
                 Settings.hookFailedPrivately(KEY, "Can't keep the message log", failure);
+                if (delay > 0) retryLater.accept(delay);
             }
         }
+    }
+
+    /** The write set up after a failed one. */
+    static void retry() {
+        synchronized (PENDING) {
+            retryScheduled = false;
+        }
+        drain();
     }
 
     /**
