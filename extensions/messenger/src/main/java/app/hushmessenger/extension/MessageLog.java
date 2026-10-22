@@ -531,7 +531,9 @@ public final class MessageLog {
         synchronized (LOCK) {
             if (context != null) {
                 try {
-                    removed.addAll(load(context));
+                    // read, not load: load sets a damaged file aside and answers with an empty log, which would put
+                    // back only the queued few here.
+                    removed.addAll(read(new File(context.getFilesDir(), FILE)));
                 } catch (Throwable unreadable) {
                     // Putting back only the queued few would read as the whole log coming back.
                     return new Cleared(clear(), new ArrayList<>());

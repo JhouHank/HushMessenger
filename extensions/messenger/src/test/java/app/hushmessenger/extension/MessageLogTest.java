@@ -732,6 +732,17 @@ public class MessageLogTest {
         assertFalse(logFile().exists());
     }
 
+    /** A file that can't be the log's own gives Undo nothing, the same as one the key store won't open. */
+    @Test public void aDamagedLogIsClearedWithNothingForUndo() throws Exception {
+        Files.write(logFile().toPath(), new byte[] {1, 2, 3});
+        MessageLog.queue("queued", "t");
+        MessageLog.Cleared cleared = MessageLog.clearForUndo();
+        assertTrue(cleared.cleared);
+        assertTrue(cleared.removed.isEmpty());
+        assertFalse(logFile().exists());
+        assertFalse(damagedFile().exists());
+    }
+
     /** Messages that keep failing to save during an outage don't push the next try out. Only failed tries do. */
     @Test public void failedWritesWhileATryWaitsDontStretchTheNextOne() throws Exception {
         MessageLog.vault = new MessageLog.Vault() {
