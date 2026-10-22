@@ -40,6 +40,7 @@
 - Two patches got plainer names, in Morphe's patch list and in settings. **Turn off the swipe up for disappearing messages** is now **Ignore the swipe up for disappearing messages**, and **Stop MQTT logging** is now **Stop live connection logging**. Morphe remembers your picks by name, so if you'd left either one out, it'll be picked again. Uncheck it before you repatch.
 - With **Hide People tab**, **Hide Notifications tab** or **Hide Meta AI** on, the bar at the bottom now lights up the tab you're actually on. With People hidden, opening Notifications used to light up Menu instead.
 - Some accounts get Meta's newer AI agent tab in the bar where the Meta AI tab usually sits. **Hide Meta AI** now hides that one too, and the bar still lights up the right tab. Restart Messenger to see it go.
+- Right after you install or update a patched Messenger, **Bold** and **Italic** no longer show up in the text selection menu while **Bold and italic text** is off. Messenger's first start turned them on, and they stayed there until you opened Messenger a second time.
 
 ### Docs
 
