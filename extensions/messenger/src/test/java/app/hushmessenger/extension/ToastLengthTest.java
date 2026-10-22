@@ -30,6 +30,7 @@ public class ToastLengthTest {
         "camera_permission", "gallery_missing", "gallery_failed", "restart_save_failed", "restart_unavailable",
         "text_style_read_only", "text_style_bold_none", "text_style_italic_none", "mark_read_done", "mark_read_nothing",
         "settings_open_failed", "settings_open_instead", "message_log_restored", "message_log_restore_failed",
+        "import_same",
     };
 
     @Test public void everyToastFitsOnTwoLines() {
@@ -39,11 +40,15 @@ public class ToastLengthTest {
         check(cut, "quick_setups_hidden", words.get("quick_setups_hidden", words.format("quick_setups_home"), words.format("choices")));
         check(cut, "font_file_too_large", words.get("font_file_too_large", FontFile.MAX_MEGABYTES));
         check(cut, "auto_reply_saved", words.get("auto_reply_saved", 12));
+        // A restored pause adds its own sentence to the restore toast.
+        String paused = " " + words.get("changes_paused") + ".";
         for (int count : new int[] {1, 12}) {
             check(cut, "quick_changed", words.count("quick_changed", count));
             check(cut, "quick_undone", words.count("quick_undone", count));
-            check(cut, "imported", words.count("imported", count));
+            check(cut, "imported", words.count("imported", count) + paused);
         }
+        check(cut, "imported_partial", words.get("imported_partial", 57, 58) + paused);
+        check(cut, "import_same", words.get("import_same") + paused);
         for (String mode : new String[] {"stock", "chat_heads", "native"})
             check(cut, "bubble_changed " + mode, words.get("bubble_changed", words.base("bubble_" + mode)));
         for (String[] control : SettingsActivity.CONTROLS) {

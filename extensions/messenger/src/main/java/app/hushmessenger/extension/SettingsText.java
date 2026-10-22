@@ -248,6 +248,9 @@ final class SettingsText {
         ENGLISH.put("import_help", "Restores choices from text you copied with Export choices. Copy it first, then tap here.");
         ENGLISH.put("imported_one", "Restored %d choice.");
         ENGLISH.put("imported_many", "Restored %d choices.");
+        // Only some of the backup's choices differed from this phone's; always two or more in all, so plural.
+        ENGLISH.put("imported_partial", "Changed %1$d of %2$d choices.");
+        ENGLISH.put("import_same", "Your choices already match that backup.");
         ENGLISH.put("import_auto_reply_off", "Auto reply stays off. Backups don't carry replies.");
         ENGLISH.put("import_empty", "Nothing to import. Copy your exported choices first.");
         ENGLISH.put("import_invalid", "Not a valid backup. Copy an unedited export.");

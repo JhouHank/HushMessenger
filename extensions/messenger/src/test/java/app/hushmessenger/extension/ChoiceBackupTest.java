@@ -241,13 +241,33 @@ public class ChoiceBackupTest {
             clipboard(backup.toString());
             screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
             String toast = ShadowToast.getTextOfLatestToast();
-            assertEquals("Restored 12 choices. Changes paused.", toast);
+            // The eleven switches restore off, as they already were, so only the pause counts as a change.
+            assertEquals("Changed 1 of 12 choices. Changes paused.", toast);
             assertTrue(toast, ToastLengthTest.lines(toast) <= 2);
             TextView result = screen.get().getWindow().getDecorView().findViewWithTag("choices_restore_status");
             SettingsText words = new SettingsText(screen.get());
             assertEquals(toast + " " + words.get("import_auto_reply_off") + " " + words.count("import_unknown", 2) + " " +
                 words.count("import_unavailable", 1), result.getText().toString());
             assertTrue(result.getText().toString(), ToastLengthTest.lines(result.getText().toString()) > 2);
+        }
+    }
+
+    /** A backup's values often match this phone's already, so the restore counts only the choices it changed. */
+    @Test public void aRestoreCountsOnlyTheChoicesItChanged() {
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            Settings.installed = new HashSet<>(Set.of("stories", "typing", "people"));
+            Settings.preferences.edit().putBoolean("stories", true).commit();
+            clipboard(ChoiceCodec.HEADER + "\nstories=true\ntyping=false\n");
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertEquals("Your choices already match that backup.", ShadowToast.getTextOfLatestToast());
+            clipboard(ChoiceCodec.HEADER + "\nstories=true\ntyping=true\npeople=false\n");
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertTrue(Settings.preferences.getBoolean("typing", false));
+            assertEquals("Changed 1 of 3 choices.", ShadowToast.getTextOfLatestToast());
+            clipboard(ChoiceCodec.HEADER + "\nstories=false\ntyping=false\n");
+            screen.get().getWindow().getDecorView().findViewWithTag("import_choices").performClick();
+            assertFalse(Settings.preferences.getBoolean("stories", true));
+            assertEquals("Restored 2 choices.", ShadowToast.getTextOfLatestToast());
         }
     }
 

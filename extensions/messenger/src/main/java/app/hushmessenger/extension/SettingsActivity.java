@@ -2610,13 +2610,20 @@ public final class SettingsActivity extends Activity {
             restoreResult(autoReplyLeftOff ? text.get("import_auto_reply_off") : text.get("import_no_choices"), skipped);
             return;
         }
+        // Every choice starts off, so a value the backup shares with this phone isn't news, and the count says so.
+        int changed = 0;
         SharedPreferences.Editor editor = Settings.preferences.edit();
-        for (Map.Entry<String, Boolean> choice : supported.entrySet()) editor.putBoolean(choice.getKey(), choice.getValue());
+        for (Map.Entry<String, Boolean> choice : supported.entrySet()) {
+            if (Settings.preferences.getBoolean(choice.getKey(), false) != choice.getValue()) changed++;
+            editor.putBoolean(choice.getKey(), choice.getValue());
+        }
         editor.apply();
         refreshChoices();
         // A backup can carry the pause, and a restored pause is easy to miss, so it stays in the toast.
         String paused = Boolean.TRUE.equals(supported.get("paused")) ? " " + text.get("changes_paused") + "." : "";
-        restoreResult(text.count("imported", supported.size()) + paused, autoReply + skipped);
+        String headline = changed == supported.size() ? text.count("imported", changed)
+            : changed == 0 ? text.get("import_same") : text.get("imported_partial", changed, supported.size());
+        restoreResult(headline + paused, autoReply + skipped);
     }
 
     /**
