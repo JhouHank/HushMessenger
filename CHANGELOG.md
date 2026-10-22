@@ -35,6 +35,7 @@
 - `scripts/walk-app.ps1` does that walk. It patches Messenger from the bundle, installs it in place on a leased phone or an emulator, opens both settings pages, a chat and the patched screens, then reads the crash buffer and writes the receipt publish asks for. Any Messenger crash fails the walk. Leaving out a page or a screen makes it partial, and neither one backs a release. A walk that finds the device busy keeps the APK it patched, so the next try goes straight to the device instead of patching again.
 - The development release check, the one a held build goes through, fails when the source has no bundle timestamp. Before, a bundle and a source both missing one counted as a match there. The full release check already refused it, and now it says why.
 - A Gradle run through this PC's build wrapper fails when the wrapper itself errors out before Gradle starts. It used to exit 0 and read as a pass.
+- Recording a Messenger build with `CompatReport.java --save` refuses an APK that isn't signed by Facebook or Meta, or whose signer apksigner can't read. A record pins the APK's checksum, so a re-signed copy could have been written down as the stock build. The release build stage also checks each stock APK against the checksum in its record before patching it, and CompatReport looks for Python as `py`, `python3` or `python` (never the Windows Store stub) instead of assuming `python`.
 
 ## 0.25.0 (2026-10-18)
 

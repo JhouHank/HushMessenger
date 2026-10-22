@@ -391,6 +391,11 @@ switch ($Stage) {
             $recorded = Join-Path $root "scripts/profiles/$code.txt"
             # CompatReport writes LF; a checkout can hold the record with CRLF.
             $profileText = (Get-Content -LiteralPath $recorded -Raw) -replace "`r`n", "`n"
+            # Only the stock APK the profile was recorded from proves this bundle patches that build.
+            $recordedStock = [regex]::Match($profileText, '(?m)^sha256 ([0-9a-f]{64})$').Groups[1].Value
+            if ($stock -ne $recordedStock) {
+                throw "$apk is $stock, but scripts/profiles/$code.txt was recorded from $recordedStock. Put the unmodified APK from APKMirror in HUSH_NATIVE_FIXTURES."
+            }
             $profileHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($profileText))).ToLowerInvariant()
             if (Test-Path -LiteralPath $receipt) {
                 $kept = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json

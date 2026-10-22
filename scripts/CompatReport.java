@@ -319,11 +319,29 @@ public class CompatReport {
 
     static final Path PROFILES = scriptDir().resolve("profiles");
 
+    /** Python 3 from PATH: the py launcher first on Windows, then python3 or python. */
+    static List<String> python() throws IOException {
+        boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String path = System.getenv("PATH");
+        for (var name : win ? List.of("py", "python3", "python") : List.of("python3", "python")) {
+            for (var dir : (path == null ? "" : path).split(File.pathSeparator)) {
+                if (dir.isBlank()) continue;
+                Path exe;
+                try { exe = Path.of(dir.strip(), win ? name + ".exe" : name); } catch (InvalidPathException e) { continue; }
+                // WindowsApps holds the Store's python stubs, which open the Store instead of running a script.
+                if (!Files.isRegularFile(exe) || (win && exe.toString().toLowerCase().contains("\\windowsapps\\"))) continue;
+                return "py".equals(name) ? List.of(exe.toString(), "-3") : List.of(exe.toString());
+            }
+        }
+        throw new IOException("verify_compat_patch.py needs Python 3. Put the py launcher, python3 or python on PATH");
+    }
+
     /** Discovery isn't patch application. Never publish a profile on discovery evidence alone. */
     static boolean verifyPatch(File apk, String apkHash, Path desktop, Path bundle) throws IOException, InterruptedException {
         String aapt2 = findTool("aapt2");
         if (aapt2 == null) throw new IOException("Android Build Tools aapt2 is required to validate the rebuilt APK");
-        var command = new ArrayList<>(List.of("python", scriptDir().resolve("verify_compat_patch.py").toString(),
+        var command = new ArrayList<>(python());
+        command.addAll(List.of(scriptDir().resolve("verify_compat_patch.py").toString(),
             "--apk", apk.getAbsolutePath(), "--apk-sha256", apkHash, "--desktop", desktop.toAbsolutePath().toString(),
             "--bundle", bundle.toAbsolutePath().toString(), "--java",
             Path.of(System.getProperty("java.home"), "bin", "java").toString(), "--aapt2", aapt2));
@@ -5641,8 +5659,16 @@ public class CompatReport {
             System.out.println("[FAIL] Version name: expected " + expected.version + ", got " + info.versionName);
             anyFail = true;
         }
-        if (signer != null && !FACEBOOK_SIGNER.equals(signer) && !META_SIGNER.equals(signer)) {
+        boolean stockSigner = FACEBOOK_SIGNER.equals(signer) || META_SIGNER.equals(signer);
+        if (signer != null && !stockSigner) {
             System.out.println("[WARN] Signer: " + signer + " is not the stock Facebook or Meta certificate");
+        }
+        // A record pins the APK's hash, so it may only ever describe the stock file from Meta.
+        if (save && !stockSigner) {
+            System.out.println("[FAIL] Signer: " + (signer == null ? "apksigner couldn't read it" : "not stock") +
+                ", and --save records only an APK signed by Facebook or Meta");
+            blockers.add("Signer");
+            anyFail = true;
         }
 
         // Load DEX
