@@ -123,6 +123,8 @@ public final class SettingsActivity extends Activity {
     private Button saveChoicesFile, readChoicesFile;
     private Button cancelChoicesFile;
     private TextView documentStatus;
+    /** The whole restore result. The toast holds only its first part, since Android 12+ cuts a toast after two lines. */
+    private TextView restoreStatus;
     private DocumentJob documentJob;
     static int documentTimeoutMillis = 30_000;
     private static final java.util.concurrent.Semaphore documentSlots = new java.util.concurrent.Semaphore(2);
@@ -1509,6 +1511,11 @@ public final class SettingsActivity extends Activity {
         documentStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         documentStatus.setVisibility(View.GONE);
         ui.add(choices, documentStatus, 8);
+        restoreStatus = ui.text("", 13, ui.muted, false);
+        restoreStatus.setTag("choices_restore_status");
+        restoreStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        restoreStatus.setVisibility(View.GONE);
+        ui.add(choices, restoreStatus, 8);
         cancelChoicesFile = ui.button(text.get("cancel_choices_file"));
         cancelChoicesFile.setTag("cancel_choices_file");
         cancelChoicesFile.setVisibility(View.GONE);
@@ -2389,6 +2396,7 @@ public final class SettingsActivity extends Activity {
 
     private void importChoices() {
         documentGeneration++;
+        restoreStatus.setVisibility(View.GONE);
         try {
             ClipboardManager clipboard = getSystemService(ClipboardManager.class);
             if (clipboard == null || !clipboard.hasPrimaryClip()) {
@@ -2431,16 +2439,23 @@ public final class SettingsActivity extends Activity {
         if (autoReplyLeftOff) supported.remove(AutoReply.KEY);
         String autoReply = autoReplyLeftOff ? " " + text.get("import_auto_reply_off") : "";
         if (supported.isEmpty()) {
-            feedback((autoReplyLeftOff ? text.get("import_auto_reply_off") : text.get("import_no_choices")) + skipped, Toast.LENGTH_LONG);
+            restoreResult(autoReplyLeftOff ? text.get("import_auto_reply_off") : text.get("import_no_choices"), skipped);
             return;
         }
         SharedPreferences.Editor editor = Settings.preferences.edit();
         for (Map.Entry<String, Boolean> choice : supported.entrySet()) editor.putBoolean(choice.getKey(), choice.getValue());
         editor.apply();
         refreshChoices();
-        // A backup can carry the pause, and a restored pause is easy to miss.
+        // A backup can carry the pause, and a restored pause is easy to miss, so it stays in the toast.
         String paused = Boolean.TRUE.equals(supported.get("paused")) ? " " + text.get("changes_paused") + "." : "";
-        feedback(text.count("imported", supported.size()) + paused + autoReply + skipped, Toast.LENGTH_LONG);
+        restoreResult(text.count("imported", supported.size()) + paused, autoReply + skipped);
+    }
+
+    /** The headline goes in the toast. With notes after it, the whole result also stays on the card under the buttons. */
+    private void restoreResult(String headline, String notes) {
+        feedback(headline, Toast.LENGTH_LONG);
+        restoreStatus.setText(headline + notes);
+        restoreStatus.setVisibility(notes.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -2474,6 +2489,7 @@ public final class SettingsActivity extends Activity {
         DocumentJob job = new DocumentJob(this, uri, request, export);
         documentJob = job;
         documentBusy = true;
+        restoreStatus.setVisibility(View.GONE);
         saveChoicesFile.setEnabled(false);
         readChoicesFile.setEnabled(false);
         cancelChoicesFile.setVisibility(View.VISIBLE);

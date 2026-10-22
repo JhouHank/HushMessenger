@@ -15,6 +15,7 @@
 - A video picked in a chat whose access ran out before or during the send no longer gets **Fix videos that won't send** marked as failing in settings. It goes out the way Messenger would send it anyway.
 - If the phone's sound encoder won't start while a video's sound is being fixed, it's let go right away instead of staying held until Messenger closes.
 - Android 12 and newer show only two lines of a pop-up message and cut the rest with "...", which hid the useful part of 27 of HushMessenger's. They're shorter now and fit, from the font file and backup messages to the camera, gallery and restart ones.
+- Restoring your choices pops up how many came back, plus "Changes paused" when the backup paused them. Skipped choices and Auto reply staying off used to run past the end of that message. Now the whole result stays written under the backup buttons.
 - When reading a choices file takes too long, the message says your choices didn't change. It used to warn that a saved file may be cut off, which is only true when saving one.
 - If settings can't open from the side menu or the Messenger logo, two short messages now say so and then name the other way in. One message was too long and lost its second half.
 - Picking a font file while **Use your own font** is off now says to turn the switch on, instead of telling you to restart Messenger. The file's name stays on the line under the button, where a long one can't push the rest off the message.
