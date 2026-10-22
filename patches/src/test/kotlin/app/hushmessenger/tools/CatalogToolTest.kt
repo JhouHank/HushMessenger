@@ -328,6 +328,33 @@ class CatalogToolTest {
         assertFailsWith<IllegalArgumentException> { CatalogTool.requireBundleTimestamp("", "") }
     }
 
+    /** The check's own entry point reads both sides, so a bundle and source that both lack a timestamp still fail there. */
+    @Test fun theCatalogCheckRefusesABundleWithoutATimestamp() {
+        fun manifest(vararg pairs: Pair<String, String>) = java.util.jar.Manifest().apply {
+            for ((name, value) in pairs) mainAttributes.putValue(name, value)
+        }
+        fun source(vararg pairs: Pair<String, String>) = java.util.Properties().apply { for ((name, value) in pairs) setProperty(name, value) }
+        val fresh = manifest("Version" to "0.25.0", "Timestamp" to "1790552148000")
+        assertEquals("0.25.0", CatalogTool.requireBundleMatchesSource(fresh,
+            source("version" to "0.25.0", "bundleTimestampMillis" to "1790552148000")))
+        val neither = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.requireBundleMatchesSource(manifest("Version" to "0.25.0"), source("version" to "0.25.0"))
+        }
+        assertEquals("Source has no bundle timestamp", neither.message)
+        val stale = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.requireBundleMatchesSource(manifest("Version" to "0.25.0"),
+                source("version" to "0.25.0", "bundleTimestampMillis" to "1790552148000"))
+        }
+        assertEquals("Bundle timestamp differs from source", stale.message)
+        val older = assertFailsWith<IllegalArgumentException> {
+            CatalogTool.requireBundleMatchesSource(fresh, source("version" to "0.26.0", "bundleTimestampMillis" to "1790552148000"))
+        }
+        assertEquals("Bundle version differs from source", older.message)
+        assertFailsWith<IllegalArgumentException> {
+            CatalogTool.requireBundleMatchesSource(manifest("Timestamp" to "1790552148000"), source("bundleTimestampMillis" to "1790552148000"))
+        }
+    }
+
     /** A run that refuses its bundle, however early, leaves no success receipt from an earlier run behind. */
     @Test fun aRefusedBundleLeavesNoReceipt(@TempDir temporary: Path) {
         val receipt = temporary.resolve("catalog-evidence.json").toFile()

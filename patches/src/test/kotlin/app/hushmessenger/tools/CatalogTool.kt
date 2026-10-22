@@ -20,6 +20,7 @@ import java.security.MessageDigest
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import java.util.jar.JarFile
+import java.util.jar.Manifest
 import java.util.zip.Adler32
 import java.util.zip.ZipFile
 import javax.xml.parsers.DocumentBuilderFactory
@@ -205,6 +206,14 @@ object CatalogTool {
     fun requireBundleTimestamp(bundle: String?, source: String?) {
         require(source != null && source.matches(Regex("\\d+"))) { "Source has no bundle timestamp" }
         require(bundle == source) { "Bundle timestamp differs from source" }
+    }
+
+    /** The bundle's manifest carries this source's build time and version, so the catalog can't describe a stale bundle. */
+    fun requireBundleMatchesSource(manifest: Manifest, properties: Properties): String {
+        requireBundleTimestamp(manifest.mainAttributes.getValue("Timestamp"), properties.getProperty("bundleTimestampMillis"))
+        val version = manifest.mainAttributes.getValue("Version")
+        require(version != null && version == properties.getProperty("version")) { "Bundle version differs from source" }
+        return version
     }
 
     fun validateDex(data: ByteArray): Int {
@@ -427,10 +436,8 @@ object CatalogTool {
             extensionDex = jar.getInputStream(jar.getEntry("extensions/messenger.mpe")).use { it.readBytes() }
             for (dex in listOf(patcherDex, extensionDex)) require(validateDex(dex) > 0) { "Bundle DEX contains no classes" }
             patchClasses = names.filter { it.startsWith("app/hushmessenger/patches/") && it.endsWith(".class") }
-            requireBundleTimestamp(jar.manifest.mainAttributes.getValue("Timestamp"), properties.getProperty("bundleTimestampMillis"))
-            jar.manifest.mainAttributes.getValue("Version")
+            requireBundleMatchesSource(requireNotNull(jar.manifest) { "Bundle has no manifest" }, properties)
         }
-        require(version == properties.getProperty("version")) { "Bundle version differs from source" }
         val patches = loadPatchesFromJar(setOf(bundle))
         val patchNames = patches.map { requireNotNull(it.name) }.toSet()
         require(patches.size == patchNames.size) { "Duplicate visible patch names" }
