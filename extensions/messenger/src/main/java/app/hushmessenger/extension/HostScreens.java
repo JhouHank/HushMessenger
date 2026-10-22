@@ -230,6 +230,9 @@ public final class HostScreens {
         // After CrashGuard too: Bold and Italic sit in every text field's menu, so safe mode has to take them out.
         if (started && !failed && Settings.installed.contains(TextStyleActivity.KEY)
                 && context.getPackageName().equals(Application.getProcessName())) TextStyleActivity.watch();
+        // Converted copies of picked videos go a day after their last use, switch on or off, without another pick.
+        if (started && !failed && Settings.installed.contains(XheAudio.KEY)
+                && context.getPackageName().equals(Application.getProcessName())) XheAudio.pruneLater(context);
         // A failed start can't follow the switch, so entries an earlier run left on come out. Settings.installed may
         // never have loaded here, and TextStyleActivity checks the manifest itself.
         if (failed && context.getPackageName().equals(Application.getProcessName())) TextStyleActivity.turnOff(context);
