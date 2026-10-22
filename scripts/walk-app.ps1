@@ -239,6 +239,16 @@ function Find-WalkPatchRecord {
     return [string]$kept.apk
 }
 
+# True when the Desktop CLI's result lists at least one step and every step succeeded. Desktop 1.19.0
+# (patcher 2.0) calls the list stepResults; 1.18.1 and older called it patchingSteps. A result with
+# no steps at all is not a finished patch run.
+function Test-WalkPatchSteps {
+    param($Report)
+    $stepList = if ($null -ne $Report.PSObject.Properties['stepResults']) { $Report.stepResults } else { $Report.patchingSteps }
+    $steps = @($stepList | Where-Object { $null -ne $_ })
+    return ($steps.Count -gt 0 -and @($steps | Where-Object { -not $_.success }).Count -eq 0)
+}
+
 function Invoke-WalkPatch {
     param([string]$JavaExe, [string]$Jar, [string]$BundlePath, [string]$StockApk, [string]$KeystorePath,
         [string]$Alias, [string]$StorePassword, [string]$Destination)
@@ -254,7 +264,7 @@ function Invoke-WalkPatch {
         return $kept
     }
     Remove-Item -LiteralPath $patched, $resultFile, $log, $inputsFile -Force -ErrorAction SilentlyContinue
-    # Desktop 1.18.1 fails at SIGNING when it's handed an empty password, so a key without one gets
+    # Desktop 1.18.1 failed at SIGNING when it's handed an empty password, so a key without one gets
     # no password flag. A password travels in an argument file, kept off the process command line.
     $cliArguments = @('patch', "--patches=$BundlePath", "--keystore=$KeystorePath", "--keystore-entry-alias=$Alias",
         "--out=$patched", "--result-file=$resultFile", "--temporary-files-path=$scratch")
@@ -288,7 +298,7 @@ function Invoke-WalkPatch {
     if (-not (Test-Path -LiteralPath $resultFile)) { throw "The Desktop CLI wrote no result. See $log." }
     $report = Get-Content -LiteralPath $resultFile -Raw | ConvertFrom-Json
     $failed = @($report.failedPatches)
-    if ($failed.Count -or @($report.patchingSteps | Where-Object { -not $_.success }).Count -or -not (Test-Path -LiteralPath $patched)) {
+    if ($failed.Count -or -not (Test-WalkPatchSteps -Report $report) -or -not (Test-Path -LiteralPath $patched)) {
         throw "Patching didn't make a complete APK ($($failed.Count) patches failed). See $log."
     }
     Write-Host "[walk] applied $(@($report.appliedPatches).Count) patches to $($report.packageName) $($report.packageVersion)"

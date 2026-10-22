@@ -49,6 +49,16 @@ try {
     }
     Assert-WalkApp ($null -eq (Get-WalkApkProblem -Installed '' -Patched '')) 'With no patched APK to hold it to, the skip covers it, not a problem.'
 
+    # The Desktop CLI's step list: 1.18.1 wrote patchingSteps, 1.19.0 writes stepResults.
+    $goodSteps = @([pscustomobject]@{ step = 'PATCHING'; success = $true }, [pscustomobject]@{ step = 'REBUILDING'; success = $true })
+    $badSteps = @([pscustomobject]@{ step = 'PATCHING'; success = $true }, [pscustomobject]@{ step = 'REBUILDING'; success = $false })
+    Assert-WalkApp (Test-WalkPatchSteps -Report ([pscustomobject]@{ patchingSteps = $goodSteps })) 'A 1.18 result with good steps should pass.'
+    Assert-WalkApp (Test-WalkPatchSteps -Report ([pscustomobject]@{ success = $true; stepResults = $goodSteps })) 'A 1.19 result with good steps should pass.'
+    Assert-WalkApp (-not (Test-WalkPatchSteps -Report ([pscustomobject]@{ patchingSteps = $badSteps }))) 'A 1.18 result with a failed step should not pass.'
+    Assert-WalkApp (-not (Test-WalkPatchSteps -Report ([pscustomobject]@{ success = $true; stepResults = $badSteps }))) 'A 1.19 result with a failed step should not pass.'
+    Assert-WalkApp (-not (Test-WalkPatchSteps -Report ([pscustomobject]@{ success = $true }))) 'A result with no step list should not pass.'
+    Assert-WalkApp (-not (Test-WalkPatchSteps -Report ([pscustomobject]@{ success = $true; stepResults = @() }))) 'A result with an empty step list should not pass.'
+
     # Reading the hash off sha256sum's output.
     $hashOut = "$patchedHash  /data/app/~~x==/com.facebook.orca-y==/base.apk"
     Assert-WalkApp ((Read-WalkSha256 @($hashOut)) -ceq $patchedHash) 'The hash line should give its hash.'
