@@ -282,6 +282,36 @@ public class HostScreensTest {
         }
     }
 
+    /** A launcher ranks a dynamic shortcut by its reported use, so Root Mount's copies say when they're tapped. */
+    @Test public void aRootMountShortcutTellsTheLauncherItWasUsed() {
+        mount();
+        Application app = RuntimeEnvironment.getApplication();
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        startWithoutProvider(app);
+        assertEquals(List.of(), Shadows.shadowOf(manager).getReportedShortcutsUsed());
+        for (ShortcutInfo shortcut : manager.getDynamicShortcuts()) {
+            try (var trampoline = Robolectric.buildActivity(HostScreens.ShortcutTrampoline.class, shortcut.getIntent()).setup()) {
+                assertTrue(trampoline.get().isFinishing());
+            }
+        }
+        List<String> reported = Shadows.shadowOf(manager).getReportedShortcutsUsed();
+        assertEquals(2, reported.size());
+        assertEquals(Set.of(HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT), new TreeSet<>(reported));
+    }
+
+    /** The static pair on a normal install isn't a dynamic copy, so its launches report nothing. */
+    @Test public void theStaticShortcutsReportNothing() {
+        Application app = RuntimeEnvironment.getApplication();
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        for (String screen : new String[] {"settings", "restart"}) {
+            try (var trampoline = Robolectric.buildActivity(HostScreens.ShortcutTrampoline.class,
+                    host(screen).setClassName(app, HostScreens.SHORTCUT_HOST)).setup()) {
+                assertTrue(trampoline.get().isFinishing());
+            }
+        }
+        assertEquals(List.of(), Shadows.shadowOf(manager).getReportedShortcutsUsed());
+    }
+
     /** #22: the Menu row comes back whenever Patch controls is missing from the long-press menu, as after a failed publish. */
     @Test public void theMenuRowHidesOnlyWhilePatchControlsIsPublished() {
         Application app = RuntimeEnvironment.getApplication();

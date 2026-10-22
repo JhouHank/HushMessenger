@@ -197,6 +197,28 @@ public final class HostScreens {
         return present;
     }
 
+    /**
+     * Tells the launcher a Root Mount copy was used, so it ranks it and doesn't drop it first when Messenger's
+     * conversation shortcuts crowd the long-press menu. The static pair needs none of this, and while it's there the
+     * copies aren't published, so a launch from it reports nothing.
+     */
+    static void reportShortcutUsed(Context context, String screen) {
+        String id = SETTINGS.equals(screen) ? CONTROLS_SHORTCUT : RESTART.equals(screen) ? RESTART_SHORTCUT : null;
+        if (id == null) return;
+        try {
+            ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+            if (manager == null) return;
+            for (ShortcutInfo shortcut : manager.getDynamicShortcuts()) {
+                if (id.equals(shortcut.getId())) {
+                    manager.reportShortcutUsed(id);
+                    return;
+                }
+            }
+        } catch (RuntimeException error) {
+            Log.w("HushMessenger", "Can't tell the launcher a shortcut was used", error);
+        }
+    }
+
     /** Same target and extra as the static shortcut, so ShortcutTrampoline opens the hosted screen. */
     private static ShortcutInfo shortcut(Context context, String id, String label, String screen, int icon, int rank) {
         Intent intent = new Intent(Intent.ACTION_VIEW).setClassName(context.getPackageName(), SHORTCUT_HOST).putExtra(EXTRA, screen);
@@ -286,6 +308,8 @@ public final class HostScreens {
             try {
                 String screen = getIntent().getStringExtra(EXTRA);
                 if (SETTINGS.equals(screen)) start(this);
+                // Before opening, since Restart Messenger ends the process.
+                reportShortcutUsed(this, screen);
                 open(this, screen);
                 // Proven only once settings actually opened from it.
                 if (SETTINGS.equals(screen)) Settings.noteShortcutUsed();

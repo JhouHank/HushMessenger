@@ -23,6 +23,7 @@
 - **Use system emoji** loads the phone's emoji font once, even when Messenger asks for it from several threads at the same moment. Each thread could load its own copy before.
 - When the message log can't save new messages (the phone's key store is busy, say), it tries again by itself 30 seconds later, then less often while it keeps failing. Those messages used to wait for the next notification and were lost if Messenger closed first.
 - **Back to defaults**, the other Quick setups and **Clear log** each show an Undo button at the top of settings for about 10 seconds, and the emptied log shows one too. Clear log still deletes the saved messages and their key right away. Undo writes them back from a copy kept in memory until the button goes, and leaving settings makes the change final. A switch you flipped again in the meantime stays the way you set it.
+- On a Root Mount install, the **Patch controls** and **Restart Messenger** long-press shortcuts now tell your launcher when you use them, so it can rank them by use the way it does Messenger's own chat shortcuts.
 - In the settings cards, the line between switches now sits below a switch's own buttons (Keep the Profile button, the bubble choices, the font file, message log and auto reply buttons) instead of between the switch and them. The last switch in a card no longer draws a second line just above the card's edge.
 
 ### Docs
