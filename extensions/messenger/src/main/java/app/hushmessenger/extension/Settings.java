@@ -877,31 +877,40 @@ public final class Settings {
     /** Android's standard color emoji font, used when the phone can't say which font it draws emoji with. */
     static final String NOTO_EMOJI_FONT = "/system/fonts/NotoColorEmoji.ttf";
     /** Null asks Android which font it draws emoji with. Tests point this at a missing file. */
-    static String systemEmojiFont;
-    static android.graphics.Typeface systemEmoji;
-    static boolean systemEmojiMissing;
+    static volatile String systemEmojiFont;
+    /** Read without a lock by every hook thread that draws emoji, and loaded once under Settings.class. */
+    static volatile android.graphics.Typeface systemEmoji;
+    static volatile boolean systemEmojiMissing;
     /** Which font the emoji typeface came from, for diagnostics and tests. */
-    static String systemEmojiSource;
+    static volatile String systemEmojiSource;
     public static android.graphics.Typeface systemEmojiTypeface() {
         // Checked before enabled(), so a font that failed to load doesn't count as a use.
         if (systemEmojiMissing || !enabled("use_system_emoji")) return null;
-        if (systemEmoji != null) return systemEmoji;
-        try {
-            // Samsung, many other phones and emoji modules draw emoji with a font other than NotoColorEmoji.ttf (#25).
-            android.graphics.Typeface shaped = systemEmojiFont == null ? shapedEmojiTypeface() : null;
-            if (shaped != null) {
-                systemEmoji = shaped;
-            } else {
-                String path = systemEmojiFont != null ? systemEmojiFont : NOTO_EMOJI_FONT;
-                systemEmoji = android.graphics.Typeface.createFromFile(path);
-                systemEmojiSource = path;
+        android.graphics.Typeface loaded = systemEmoji;
+        if (loaded != null) return loaded;
+        synchronized (Settings.class) {
+            // Another thread may have loaded it, or failed to, while this one waited.
+            if (systemEmojiMissing) return null;
+            if (systemEmoji != null) return systemEmoji;
+            try {
+                // Samsung, many other phones and emoji modules draw emoji with a font other than NotoColorEmoji.ttf (#25).
+                String font = systemEmojiFont;
+                android.graphics.Typeface shaped = font == null ? shapedEmojiTypeface() : null;
+                if (shaped != null) {
+                    systemEmoji = shaped;
+                } else {
+                    String path = font != null ? font : NOTO_EMOJI_FONT;
+                    android.graphics.Typeface typeface = android.graphics.Typeface.createFromFile(path);
+                    systemEmojiSource = path;
+                    systemEmoji = typeface;
+                }
+            } catch (Exception error) {
+                // The font file won't appear later, so Messenger's own emoji stay without retrying on every draw.
+                systemEmojiMissing = true;
+                hookFailed("use_system_emoji", "Can't load the system emoji font", error);
             }
-        } catch (Exception error) {
-            // The font file won't appear later, so Messenger's own emoji stay without retrying on every draw.
-            systemEmojiMissing = true;
-            hookFailed("use_system_emoji", "Can't load the system emoji font", error);
+            return systemEmoji;
         }
-        return systemEmoji;
     }
 
     /** Default emoji presentation, so Android picks its emoji font rather than a text symbol font. */
@@ -938,7 +947,7 @@ public final class Settings {
     }
 
     /** The android.graphics.fonts.Font Android shaped the emoji probe with; Object so Android 9 never resolves the type. */
-    static Object systemEmojiShaped;
+    static volatile Object systemEmojiShaped;
     /** Messenger's downloaded FacebookEmoji.ttf, recorded as Messenger loads it. */
     static volatile java.io.File messengerEmojiFile;
     static java.io.File mergedEmojiFile;
