@@ -386,6 +386,16 @@ public class XheAudioTest {
         onlyFinishedCopies(0);
     }
 
+    /**
+     * Stock Android turns a refused grant into an IOException inside the extractor, but nothing promises every phone's
+     * does. A refusal that comes through as itself still reads as a video the platform can't open, not a broken hook.
+     */
+    @Test public void anExtractorThatPassesOnARefusedGrantReadsAsUnreadable() {
+        assertNull(XheAudio.Tracks.of(source -> { throw new SecurityException("Permission Denial"); }));
+        assertNull(XheAudio.Tracks.of(source -> { throw new IllegalArgumentException("no such file"); }));
+        assertNull(XheAudio.Tracks.of(source -> { throw new IOException("unreadable"); }));
+    }
+
     /** An encoder that won't start, the way one does when it can't take the format, counting the releases it gets. */
     @Implements(MediaCodec.class)
     public static final class RefusingCodec extends ShadowMediaCodec {

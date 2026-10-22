@@ -532,7 +532,7 @@ public final class XheAudio {
         return needsFix(source -> source.setDataSource(context, uri, null));
     }
 
-    private interface Opener {
+    interface Opener {
         void open(MediaExtractor source) throws IOException;
     }
 
