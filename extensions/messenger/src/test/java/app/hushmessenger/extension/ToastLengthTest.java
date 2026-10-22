@@ -29,7 +29,7 @@ public class ToastLengthTest {
         "import_auto_reply_off", "open_help", "no_browser", "page_blocked", "camera_missing", "camera_failed",
         "camera_permission", "gallery_missing", "gallery_failed", "restart_save_failed", "restart_unavailable",
         "text_style_read_only", "text_style_bold_none", "text_style_italic_none", "mark_read_done", "mark_read_nothing",
-        "settings_open_failed",
+        "settings_open_failed", "settings_open_instead",
     };
 
     @Test public void everyToastFitsOnTwoLines() {

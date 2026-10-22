@@ -135,7 +135,8 @@ final class SettingsText {
         ENGLISH.put("restart_account", "Your account stays signed in.");
         ENGLISH.put("choices", "Your choices");
         ENGLISH.put("restart_unavailable", "Couldn't restart. Close and reopen Messenger.");
-        ENGLISH.put("settings_open_failed", "Patch controls: long-press Messenger's home screen icon");
+        ENGLISH.put("settings_open_failed", "Couldn't open HushMessenger settings.");
+        ENGLISH.put("settings_open_instead", "Patch controls: long-press Messenger's home screen icon");
         ENGLISH.put("restart_save_failed", "Couldn't save, so Messenger wasn't restarted. Try again.");
         ENGLISH.put("setup", "YOUR SETUP");
         ENGLISH.put("paused", "Pause all changes");
