@@ -10,11 +10,17 @@
     native), and writes walk-receipt.json with New-WalkReceipt. The receipt names the SHA-256 of the
     .mpp the walked APK was patched with, which is what publish holds it to.
 
-    The result the walk writes:
-      PASS      the whole app was walked, every screen opened, no crash.
-      PARTIAL   a settings page, the chat or one of the default screens was left out.
-      FAIL      a Messenger crash, or a screen that would not open.
+    The result the walk writes, and the exit code it ends with:
+      PASS      0  the whole app was walked, every screen opened, no crash.
+      PARTIAL   2  a settings page, the chat or one of the default screens was left out, or a
+                   -SkipPatch walk found no record that the installed app was patched from -Bundle.
+      FAIL      1  a Messenger crash, a screen that would not open, a crash buffer that couldn't be
+                   read, or an installed APK that isn't the one patched from -Bundle.
     Only a PASS backs a release.
+
+    A screen counts as opened when its link starts in Messenger and Messenger is still in front
+    after the settle time. The walk doesn't check which screen Messenger picked for a link, so it
+    prints the activity each one reached.
 
     Screens open by their fb-messenger:// links (am start -W -a VIEW -d ...), and the chat by
     -Thread, the user id of a chat on the signed-in account. Opening a chat by its link also gets
@@ -49,8 +55,8 @@ param(
     # The patched screens to open, each a link. Leaving out one of the defaults makes the walk PARTIAL,
     # and a link that won't open fails it.
     [string[]]$Visit,
-    # Walk the app that's already installed instead of patching and installing a fresh one. It must
-    # have been patched from -Bundle, since the receipt names that bundle's hash.
+    # Walk the app that's already installed instead of patching and installing a fresh one. It backs a
+    # release only when it's the APK an earlier walk patched from -Bundle into -OutDir.
     [switch]$SkipPatch,
     # Leave the Hush settings pages out. Makes the walk PARTIAL, not a release walk.
     [switch]$SkipSettings,
@@ -102,8 +108,10 @@ function Get-WalkSkips {
     .SYNOPSIS
         The parts of the app a walk with these choices leaves out. Any at all and it isn't the whole app.
     #>
-    param([bool]$SkipSettings, [string]$Thread, [string[]]$Visit = @(), [string[]]$DefaultScreens = $WalkDefaultScreens)
+    param([bool]$SkipSettings, [string]$Thread, [string[]]$Visit = @(), [string[]]$DefaultScreens = $WalkDefaultScreens,
+        [bool]$Unproven = $false)
     $skips = [Collections.Generic.List[string]]::new()
+    if ($Unproven) { $skips.Add('proof the installed app was patched from -Bundle (no patch of it recorded in -OutDir)') }
     if ($SkipSettings) { $skips.Add('the Hush settings pages') }
     if ([string]::IsNullOrWhiteSpace($Thread)) { $skips.Add('a chat (no -Thread)') }
     foreach ($screen in $DefaultScreens) { if ($Visit -cnotcontains $screen) { $skips.Add($screen) } }
@@ -122,6 +130,23 @@ function Select-WalkCrashes {
         $_ -match '^\s*(\d+)\.\d+\s' -and [long]$Matches[1] -ge $SinceEpoch -and
             ($_ -match "Process:\s*$name(?![\w.])" -or $_ -match ">>>\s*$name(?![\w.])")
     })
+}
+
+function Get-WalkApkProblem {
+    <#
+    .SYNOPSIS
+        Why the APK the device ran can't stand for the one patched from the bundle, or $null when it
+        can. -Patched '' means there's nothing to hold it to, which Get-WalkSkips counts instead.
+    #>
+    param([string]$Installed, [string]$Patched)
+    if (-not $Patched) { return $null }
+    if ($Installed -cnotmatch '^[0-9a-f]{64}$') { return "couldn't read the installed APK's SHA-256, so nothing shows it's the one patched from -Bundle" }
+    if ($Installed -cne $Patched) { return "the installed APK ($Installed) isn't the one patched from -Bundle ($Patched)" }
+    return $null
+}
+
+function Get-WalkExitCode([string]$Result) {
+    switch -CaseSensitive ($Result) { 'PASS' { return 0 } 'PARTIAL' { return 2 } default { return 1 } }
 }
 
 function Enter-WalkLease {
@@ -155,7 +180,9 @@ function Exit-WalkLease {
     param($Lease)
     if ($null -eq $Lease) { return }
     $Lease.File.Dispose()
-    Remove-Item -LiteralPath $Lease.Path -ErrorAction Stop
+    # A warning, not a throw, so a failure here never hides the error that ended the walk.
+    try { Remove-Item -LiteralPath $Lease.Path -ErrorAction Stop }
+    catch { Write-Warning "Couldn't remove the lease $($Lease.Path), so the device reads as busy until it's deleted: $($_.Exception.Message)" }
 }
 
 function Get-WalkPatchInputs {
@@ -187,6 +214,17 @@ function Save-WalkPatchInputs {
     foreach ($name in $Inputs.Keys) { $record[$name] = $Inputs[$name] }
     $record.apk = (Get-FileHash -LiteralPath (Join-Path $Destination 'hushmessenger-walk.apk') -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath (Join-Path $Destination 'patch-inputs.json') -Value ($record | ConvertTo-Json -Compress) -Encoding utf8
+}
+
+# The SHA-256 of the APK an earlier walk patched from this bundle into Destination, or '' when there's
+# no such record. A -SkipPatch walk holds the installed app to it.
+function Find-WalkPatchRecord {
+    param([string]$Destination, [string]$BundleSha256)
+    $inputsFile = Join-Path $Destination 'patch-inputs.json'
+    if (-not (Test-Path -LiteralPath $inputsFile -PathType Leaf)) { return '' }
+    try { $kept = Get-Content -LiteralPath $inputsFile -Raw | ConvertFrom-Json } catch { return '' }
+    if ([string]$kept.bundle -cne $BundleSha256 -or [string]$kept.apk -cnotmatch '^[0-9a-f]{64}$') { return '' }
+    return [string]$kept.apk
 }
 
 function Invoke-WalkPatch {
@@ -260,16 +298,20 @@ function Invoke-WalkApp {
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
     $installApk = $null
-    if (-not $SkipPatch) {
+    $patchedSha = ''
+    if ($SkipPatch) {
+        $patchedSha = Find-WalkPatchRecord -Destination $OutDir -BundleSha256 $bundleSha256
+    } else {
         if (-not $StockApk -or -not (Test-Path -LiteralPath $StockApk -PathType Leaf)) { throw 'No stock Messenger APK. Pass -Apk or set HUSH_NATIVE_FIXTURES.' }
         if (-not $KeystorePath -or -not (Test-Path -LiteralPath $KeystorePath -PathType Leaf)) { throw 'Pass -Keystore with the key the installed Messenger is signed with.' }
         if (-not $Jar -or -not (Test-Path -LiteralPath $Jar -PathType Leaf)) { throw 'Pass -DesktopJar or set HUSHMESSENGER_DESKTOP_JAR.' }
         Write-Host "[walk] patching $(Split-Path -Leaf $StockApk) with $(Split-Path -Leaf $BundlePath)"
         $installApk = Invoke-WalkPatch -JavaExe $JavaExe -Jar $Jar -BundlePath $BundlePath -StockApk $StockApk `
             -KeystorePath $KeystorePath -Alias $Alias -StorePassword $StorePassword -Destination $OutDir
+        $patchedSha = (Get-FileHash -LiteralPath $installApk -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 
-    $skips = Get-WalkSkips -SkipSettings $SkipSettings -Thread $Thread -Visit $Visit
+    $skips = Get-WalkSkips -SkipSettings $SkipSettings -Thread $Thread -Visit $Visit -Unproven (-not $patchedSha)
     $lease = Enter-WalkLease -Directory $LeaseDirectory -Serial $Serial -ExpectedModel $ExpectedModel
     $problems = [Collections.Generic.List[string]]::new()
     $screens = 0
@@ -329,9 +371,10 @@ function Invoke-WalkApp {
             $resumed = @((Invoke-WalkAdb @('shell', 'dumpsys', 'activity', 'activities')).Stdout |
                 Where-Object { $_ -match 'ResumedActivity' }) -join ' '
             $foreground = $resumed -match [regex]::Escape($step.Expect)
+            $reached = @($launch.Stdout | Where-Object { $_ -match '^Activity:\s*(\S+)' } | ForEach-Object { $Matches[1] })
             if ($launched -and $foreground) {
                 $screens++
-                Write-Host "[walk] opened $($step.Name)"
+                Write-Host "[walk] opened $($step.Name)$(if ($reached.Count) { " ($($reached[0]))" })"
             } else {
                 $problems.Add("$($step.Name) would not open (status ok: $launched, in front: $foreground)")
                 Write-Host "[walk] $($step.Name) would not open"
@@ -340,7 +383,13 @@ function Invoke-WalkApp {
         # Back to the inbox, so the phone is left on Messenger's home screen.
         [void](Invoke-WalkAdb @('shell', 'am', 'start', '-W', '-n', "$Package/.auth.StartScreenActivity"))
 
-        $crashLines = @((Invoke-WalkAdb @('logcat', '-b', 'crash', '-d', '-v', 'epoch')).Stdout)
+        $crashRead = Invoke-WalkAdb @('logcat', '-b', 'crash', '-d', '-v', 'epoch')
+        $crashLines = @($crashRead.Stdout)
+        if ($crashRead.ExitCode -ne 0) {
+            # An empty read would look like a walk with no crash.
+            $problems.Add("couldn't read the crash buffer (adb exited $($crashRead.ExitCode)), so a crash could have gone unseen")
+            $crashLines = @()
+        }
         $fatal = @(Select-WalkCrashes -Lines $crashLines -Package $Package -SinceEpoch $startedEpoch)
         if ($fatal.Count -gt 0) {
             [IO.File]::WriteAllLines((Join-Path $OutDir 'crash-buffer.txt'), [string[]]$crashLines)
@@ -352,11 +401,15 @@ function Invoke-WalkApp {
         $apkPath = @((Invoke-WalkAdb @('shell', 'pm', 'path', $Package)).Stdout | Where-Object { $_ -like 'package:*base.apk' }) | Select-Object -First 1
         $installedSha = ''
         if ($apkPath) { $installedSha = (@((Invoke-WalkAdb @('shell', 'sha256sum', $apkPath.Substring(8))).Stdout)[0] -split '\s+')[0] }
+        # A missing sha256sum answers with an error line, never a hash.
+        if ($installedSha -cnotmatch '^[0-9a-f]{64}$') { $installedSha = '' }
+        $apkProblem = Get-WalkApkProblem -Installed $installedSha -Patched $patchedSha
+        if ($apkProblem) { $problems.Add($apkProblem) }
 
         $full = $skips.Count -eq 0 -and $problems.Count -eq 0
         $result = Resolve-WalkOutcome -Screens $screens -Crashes $fatal.Count -Problems ([string[]]$problems) -Full $full
         $receipt = New-WalkReceipt -Result $result -Full $full -Serial $Serial -Device $deviceModel `
-            -AppVersion ([string]$appVersion) -BundleSha256 $bundleSha256 -InstalledApkSha256 $installedSha `
+            -AppVersion ([string]$appVersion) -BundleSha256 $bundleSha256 -PatchedApkSha256 $patchedSha -InstalledApkSha256 $installedSha `
             -Started $started -Finished ([DateTimeOffset]::UtcNow) -Screens $screens -Crashes $fatal.Count `
             -Problems ([string[]]$problems)
         $receiptPath = Join-Path $OutDir 'walk-receipt.json'
@@ -396,8 +449,10 @@ if ($MyInvocation.InvocationName -ne '.') {
         if (-not $Adb -and $env:ANDROID_HOME) { $Adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe' }
         if (-not $Adb -or -not (Test-Path -LiteralPath $Adb)) { throw 'No adb found. Pass -Adb or put it on the PATH.' }
     }
-    Invoke-WalkApp -Serial $Serial -ExpectedModel $ExpectedModel -Package $Package -BundlePath $Bundle -StockApk $Apk `
+    $receiptPath = Invoke-WalkApp -Serial $Serial -ExpectedModel $ExpectedModel -Package $Package -BundlePath $Bundle -StockApk $Apk `
         -Thread $Thread -Visit $Visit -SkipPatch:$SkipPatch -SkipSettings:$SkipSettings -SettleSeconds $SettleSeconds `
         -OutDir $OutDir -KeystorePath $Keystore -Alias $KeyAlias -StorePassword $KeystorePassword `
         -Jar $DesktopJar -JavaExe $Java -AdbExe $Adb -LeaseDirectory $LeaseDirectory
+    $receiptPath
+    exit (Get-WalkExitCode (Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json).result)
 }

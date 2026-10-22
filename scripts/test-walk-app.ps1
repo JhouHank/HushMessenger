@@ -34,6 +34,25 @@ try {
     Assert-WalkApp (@(Get-WalkSkips -SkipSettings $true -Thread '1' -Visit $WalkDefaultScreens) -contains 'the Hush settings pages') 'Skipping settings should count as a skip.'
     Assert-WalkApp (@(Get-WalkSkips -SkipSettings $false -Thread '1' -Visit ($WalkDefaultScreens + 'fb-messenger://quicksnap')).Count -eq 0) `
         'An extra screen on top of the defaults should not count as a skip.'
+    $unproven = @(Get-WalkSkips -SkipSettings $false -Thread '1' -Visit $WalkDefaultScreens -Unproven $true)
+    Assert-WalkApp ($unproven.Count -eq 1 -and $unproven[0] -like 'proof the installed app was patched from -Bundle*') `
+        'A -SkipPatch walk with no patch record of its bundle should count as a skip.'
+
+    # Whether the APK the device ran is the one patched from the bundle.
+    $patchedHash = 'c' * 64
+    Assert-WalkApp ($null -eq (Get-WalkApkProblem -Installed $patchedHash -Patched $patchedHash)) 'The patched APK on the device should raise nothing.'
+    Assert-WalkApp ((Get-WalkApkProblem -Installed ('d' * 64) -Patched $patchedHash) -like "the installed APK (dddd*) isn't the one patched*") `
+        'Another APK on the device should be a problem.'
+    foreach ($unread in @('', '/system/bin/sh: sha256sum: not found', ('C' * 64))) {
+        Assert-WalkApp ((Get-WalkApkProblem -Installed $unread -Patched $patchedHash) -like "couldn't read the installed APK's SHA-256*") `
+            "An installed hash of '$unread' should read as unreadable."
+    }
+    Assert-WalkApp ($null -eq (Get-WalkApkProblem -Installed '' -Patched '')) 'With no patched APK to hold it to, the skip covers it, not a problem.'
+
+    # The exit code each result ends with.
+    Assert-WalkApp ((Get-WalkExitCode 'PASS') -eq 0 -and (Get-WalkExitCode 'PARTIAL') -eq 2 -and (Get-WalkExitCode 'FAIL') -eq 1) `
+        'PASS, PARTIAL and FAIL should exit 0, 2 and 1.'
+    Assert-WalkApp ((Get-WalkExitCode '') -eq 1 -and (Get-WalkExitCode 'pass') -eq 1) 'Anything but an exact PASS or PARTIAL should exit 1.'
 
     # Which crash buffer lines are a Messenger crash during the walk.
     $buffer = @(
@@ -54,9 +73,10 @@ try {
     $walkedBundle = Join-Path $work 'patches-0.26.0.mpp'
     [IO.File]::WriteAllText($walkedBundle, 'walk-app contract bundle')
     $walkedSha256 = (Get-FileHash -LiteralPath $walkedBundle -Algorithm SHA256).Hash.ToLowerInvariant()
-    function Write-ContractReceipt([string]$Name, [string]$Result, [bool]$Full, [int]$Screens, [int]$Crashes, [string]$Sha, [string[]]$Problems) {
+    function Write-ContractReceipt([string]$Name, [string]$Result, [bool]$Full, [int]$Screens, [int]$Crashes, [string]$Sha, [string[]]$Problems,
+        [string]$PatchedSha = ('0' * 64)) {
         $receipt = New-WalkReceipt -Result $Result -Full $Full -Serial 'TESTPHONE01' -Device 'SM-S908U1' -AppVersion '584.0.0.49.98' `
-            -BundleSha256 $Sha -InstalledApkSha256 ('0' * 64) -Started '2026-10-22T00:00:00Z' -Finished '2026-10-22T00:06:00Z' `
+            -BundleSha256 $Sha -PatchedApkSha256 $PatchedSha -InstalledApkSha256 ('0' * 64) -Started '2026-10-22T00:00:00Z' -Finished '2026-10-22T00:06:00Z' `
             -Screens $Screens -Crashes $Crashes -Problems $Problems
         $receiptFile = Join-Path $work $Name
         [IO.File]::WriteAllText($receiptFile, (ConvertTo-Json -InputObject $receipt -Depth 4) + "`n")
@@ -72,6 +92,12 @@ try {
     Assert-WalkApp (-not $verdict.Valid -and $verdict.Reason -match 'PARTIAL') "A walk that skipped a screen must not back a release ($($verdict.Reason))."
     $elsewhere = Write-ContractReceipt 'other.json' 'PASS' $true 10 0 ('a' * 64) @()
     Assert-WalkApp (-not (Test-WalkReceipt -Path $elsewhere -BundlePath $walkedBundle).Valid) 'A clean walk of a different bundle must not back this one.'
+    $unprovenWalk = Write-ContractReceipt 'unproven.json' 'PASS' $true 10 0 $walkedSha256 @() ''
+    Assert-WalkApp (-not (Test-WalkReceipt -Path $unprovenWalk -BundlePath $walkedBundle).Valid) `
+        'A clean walk of an app nothing ties to this bundle must not back it.'
+    $swapped = Write-ContractReceipt 'swapped.json' 'PASS' $true 10 0 $walkedSha256 @() ('e' * 64)
+    Assert-WalkApp (-not (Test-WalkReceipt -Path $swapped -BundlePath $walkedBundle).Valid) `
+        'A clean walk of an APK other than the one patched from this bundle must not back it.'
 
     # A patched APK is used again only for the same bundle, stock APK and key, and only while it's unchanged.
     $patchDir = Join-Path $work 'patched'
@@ -87,6 +113,11 @@ try {
     Save-WalkPatchInputs -Destination $patchDir -Inputs $sameInputs
     Assert-WalkApp (-not $sameInputs.Contains('apk')) 'Saving the record should leave the inputs it was given alone.'
     Assert-WalkApp ((Find-WalkPatched -Destination $patchDir -Inputs $sameInputs) -ceq $patchedFile) 'The APK patched from the same inputs should be used again.'
+    $recordedApk = (Get-FileHash -LiteralPath $patchedFile -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-WalkApp ((Find-WalkPatchRecord -Destination $patchDir -BundleSha256 $walkedSha256) -ceq $recordedApk) `
+        'A -SkipPatch walk should find the APK patched from its bundle.'
+    Assert-WalkApp ((Find-WalkPatchRecord -Destination $patchDir -BundleSha256 ('a' * 64)) -ceq '') 'A -SkipPatch walk of another bundle should find no patch record.'
+    Assert-WalkApp ((Find-WalkPatchRecord -Destination $work -BundleSha256 $walkedSha256) -ceq '') 'A folder with no patch record should give none.'
     $otherAlias = Get-WalkPatchInputs -BundlePath $walkedBundle -StockApk $stockFile -KeystorePath $keyFile -Alias 'Other'
     Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $otherAlias)) 'Another key alias should patch again.'
     $otherBundle = Join-Path $work 'patches-0.26.1.mpp'
@@ -97,6 +128,7 @@ try {
     Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $sameInputs)) 'An APK changed since its patch should be patched again.'
     [IO.File]::WriteAllText((Join-Path $patchDir 'patch-inputs.json'), '{ not json')
     Assert-WalkApp ($null -eq (Find-WalkPatched -Destination $patchDir -Inputs $sameInputs)) 'An unreadable record should patch again.'
+    Assert-WalkApp ((Find-WalkPatchRecord -Destination $patchDir -BundleSha256 $walkedSha256) -ceq '') 'An unreadable record should prove nothing.'
 
     Write-Host "walk-app contracts passed ($checks checks)"
 } finally {
