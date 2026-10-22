@@ -373,6 +373,7 @@ internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInbox
     found.getValue(EMOJI_SEARCH).addAll(findEmojiSearch(classes))
     found.getValue(TAB_BADGES).addAll(findTabBadges(classes))
     found.getValue(FACEBOOK_BADGE).addAll(findFacebookBadge(classes))
+    found.getValue(TAB_CONFIG).addAll(findTabConfig(classes))
     found.getValue(AI_MENTIONS).addAll(findAiMentions(classes))
     found.getValue(AI_COMMANDS).addAll(findAiCommands(classes))
     found.getValue(AI_SEARCH_HINT).addAll(findAiSearchHint(classes))

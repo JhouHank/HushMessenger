@@ -194,6 +194,7 @@ internal val PROFILE_346814894 = ControlProfile(
             "LX/AaX;->C0w(Landroid/os/Bundle;LX/6NI;)Z", "LX/AwA;->Bpf(LX/4Jq;Ljava/lang/String;)V",
         ),
         "tab_badges" to setOf("LX/1n1;->A00(Ljava/lang/String;)LX/38i;"),
+        "tab_config" to setOf("LX/1nk;->A02(Landroid/content/Context;Lcom/facebook/auth/usersession/FbUserSession;)LX/1oC;"),
         "tab_notifications" to setOf("LX/1n0;->A09(LX/1n0;)Z"),
         "tab_people" to setOf("LX/1n0;->A0E(LX/1n0;)Z"),
         "text_style" to setOf("LX/8eA;->onFocusChanged(ZILandroid/graphics/Rect;)V"),

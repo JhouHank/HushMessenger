@@ -172,11 +172,11 @@ public class CompatReport {
         PATCHES.put("Hide Mark as read", List.of("mark_read_action"));
         PATCHES.put("Pin more chats", List.of("pinned_chats"));
         PATCHES.put("Hide Facebook shortcuts", List.of("facebook", "facebook_profile"));
-        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows"));
+        PATCHES.put("Hide Meta AI", List.of("ai_menu", "ai_fab", "ai_toolbar", "ai_tab", "ai_search", "ai_search_chip", "ai_mentions", "ai_commands", "ai_search_hint", "ai_mention_rows", "tab_config"));
         PATCHES.put("Hide Chat Moments", List.of("moments"));
         PATCHES.put("Hide Reels badge", List.of("reels_badge"));
-        PATCHES.put("Hide People tab", List.of("tab_people"));
-        PATCHES.put("Hide Notifications tab", List.of("tab_notifications"));
+        PATCHES.put("Hide People tab", List.of("tab_people", "tab_config"));
+        PATCHES.put("Hide Notifications tab", List.of("tab_notifications", "tab_config"));
         PATCHES.put("Hide tab badges", List.of("tab_badges", "facebook_badge"));
         PATCHES.put("Hold stories at the end", List.of("story_hold"));
         PATCHES.put("Hide AI sticker tools", List.of("ai_stickers", "ai_sticker_cell"));
@@ -3414,6 +3414,68 @@ public class CompatReport {
         return found;
     }
 
+    static final String TAB_CONFIG_TRACE = "MessengerTabConfigurationCreator.createTabConfiguration";
+    static final Set<String> HIDABLE_TABS = Set.of("PEOPLE", "JEWEL", "AI");
+
+    /**
+     * tab_config: the bottom bar's tab-list builder, an instance (Context, FbUserSession) method naming its trace. Every
+     * match must have one configuration site with nothing jumping to it, or none counts. Mirrors TabConfig.kt.
+     */
+    static List<Method> tabConfigurations(List<ClassDef> classes) {
+        var found = new ArrayList<Method>();
+        for (var cls : classes) for (var method : cls.getMethods()) {
+            if (method.getImplementation() == null || AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
+                !method.getReturnType().startsWith("L") || method.getParameterTypes().size() != 2 ||
+                !"Landroid/content/Context;".equals(method.getParameterTypes().get(0).toString()) ||
+                !BUBBLE_SESSION.equals(method.getParameterTypes().get(1).toString())) continue;
+            boolean traced = false;
+            for (var i : method.getImplementation().getInstructions())
+                if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference sr && TAB_CONFIG_TRACE.equals(sr.getString())) traced = true;
+            if (traced) found.add(method);
+        }
+        for (var method : found) {
+            int site = tabConfigSite(method);
+            if (site < 0) return List.of();
+            var targets = mediaTargets(method);
+            if (targets.contains(site) || targets.contains(site + 1)) return List.of();
+        }
+        return found;
+    }
+
+    /**
+     * Index of the new-instance right before the builder's one (List, List) configuration constructor, or -1. The builder
+     * must read PEOPLE, JEWEL and AI as constants of one enum.
+     */
+    static int tabConfigSite(Method method) {
+        var code = instructions(method);
+        int at = -1;
+        for (int i = 0; i < code.size(); i++) {
+            var op = code.get(i).getOpcode();
+            if ((op == Opcode.INVOKE_DIRECT || op == Opcode.INVOKE_DIRECT_RANGE) &&
+                ((ReferenceInstruction) code.get(i)).getReference() instanceof MethodReference m &&
+                "<init>".equals(m.getName()) && method.getReturnType().equals(m.getDefiningClass())) {
+                if (at >= 0) return -1;
+                at = i;
+            }
+        }
+        if (at < 1 || !(code.get(at) instanceof FiveRegisterInstruction build) || build.getRegisterCount() != 3) return -1;
+        var params = new ArrayList<String>();
+        for (var t : ((MethodReference) ((ReferenceInstruction) build).getReference()).getParameterTypes()) params.add(t.toString());
+        if (!params.equals(List.of("Ljava/util/List;", "Ljava/util/List;"))) return -1;
+        var start = code.get(at - 1);
+        if (start.getOpcode() != Opcode.NEW_INSTANCE || register(start) != build.getRegisterC() ||
+            !method.getReturnType().equals(((TypeReference) ((ReferenceInstruction) start).getReference()).getType())) return -1;
+        var names = new HashSet<String>();
+        var types = new HashSet<String>();
+        for (var i : code)
+            if (i.getOpcode() == Opcode.SGET_OBJECT && ((ReferenceInstruction) i).getReference() instanceof FieldReference f &&
+                HIDABLE_TABS.contains(f.getName()) && f.getType().equals(f.getDefiningClass())) {
+                names.add(f.getName());
+                types.add(f.getType());
+            }
+        return names.equals(HIDABLE_TABS) && types.size() == 1 ? at - 1 : -1;
+    }
+
     /** Index of the check's MOVE_RESULT, or -1. */
     static int facebookBadgeCheck(Method method) {
         if (!FACEBOOK_BUTTON.equals(method.getDefiningClass()) || AccessFlags.STATIC.isSet(method.getAccessFlags()) ||
@@ -4719,6 +4781,7 @@ public class CompatReport {
         found.get("emoji_search").addAll(emojiSearchWatchers(classes));
         found.get("tab_badges").addAll(tabBadgeDispatchers(classes));
         found.get("facebook_badge").addAll(facebookBadgeChecks(classes));
+        found.get("tab_config").addAll(tabConfigurations(classes));
         found.get("ai_mentions").addAll(aiMentionDispatchers(classes));
         found.get("ai_commands").addAll(aiCommandLists(classes));
         found.get("ai_search_hint").addAll(searchBarBuilders(classes));

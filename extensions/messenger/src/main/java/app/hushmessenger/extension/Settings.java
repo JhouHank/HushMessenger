@@ -240,6 +240,44 @@ public final class Settings {
         return hidden;
     }
 
+    /**
+     * Messenger's tab list for the bottom bar as it's built. The bar draws only the tabs whose gate let them in, but it
+     * marks the open tab by its place in this full list, so a hidden tab ahead of it lit up its neighbor (with People
+     * hidden, opening Notifications showed Menu as open). Dropping the hidden tabs here keeps the two in step; every other
+     * tab and its order stay as Messenger built them.
+     */
+    public static <T> List<T> visibleTabs(List<T> tabs) {
+        try {
+            List<T> kept = new ArrayList<>(tabs.size());
+            for (T tab : tabs) {
+                String key = tab instanceof Enum ? barTabKey(((Enum<?>) tab).name()) : null;
+                if (key == null || !("meta_ai".equals(key) ? hideMetaAiTab() : hideBottomTab(key))) kept.add(tab);
+            }
+            return kept.size() == tabs.size() ? tabs : kept;
+        } catch (RuntimeException error) {
+            // The one list serves every tab switch, so the failure goes on each switch that's on, never on one that's off.
+            boolean blamed = false;
+            for (String control : TAB_CONTROLS) {
+                if (wouldUse(control)) { hookFailed(control, "Can't line up the tab bar", error); blamed = true; }
+            }
+            if (!blamed) android.util.Log.e("HushMessenger", "Can't line up the tab bar", error);
+            return tabs;
+        }
+    }
+
+    /** Every switch that takes a tab off the bottom bar, so each one's list goes through {@link #visibleTabs}. */
+    static final List<String> TAB_CONTROLS = Collections.unmodifiableList(Arrays.asList("tab_people", "tab_notifications", "meta_ai"));
+
+    /** The switch that hides a bottom tab, by the tab's constant in Messenger's tab enum, or null for a tab with none. */
+    static String barTabKey(String name) {
+        switch (name) {
+            case "PEOPLE": return "tab_people";
+            case "JEWEL": return "tab_notifications";
+            case "AI": return "meta_ai";
+            default: return null;
+        }
+    }
+
     static final String TAB_BADGES = "tab_badges";
     /**
      * Under Hide tab badges: each badge's Keep switch, by the tab id Messenger's bottom bar asks its badge for. The

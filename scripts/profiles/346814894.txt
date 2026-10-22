@@ -173,6 +173,7 @@ hook system_camera LX/99A;->BkO(Lcom/facebook/xapp/messaging/capability/vector/C
 hook system_camera LX/AaX;->C0w(Landroid/os/Bundle;LX/6NI;)Z
 hook system_camera LX/AwA;->Bpf(LX/4Jq;Ljava/lang/String;)V
 hook tab_badges LX/1n1;->A00(Ljava/lang/String;)LX/38i;
+hook tab_config LX/1nk;->A02(Landroid/content/Context;Lcom/facebook/auth/usersession/FbUserSession;)LX/1oC;
 hook tab_notifications LX/1n0;->A09(LX/1n0;)Z
 hook tab_people LX/1n0;->A0E(LX/1n0;)Z
 hook text_style LX/8eA;->onFocusChanged(ZILandroid/graphics/Rect;)V
