@@ -147,8 +147,9 @@ private fun handlerClass(body: String = GALLERY_HANDLER_BODY, registers: Int = 1
 private fun itemsClass(body: String = GALLERY_ITEMS_BODY, id: String = GALLERY_ITEMS, registers: Int = 13, flags: Int = STATIC) =
     fixtureClass(id.substringBefore("->"), listOf(fixtureMethod(id, body, registers = registers, flags = flags)))
 
-private fun resultEventClass(intentFlags: Int = AccessFlags.FINAL.value, intentName: String = "A02") = fixtureClass(ACTIVITY_RESULT_EVENT,
-    extraFields = listOf("A00" to "I", "A01" to "I", intentName to "Landroid/content/Intent;").map { (name, type) ->
+private fun resultEventClass(intentFlags: Int = AccessFlags.FINAL.value, intentName: String = "A02", secondIntent: String? = null) =
+    fixtureClass(ACTIVITY_RESULT_EVENT, extraFields = (listOf("A00" to "I", "A01" to "I", intentName to "Landroid/content/Intent;") +
+        listOfNotNull(secondIntent?.let { it to "Landroid/content/Intent;" })).map { (name, type) ->
         ImmutableField(ACTIVITY_RESULT_EVENT, name, type, if (type == "I") AccessFlags.FINAL.value else intentFlags, null, null, null)
     }, flags = AccessFlags.PUBLIC.value or AccessFlags.FINAL.value)
 
@@ -301,11 +302,12 @@ class ExternalGalleryTest {
     }
 
     @Test fun aPhotoHandlerTheHookCantReachRefusesBeforeMutation() {
-        // No local for the intent, or the thread past v15 where the hook's plain invoke can't reach it.
+        // No local for the intent, or the thread past v15 where the hook's plain invoke can't reach it. CompatReport has to
+        // refuse both as well, or it would pass a build the patch then stops on.
         val threadLast = "LX/B5V;->A00($ACTIVITY_RESULT_EVENT${ANDROIDX_FRAGMENT}${FB_USER_SESSION}LX/6NI;$THREAD_KEY_TYPE)V"
         val eventFirst = GALLERY_ITEMS_BODY.replace("p3", "p0").lines().filterNot { it.startsWith("invoke-static") }.joinToString("\n")
         for ((id, cls) in listOf(GALLERY_ITEMS to itemsClass(registers = 5), threadLast to itemsClass(eventFirst, threadLast, registers = 20))) {
-            val found = findExternalGallery(galleryClasses(cls))
+            val found = mirroredControls(galleryClasses(cls)).getValue(EXTERNAL_GALLERY)
             assertEquals(id, galleryRoute!!.items, id)
             val items = MutableMethod(found.single { it.hookId() == id })
             assertFailsWith<PatchException> { items.validateHook(EXTERNAL_GALLERY) }
@@ -402,10 +404,13 @@ class ExternalGalleryTest {
         // request and reads one intent field the event class has, from an event register it never overwrites.
         val itemsTwin = itemsClass(GALLERY_ITEMS_BODY.replace("LX/B5V;", "LX/B5W;"), GALLERY_ITEMS.replace("LX/B5V;", "LX/B5W;"))
         val itemsOverwritten = itemsClass(GALLERY_ITEMS_BODY.replace(":other\nreturn-void", ":other\nconst/4 p3, 0x0\nreturn-void"))
-        val itemsTwoIntents = itemsClass(GALLERY_ITEMS_BODY.replace("iget v0, p3, $ACTIVITY_RESULT_EVENT->A01:I",
-            "iget-object v0, p3, $ACTIVITY_RESULT_EVENT->A03:Landroid/content/Intent;"))
+        // Two intent fields the event class really has, read ahead of the usual one, so only the one-field rule refuses.
+        val itemsTwoIntents = itemsClass(GALLERY_ITEMS_BODY.replace("iget-object v2, p3, $ITEMS_INTENT",
+            "iget-object v3, p3, $ACTIVITY_RESULT_EVENT->A03:Landroid/content/Intent;\niget-object v2, p3, $ITEMS_INTENT"))
         val itemsNoRequest = itemsClass(GALLERY_ITEMS_BODY.replace("const/16 v1, $EXTERNAL_MEDIA_REQUEST", "const/16 v1, 0x457"))
-        val itemsNotStatic = itemsClass(flags = AccessFlags.PUBLIC.value, registers = 14)
+        // The same handler as an instance method, its parameters one register later, so only the static rule refuses.
+        val itemsNotStatic = itemsClass(GALLERY_ITEMS_BODY.replace("p3", "p4").replace("p2", "p3").replace("p0", "p1"),
+            flags = AccessFlags.PUBLIC.value, registers = 14)
         val noThread = GALLERY_ITEMS.replace(THREAD_KEY_TYPE, "Ljava/lang/Object;")
         val itemsNoThread = itemsClass(GALLERY_ITEMS_BODY.replace("LX/B5V;->A01(${ANDROIDX_FRAGMENT}$THREAD_KEY_TYPE", "LX/B5V;->A01(${ANDROIDX_FRAGMENT}Ljava/lang/Object;"), noThread)
         for ((case, classes) in listOf("other field" to galleryClasses(otherField), "other start" to galleryClasses(otherStart),
@@ -414,13 +419,13 @@ class ExternalGalleryTest {
             "override" to galleryClasses() + overriding,
             "override below" to galleryClasses() + middle + below, "not an interface" to galleryClasses(notInterface),
             "static reader" to galleryClasses(staticReader), "items twin" to galleryClasses() + itemsTwin,
-            "items event overwritten" to galleryClasses(itemsOverwritten), "items two intents" to galleryClasses(itemsTwoIntents),
+            "items event overwritten" to galleryClasses(itemsOverwritten), "items two intents" to galleryClasses(itemsTwoIntents, resultEventClass(secondIntent = "A03")),
             "items no request" to galleryClasses(itemsNoRequest), "items not static" to galleryClasses(itemsNotStatic),
             "items no thread" to galleryClasses(itemsNoThread), "items no handler" to galleryClasses().filterNot { it.type == "LX/B5V;" },
             "items field missing" to galleryClasses(resultEventClass(intentName = "A03")),
             "items field static" to galleryClasses(resultEventClass(intentFlags = STATIC)),
             "items no event class" to galleryClasses().filterNot { it.type == ACTIVITY_RESULT_EVENT })) {
-            assertTrue(findExternalGallery(classes).isEmpty(), case)
+            assertTrue(mirroredControls(classes).getValue(EXTERNAL_GALLERY).isEmpty(), case)
             assertEquals(null, galleryRoute, case)
         }
         // And without the chat camera's launcher there's nothing to hand the gallery button to.
