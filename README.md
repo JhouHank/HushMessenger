@@ -39,7 +39,7 @@ Prefer a local source? Download [`patches-0.25.0.mpp`](https://github.com/SysAdm
 
 ## Settings
 
-Long-press Messenger's icon on your home screen and tap **Patch controls**. The **HushMessenger** row in Messenger's Menu tab and side menu opens the same screen, and so does the **HushMessenger settings** icon in your app drawer. **App > Hide app drawer icon** hides that icon without touching Messenger. Inside Messenger, a long press on the Messenger logo at the top of Chats or on the Menu tab's title opens settings too, even while changes are paused. On a Root Mount install there's no drawer icon, and the long-press shortcuts appear once Messenger has started.
+Long-press Messenger's icon on your home screen and tap **Patch controls**. The **HushMessenger** row in Messenger's Menu tab and side menu opens the same screen, and so does the **HushMessenger settings** icon in your app drawer. **App > Hide app drawer icon** hides that icon without touching Messenger. Inside Messenger, a long press on the Messenger logo at the top of Chats or on the Menu tab's title opens settings too, even while changes are paused. The long-press shortcuts appear once Messenger has started, and a Root Mount install has no drawer icon. The App tab can switch off the Menu row, the icon shortcuts or the logo long press, but never the last way in that's still on.
 
 **Pause all changes** turns every switch off at once without forgetting your choices. Changes to the Meta AI and bottom tabs, bubbles, your font and **Restore old emoji drawer** need **Restart Messenger**. Inbox options show up with the next chat list Messenger builds. While a restart is waiting, a bar at the top of settings says how many and has the button, and after the restart settings open again on the page you left. The button is also on the App tab and in the icon's long-press menu. If Messenger crashes three times near startup, safe mode pauses the controls. Open settings and tap **Resume**.
 
@@ -111,7 +111,7 @@ The screenshots below show the settings in the current release, in the dark and 
 | Material You theme | In dark mode on Android 12 and newer, Messenger takes the accent color from your wallpaper. A **Pure black dark mode** switch sits under Appearance. |
 | Use your own font | Replaces Meta's font with your phone's, or with a .ttf or .otf file you pick, with size and position adjustments. Restart Messenger after a change. |
 | Bold and italic text | Adds Bold and Italic to the text selection menu. They change the letters A to Z, accented ones included, and Bold changes digits too. Other alphabets stay as they are. On a Samsung phone, turn them on once under **Manage apps** in that menu. |
-| Open settings from menu | Adds the HushMessenger row to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or the Menu tab's title open settings. Always on. |
+| Open settings from menu | Adds the HushMessenger row to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or the Menu tab's title open settings. On by default. The App tab can turn off each way in, as long as one stays on. |
 
 ### Patches without a switch
 
@@ -125,7 +125,7 @@ The screenshots below show the settings in the current release, in the dark and 
 
 ### If something doesn't work
 
-- **Can't find the settings.** Long-press Messenger's home screen icon and tap **Patch controls**. If no way in shows up at all, refresh the source and patch again.
+- **Can't find the settings.** Long-press Messenger's home screen icon and tap **Patch controls**. Not there? You may have hidden the icon shortcuts, so use the **HushMessenger** row in the Menu tab or long-press the Messenger logo at the top of Chats. If no way in shows up at all, refresh the source and patch again.
 - **Switches do nothing.** The settings live inside the patched Messenger, and refreshing a source only downloads patches. Patch and install again. The Meta AI tab and the old emoji drawer only change after **Restart Messenger**. Inbox options wait for the next chat list Messenger builds, and a restart applies them right away.
 - **The source shows an old version or misses a patch.** Refresh it and check that it shows the version of the [latest release](https://github.com/SysAdminDoc/HushMessenger/releases/latest). A local source needs the new `.mpp` added by hand.
 - **APK rejected.** Use an unmodified arm64 Messenger 583.0.0.29.95 whose version code is in the [supported builds](#supported-messenger-builds). The error names the builds it checked. When the log says "This Messenger build (version code N) isn't supported yet", that's the whole problem, and the patch Manager names above it (often **Allow chat bubbles**) didn't fail on its own.

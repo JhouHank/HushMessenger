@@ -116,9 +116,12 @@ public final class SettingsActivity extends Activity {
     private TextView fontStatus, fontSize, fontShift;
     private Button fontChoose, fontStop, fontPhone, fontSmaller, fontLarger, fontUp, fontDown;
     private LinearLayout fontAdjust;
-    /** #22's control and whether it could be turned on when it was built. */
-    private LinearLayout menuRowControl;
-    private boolean menuRowAvailable;
+    /**
+     * The switch for each way back in (#22, HushFacebook#146), and the help and reason each was built with. Turning one
+     * way off can change what the others say or whether they can turn off, so they're rebuilt when that changes.
+     */
+    private final Map<String, LinearLayout> wayControls = new java.util.LinkedHashMap<>();
+    private final Map<String, String> wayBuilt = new java.util.HashMap<>();
     /** The Quick setups heading and panel, hidden by a long press on either, and the line that says which way the choice is. */
     private TextView quickHeading, quickHomeStatus;
     private LinearLayout quickPanel;
@@ -141,6 +144,8 @@ public final class SettingsActivity extends Activity {
     private static Toast toast;
     static final String SUPPORT_PAGE = "https://ko-fi.com/X8K126YVER";
     /** Switches whose effect hasn't been confirmed on a phone. Each shows the Experimental badge. */
+    /** The switches that take a way into these settings away, each with a reason when it can't turn on. */
+    static final Set<String> WAYS_IN = Set.of("hide_menu_row", Settings.HIDE_ICON_SHORTCUTS, Settings.HIDE_LOGO_PRESS);
     static final Set<String> EXPERIMENTAL = Set.of("pinned_chats", "nearby_scans", "phone_id_sync", "mark_read_button", "story_hold");
     static final String[][] CONTROLS = {
         {"people", "Hide People You May Know", "Hides suggested people in chats, search and stories, and on the People and Notifications tabs. Good if you only want people you know.", "inbox"},
@@ -411,30 +416,58 @@ public final class SettingsActivity extends Activity {
         });
     }
 
-    private LinearLayout menuRowControl() {
-        return controlRow("hide_menu_row", text.format("hide_menu_row"),
-            text.format(Settings.logoOpensSettings() ? "hide_menu_row_help" : "hide_menu_row_help_without_logo"), false);
+    /** The help a way's switch shows, which names only the ways back that are still on. */
+    private String wayHelp(String key) {
+        if (!"hide_menu_row".equals(key)) return key + "_help";
+        if (!Settings.iconShortcutsShown(this)) return Settings.logoPressOn() ? "hide_menu_row_help_without_shortcut" : "hide_menu_row_help_plain";
+        return Settings.logoPressOn() ? "hide_menu_row_help" : "hide_menu_row_help_without_logo";
     }
 
-    /** Swaps the Hide the Menu row control for one built with its current availability and reason. */
-    private void rebuildMenuRowControl() {
-        LinearLayout parent = (LinearLayout) menuRowControl.getParent();
-        if (parent == null) return;
-        switches.remove(menuRowControl.findViewWithTag("hide_menu_row"));
-        int at = parent.indexOfChild(menuRowControl);
-        ViewGroup.LayoutParams params = menuRowControl.getLayoutParams();
-        menuRowAvailable = Settings.available("hide_menu_row");
-        menuRowControl = menuRowControl();
-        parent.removeViewAt(at);
-        parent.addView(menuRowControl, at, params);
+    /** Why a way's switch can't turn on, or null when it can. */
+    private String wayReason(String key) {
+        if (Settings.available(key)) return null;
+        if (!"hide_menu_row".equals(key)) return "last_way_in";
+        if (Settings.iconShortcutsShown(this)) return "menu_row_needs_shortcut";
+        return Settings.logoPressOn() ? "menu_row_needs_logo" : "menu_row_needs_way";
+    }
+
+    private LinearLayout wayControl(String key) {
+        String help = wayHelp(key);
+        wayBuilt.put(key, help + "|" + wayReason(key));
+        LinearLayout row = controlRow(key, text.format(key), text.format(help), false);
+        wayControls.put(key, row);
+        return row;
+    }
+
+    /** Swaps each way's switch whose help or reason has changed for one built with the current ones. */
+    private void rebuildWayControls() {
+        for (String key : new ArrayList<>(wayControls.keySet())) {
+            LinearLayout old = wayControls.get(key);
+            LinearLayout parent = (LinearLayout) old.getParent();
+            if (parent == null || (wayHelp(key) + "|" + wayReason(key)).equals(wayBuilt.get(key))) continue;
+            switches.remove(old.findViewWithTag(key));
+            int at = parent.indexOfChild(old);
+            ViewGroup.LayoutParams params = old.getLayoutParams();
+            LinearLayout row = wayControl(key);
+            parent.removeViewAt(at);
+            parent.addView(row, at, params);
+        }
     }
 
     private String accessHelpText() {
         // The Menu row patch also makes the Messenger logo open settings where it finds the logo's handler, and that keeps
-        // working while the row is hidden.
-        boolean logo = Settings.logoOpensSettings();
+        // working while the row is hidden, unless its own switch turns it off.
+        boolean logo = Settings.logoPressOn();
+        boolean menuRow = accessHelpMenuRow && !Settings.menuRowHidden();
+        if (!Settings.iconShortcutsShown(this)) {
+            StringBuilder ways = new StringBuilder();
+            if (menuRow) ways.append(text.get("way_menu")).append(' ');
+            if (logo) ways.append(text.get("way_logo")).append(' ');
+            if (Settings.drawerIconShown(this)) ways.append(text.get("way_drawer")).append(' ');
+            return ways.append(text.get("way_shortcuts_hidden")).toString();
+        }
         if (!accessHelpMenuRow) return text.get(accessHelpId);
-        if (Settings.menuRowHidden()) return text.get(accessHelpId + (logo ? "_logo" : ""));
+        if (!menuRow) return text.get(accessHelpId + (logo ? "_logo" : ""));
         return text.get(accessHelpId + (logo ? "_menu" : "_menu_without_logo"));
     }
 
@@ -446,8 +479,9 @@ public final class SettingsActivity extends Activity {
             }
             return;
         }
-        // Opening settings from the long-press shortcut can bring this screen back rather than a new one.
-        if (menuRowControl != null && Settings.available("hide_menu_row") != menuRowAvailable) rebuildMenuRowControl();
+        // Opening settings from the long-press shortcut can bring this screen back rather than a new one, and turning one
+        // way in off changes what the others can do.
+        rebuildWayControls();
         if (accessHelp != null) {
             String help = accessHelpText();
             if (!help.contentEquals(accessHelp.getText())) accessHelp.setText(help);
@@ -1305,7 +1339,7 @@ public final class SettingsActivity extends Activity {
         if (!available) description += " " + text.format(CameraActivity.KEY.equals(key) ? "camera_unsupported"
             : GalleryPicker.KEY.equals(key) ? "gallery_unsupported"
             : TextStyleActivity.KEY.equals(key) ? "text_style_unsupported"
-            : "hide_menu_row".equals(key) ? "menu_row_needs_shortcut"
+            : WAYS_IN.contains(key) ? wayReason(key)
             : "bubbles".equals(key) && Build.VERSION.SDK_INT >= 30 ? "bubble_unsupported" : "unavailable");
         LinearLayout row = ui.row();
         LinearLayout labels = ui.column();
@@ -1365,6 +1399,12 @@ public final class SettingsActivity extends Activity {
                 : text.get(checked ? "choice_on" : "choice_off", title), Toast.LENGTH_SHORT);
             if ("light".equals(key)) refreshChoices();
             if ("hide_drawer_icon".equals(key)) applyDrawerIcon(this, checked);
+            // The icon shortcuts follow their switch now, and stand in when another way in goes while they're hidden.
+            if (Settings.HIDE_ICON_SHORTCUTS.equals(key) || (Settings.HIDE_LOGO_PRESS.equals(key) || "hide_drawer_icon".equals(key))
+                    && Settings.preferences.getBoolean(Settings.HIDE_ICON_SHORTCUTS, false)) HostScreens.refreshShortcuts(this, () -> runOnUiThread(() -> {
+                // Hide the Menu row asks whether Patch controls is published, which is known only now.
+                if (!isFinishing() && !isDestroyed()) refreshChoices();
+            }));
         });
         row.setOnClickListener(view -> { if (control.isEnabled()) control.toggle(); });
         row.setEnabled(available);
@@ -1458,12 +1498,19 @@ public final class SettingsActivity extends Activity {
             drawerHelp.setTag("drawer_help");
             ui.add(access, drawerHelp, 14);
         }
-        // #22: only the long-press shortcut left, once it has proved it works here.
+        wayControls.clear();
+        wayBuilt.clear();
+        // #22: the Menu row can go once another way back has proved it works here.
         if (menuRow) {
             ui.rule(access, 12);
-            menuRowAvailable = Settings.available("hide_menu_row");
-            menuRowControl = menuRowControl();
-            ui.add(access, menuRowControl, 10);
+            ui.add(access, wayControl("hide_menu_row"), 10);
+        }
+        // HushFacebook#146: every install has the icon shortcuts, and the logo's long press comes with the Menu row.
+        ui.rule(access, 12);
+        ui.add(access, wayControl(Settings.HIDE_ICON_SHORTCUTS), 10);
+        if (Settings.logoOpensSettings()) {
+            ui.rule(access, 12);
+            ui.add(access, wayControl(Settings.HIDE_LOGO_PRESS), 10);
         }
         if (drawerAlias && !hosted) {
             TextView sharedInstall = ui.text(text.get("shared_install_help"), 13, ui.muted, false);
@@ -3011,7 +3058,8 @@ public final class SettingsActivity extends Activity {
         // Every word typed, in any order, with accents and case ignored (SettingsSearch).
         List<String> terms = SettingsSearch.terms(query);
         clearQuery.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
-        String drawerWords = "hide app drawer icon launcher settings menu row " + text.get("hide_drawer_icon") + " " + text.get("hide_menu_row");
+        String drawerWords = "hide app drawer icon launcher settings menu row shortcuts " + text.get("hide_drawer_icon") + " "
+            + text.get("hide_menu_row") + " " + text.get("hide_icon_shortcuts") + " " + text.get("hide_logo_press");
         // One letter matches almost anything, so the link waits for a second one.
         drawerSearchLink.setVisibility(controlRows.isEmpty() || (query.trim().length() >= 2 && SettingsSearch.matches(terms, drawerWords)) ? View.VISIBLE : View.GONE);
         int visible = 0;

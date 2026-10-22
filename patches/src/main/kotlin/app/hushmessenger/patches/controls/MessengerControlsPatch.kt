@@ -58,17 +58,7 @@ internal val settingsResources = resourcePatch(description = "Install HushMessen
             it.requireNativeBubbleRoutesAbsent()
             it.hasNativeBubbleActivity()
         }
-        val shortcutsPath = resolveShortcutsPath(listApkEntries("res/")) { path ->
-            document(path).use { it }
-        }
-        // ARSCLib infers the resource type from the filename, so append to strings.xml.
-        document(SHORTCUT_LABEL_PATH).use { labels ->
-            labels.validateShortcutLabels()
-            document("AndroidManifest.xml").use { manifest ->
-                document(shortcutsPath).use { shortcuts -> manifest.addSettingsAccess(shortcuts) }
-            }
-            labels.addShortcutLabels()
-        }
+        document("AndroidManifest.xml").use { it.addSettingsAccess() }
     }
 }
 
@@ -694,7 +684,7 @@ private val menuRowResources = resourcePatch(description = "Record HushMessenger
 @Suppress("unused")
 val menuSettingsPatch = bytecodePatch(
     name = "Open settings from menu",
-    description = "Adds a HushMessenger entry to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or on the Menu tab's title open these settings too. Works as soon as you patch it in, with no switch.",
+    description = "Adds a HushMessenger entry to Messenger's Menu tab and side menu, and makes a long press on the Messenger logo at the top of Chats or on the Menu tab's title open these settings too. Works as soon as you patch it in. The settings App tab can turn off each way in, as long as one stays on.",
     default = true,
 ) {
     category("Navigation")

@@ -109,7 +109,7 @@ final class SettingsText {
         ENGLISH.put("hide_drawer_icon", "Hide app drawer icon");
         ENGLISH.put("hide_drawer_icon_help", "Keep access through Messenger's Menu or its home screen icon shortcut.");
         ENGLISH.put("hide_menu_row", "Hide the Menu row");
-        ENGLISH.put("hide_menu_row_help", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press the Messenger logo at the top of Chats to get back here, or long-press Messenger's home screen icon and tap Patch controls. If the Patch controls shortcut goes missing, the row comes back.");
+        ENGLISH.put("hide_menu_row_help", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press the Messenger logo at the top of Chats to get back here, or long-press Messenger's home screen icon and tap Patch controls. If neither one is left, the row comes back.");
         ENGLISH.put("menu_row_needs_shortcut", "Open these settings once from the long-press shortcut first (long-press Messenger's home screen icon, then Patch controls), so you have a way back without the row.");
         ENGLISH.put("shared_install_help", "Uninstalling this entry also removes Messenger and its local data. Use Hide app drawer icon instead.");
         ENGLISH.put("access_help_hosted", "Long-press Messenger's home screen icon for Patch controls or Restart Messenger. A Root Mount install has no separate settings icon in your app drawer.");
@@ -126,6 +126,23 @@ final class SettingsText {
         ENGLISH.put("access_help_hosted_menu_without_logo", "Open HushMessenger settings from its row in Messenger's Menu tab or side menu. Long-press Messenger's home screen icon for Patch controls or Restart Messenger. A Root Mount install has no separate settings icon in your app drawer.");
         ENGLISH.put("access_help_missing_menu_without_logo", "Open HushMessenger from Messenger's Menu tab or side menu. Long-press Messenger's home screen icon for Patch controls or Restart Messenger. This bundle has no settings icon in the app drawer.");
         ENGLISH.put("hide_menu_row_help_without_logo", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press Messenger's home screen icon and tap Patch controls to get back here. If the Patch controls shortcut goes missing, the row comes back.");
+        // HushFacebook#146: each way back in has its own switch, and the last one that's on stays on.
+        ENGLISH.put("hide_icon_shortcuts", "Hide the icon shortcuts");
+        // What Android shows on a copy pinned to the home screen while the icon shortcuts are hidden.
+        ENGLISH.put("shortcut_turned_off", "Turned off in HushMessenger settings");
+        ENGLISH.put("hide_icon_shortcuts_help","Takes Patch controls and Restart Messenger out of the menu you get by long-pressing Messenger's home screen icon. A copy pinned to your home screen turns gray until you turn this off.");
+        ENGLISH.put("hide_logo_press", "Turn off the logo long press");
+        ENGLISH.put("hide_logo_press_help", "A long press on the Messenger logo at the top of Chats, or on the Menu tab's title, stops opening these settings.");
+        ENGLISH.put("last_way_in", "This is the last way into these settings that's still on. Turn another one on first.");
+        ENGLISH.put("menu_row_needs_logo", "Open these settings once with a long press on the Messenger logo at the top of Chats, so you have a way back without the row.");
+        ENGLISH.put("menu_row_needs_way", "Turn the icon shortcuts or the logo long press back on first, so you have a way back without the row.");
+        ENGLISH.put("hide_menu_row_help_without_shortcut", "Takes the HushMessenger row out of Messenger's Menu tab and side menu. Long-press the Messenger logo at the top of Chats to get back here. Turn the logo long press off and the row comes back.");
+        ENGLISH.put("hide_menu_row_help_plain", "Takes the HushMessenger row out of Messenger's Menu tab and side menu.");
+        // With the icon shortcuts hidden, the App tab lists what's left, one sentence each.
+        ENGLISH.put("way_menu", "Open HushMessenger settings from its row in Messenger's Menu tab or side menu.");
+        ENGLISH.put("way_logo", "Long-press the Messenger logo at the top of Chats to open these settings.");
+        ENGLISH.put("way_drawer", "Open HushMessenger settings from your app drawer.");
+        ENGLISH.put("way_shortcuts_hidden", "Patch controls and Restart Messenger are hidden from Messenger's home screen icon.");
         ENGLISH.put("drawer_search", "App drawer icon settings");
         ENGLISH.put("drawer_root", "Hide app drawer icon isn't needed on Root Mount. There is no separate settings icon to hide.");
         ENGLISH.put("drawer_missing", "Hide app drawer icon isn't available. This patch bundle has no settings icon to hide.");

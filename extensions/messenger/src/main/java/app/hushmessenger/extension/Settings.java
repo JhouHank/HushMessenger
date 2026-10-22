@@ -585,6 +585,7 @@ public final class Settings {
             return context == null || TextStyleActivity.present(context);
         }
         if ("hide_menu_row".equals(key)) return menuRowCanHide();
+        if (HIDE_ICON_SHORTCUTS.equals(key) || HIDE_LOGO_PRESS.equals(key)) return anotherWayIn(key);
         if (!"bubbles".equals(key)) return true;
         if (Build.VERSION.SDK_INT < 30) return false;
         if (!HostScreens.started) HostScreens.initializeLate();
@@ -812,12 +813,53 @@ public final class Settings {
     }
 
     /**
-     * The Menu row can stay out only once the long-press shortcut has opened settings here and is still published. If
-     * the shortcut goes missing, as after a Root Mount start that couldn't publish it, the row comes back.
+     * The patched build a long press on the logo last opened settings on, the same proof for that way in. It holds for
+     * that build only: after an update or a repatch the patch can still find the logo's handler while Messenger never
+     * calls it, so one press has to work again.
+     */
+    static final String LOGO_USED = "logo_used_build";
+
+    static boolean logoPressProven(Context context) {
+        SharedPreferences prefs = preferences;
+        String build = patchedBuild(context);
+        return prefs != null && build != null && build.equals(prefs.getString(LOGO_USED, null));
+    }
+
+    /**
+     * This Messenger install and the HushMessenger version patched into it. A Root Mount repatch keeps Messenger's
+     * install time, so the version is what tells a new patch apart. Null when the install time is unknown.
+     */
+    static String patchedBuild(Context context) {
+        Long install = installedAt(context);
+        return install == null ? null : install + "/" + BuildConfig.VERSION_NAME;
+    }
+
+    private static volatile Long installedAt;
+
+    /** When this Messenger install went in, read once: an update or a repatch ends the process. Null when unknown. */
+    static Long installedAt(Context context) {
+        Long known = installedAt;
+        if (known != null || context == null) return known;
+        try {
+            known = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
+        } catch (android.content.pm.PackageManager.NameNotFoundException | RuntimeException error) {
+            return null;
+        }
+        installedAt = known;
+        return known;
+    }
+
+    /**
+     * The Menu row can stay out only once another way in has opened settings here and is still on: the logo long press,
+     * or the long-press shortcut while it's published. If neither is left, as after a Root Mount start that couldn't
+     * publish the shortcut, the row comes back.
      */
     static boolean menuRowCanHide() {
         SharedPreferences prefs = preferences;
-        return prefs != null && prefs.getBoolean(SHORTCUT_USED, false) && HostScreens.controlsShortcutPresent(appContext);
+        if (prefs == null) return false;
+        if (logoPressOn() && logoPressProven(appContext)) return true;
+        return !prefs.getBoolean(HIDE_ICON_SHORTCUTS, false) && prefs.getBoolean(SHORTCUT_USED, false)
+            && HostScreens.controlsShortcutPresent(appContext);
     }
 
     static boolean menuRowHidden() {
@@ -830,6 +872,57 @@ public final class Settings {
 
     static boolean logoOpensSettings() {
         return installed.contains(LOGO_LONG_PRESS);
+    }
+
+    /**
+     * The ways back into settings each have a switch (HushFacebook#146): these two, Hide the Menu row and Hide app
+     * drawer icon. They aren't controls, so Pause and safe mode leave them as they are, since each is a way back in to
+     * undo either.
+     */
+    static final String HIDE_ICON_SHORTCUTS = "hide_icon_shortcuts";
+    static final String HIDE_LOGO_PRESS = "hide_logo_press";
+
+    /** Whether a long press on the Messenger logo opens settings: patched in and not switched off. */
+    static boolean logoPressOn() {
+        SharedPreferences prefs = preferences;
+        return logoOpensSettings() && (prefs == null || !prefs.getBoolean(HIDE_LOGO_PRESS, false));
+    }
+
+    /** Whether the settings icon in the app drawer is there to tap, which a Root Mount install never has. */
+    static boolean drawerIconShown(Context context) {
+        if (context == null || drawerIconHidden()) return false;
+        try {
+            android.content.pm.PackageManager packages = context.getPackageManager();
+            android.content.ComponentName alias = new android.content.ComponentName(context, SettingsActivity.DRAWER_ALIAS);
+            packages.getActivityInfo(alias, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS);
+            return !HostScreens.hosted(context);
+        } catch (android.content.pm.PackageManager.NameNotFoundException | RuntimeException missing) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether Patch controls and Restart Messenger belong on the app icon's long-press menu: their switch, or on anyway
+     * when no other way back in is left. The Menu row counts whenever it's patched in, since it comes back by itself
+     * once the shortcut and the logo press are both gone.
+     */
+    static boolean iconShortcutsShown(Context context) {
+        SharedPreferences prefs = preferences;
+        if (prefs == null || !prefs.getBoolean(HIDE_ICON_SHORTCUTS, false)) return true;
+        return !(logoPressOn() || installed.contains("menu_row") || drawerIconShown(context));
+    }
+
+    /**
+     * Whether [key], one of the hide switches for a way back in, can be turned on: only while another way stays. One
+     * already on can always be turned off.
+     */
+    private static boolean anotherWayIn(String key) {
+        SharedPreferences prefs = preferences;
+        if (prefs == null || prefs.getBoolean(key, false)) return true;
+        Context context = appContext;
+        boolean menuRow = installed.contains("menu_row") && !menuRowHidden();
+        if (HIDE_ICON_SHORTCUTS.equals(key)) return logoPressOn() || menuRow || drawerIconShown(context);
+        return iconShortcutsShown(context) || menuRow || drawerIconShown(context);
     }
 
     private static final String KEPT_UNSENT_KEY = "kept_unsent_ids";
@@ -1520,11 +1613,16 @@ public final class Settings {
      * toolbar's context. Messenger hands the press to a title shortcut plugin that only its internal builds have, so for
      * everyone else it did nothing but vibrate. Like the Menu rows, this doesn't ask Pause or safe mode first: it's a way back into settings to undo
      * either. A launch Android refuses gets the same toasts as the side menu row, pointing at the launcher shortcut.
+     * Turn off the logo long press leaves the press to Messenger.
      */
     public static void logoLongPressed(Context context) {
-        if (context == null) return;
+        // Only the switch counts here: a press can come before settings have read what the patch put in.
+        SharedPreferences prefs = preferences;
+        if (context == null || prefs != null && prefs.getBoolean(HIDE_LOGO_PRESS, false)) return;
         try {
             HostScreens.open(context, HostScreens.SETTINGS);
+            String build = patchedBuild(context);
+            if (prefs != null && build != null && !logoPressProven(context)) prefs.edit().putString(LOGO_USED, build).apply();
         } catch (RuntimeException | LinkageError error) {
             hookFailed("menu_row", "Opening settings from a tab title failed", error);
             try {
@@ -1535,11 +1633,15 @@ public final class Settings {
         }
     }
 
-    /** Android 12 and later show two lines of a toast, so one says settings didn't open and the next names the way in. */
+    /**
+     * Android 12 and later show two lines of a toast, so one says settings didn't open and the next names the way in,
+     * unless Hide the icon shortcuts took that way away.
+     */
     private static void showOpenFailed(Context context) {
         SettingsText words = new SettingsText(context);
         android.widget.Toast.makeText(context, words.get("settings_open_failed"), android.widget.Toast.LENGTH_SHORT).show();
-        android.widget.Toast.makeText(context, words.get("settings_open_instead"), android.widget.Toast.LENGTH_LONG).show();
+        if (iconShortcutsShown(context))
+            android.widget.Toast.makeText(context, words.get("settings_open_instead"), android.widget.Toast.LENGTH_LONG).show();
     }
 
     private static final java.util.concurrent.atomic.AtomicBoolean MENU_LISTENER_LOGGED = new java.util.concurrent.atomic.AtomicBoolean();
