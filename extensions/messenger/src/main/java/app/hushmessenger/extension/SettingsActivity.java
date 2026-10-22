@@ -1124,7 +1124,9 @@ public final class SettingsActivity extends Activity {
                     if (wrote) OwnFont.restore(prefs, OwnFont.NAME_KEY, before);
                 }
             });
-            return words.get("font_file_set", name);
+            // With the switch off a restart changes nothing, so the toast names the switch instead. The status line
+            // under it names the file, which can be too long for a toast.
+            return words.get(prefs.getBoolean(OwnFont.KEY, false) ? "font_file_set" : "font_file_set_off");
         } catch (FontFile.Refused refused) {
             android.util.Log.i("HushMessenger", "Font file refused: " + refused.reason);
             switch (refused.reason) {

@@ -353,7 +353,8 @@ final class SettingsText {
         ENGLISH.put("font_file_picked_off", "%1$s is picked. Turn the switch on to use it.");
         ENGLISH.put("font_file_missing", "HushMessenger's copy of %1$s is gone, so your phone's font is used. Choose the file again.");
         ENGLISH.put("font_file_copying", "Copying the font file...");
-        ENGLISH.put("font_file_set", "Restart Messenger to use %1$s.");
+        ENGLISH.put("font_file_set", "Font picked. Restart Messenger to use it.");
+        ENGLISH.put("font_file_set_off", "Font picked. Turn the switch on to use it.");
         ENGLISH.put("font_file_not_font", "Not a .ttf or .otf font. Your font didn't change.");
         ENGLISH.put("font_file_too_large", "That font file is over %1$d MB. Your font didn't change.");
         ENGLISH.put("font_file_wont_load", "Android can't use that font. Your font didn't change.");

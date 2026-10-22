@@ -22,7 +22,8 @@ public class ToastLengthTest {
         "font_file_no_picker", "font_file_picker_failed", "font_file_busy", "font_file_finishing", "font_file_unreadable",
         "font_file_not_font", "font_file_wont_load", "font_file_not_saved", "font_file_stopped", "font_file_timeout",
         "font_adjust_failed", "bubble_settings_missing", "export_failed", "exported", "choices_file_no_picker",
-        "choices_file_saved", "choices_file_changed", "choices_file_timeout", "restore_failed", "quick_unchanged",
+        "choices_file_saved", "choices_file_changed", "choices_file_timeout",
+        "restore_failed", "quick_unchanged", "font_file_set", "font_file_set_off",
         "quick_missing", "copied", "copy_failed", "message_log_set_aside_failed", "message_log_cleared",
         "message_log_clear_failed", "auto_reply_saved_none", "import_empty", "import_invalid", "import_no_choices",
         "import_auto_reply_off", "open_help", "no_browser", "page_blocked", "camera_missing", "camera_failed",
@@ -36,7 +37,6 @@ public class ToastLengthTest {
         List<String> cut = new ArrayList<>();
         for (String key : PLAIN) check(cut, key, words.get(key));
         check(cut, "quick_setups_hidden", words.get("quick_setups_hidden", words.format("quick_setups_home"), words.format("choices")));
-        check(cut, "font_file_set", words.get("font_file_set", "Roboto-Regular.ttf"));
         check(cut, "font_file_too_large", words.get("font_file_too_large", FontFile.MAX_MEGABYTES));
         check(cut, "auto_reply_saved", words.get("auto_reply_saved", 12));
         for (int count : new int[] {1, 12}) {

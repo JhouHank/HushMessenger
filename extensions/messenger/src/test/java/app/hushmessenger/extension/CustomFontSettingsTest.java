@@ -258,7 +258,9 @@ public class CustomFontSettingsTest {
             Shadows.shadowOf(activity.getContentResolver()).registerInputStream(rubik,
                 new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
-            awaitToast("Restart Messenger to use Rubik-Regular.ttf.");
+            // With the switch off a restart wouldn't use it, so the toast names the switch. The file's name stays on
+            // the status line, where a long one can't push the rest of the toast past its two lines.
+            awaitToast("Font picked. Turn the switch on to use it.");
             assertEquals("Rubik-Regular.ttf", Settings.preferences.getString(OwnFont.NAME_KEY, ""));
             assertArrayEquals(FontFileTest.font(FontFileTest.STATIC_FONT), Files.readAllBytes(FontFile.file(activity).toPath()));
             assertEquals("Rubik-Regular.ttf is picked. Turn the switch on to use it.", status.getText().toString());
@@ -266,6 +268,13 @@ public class CustomFontSettingsTest {
             assertTrue(root.findViewWithTag("font_file").isEnabled());
             ((android.widget.CompoundButton) root.findViewWithTag(OwnFont.KEY)).setChecked(true);
             assertEquals("Using Rubik-Regular.ttf. Choose another file to replace it.", status.getText().toString());
+            // With the switch on, the restart is what's left.
+            Uri bold = Uri.parse("content://fonts/picked/Rubik-Bold.ttf");
+            Shadows.shadowOf(activity.getContentResolver()).registerInputStream(bold,
+                new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
+            activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(bold));
+            awaitToast("Font picked. Restart Messenger to use it.");
+            assertEquals("Using Rubik-Bold.ttf. Choose another file to replace it.", status.getText().toString());
             ((android.widget.CompoundButton) root.findViewWithTag(OwnFont.KEY)).setChecked(false);
 
             root.findViewWithTag("font_phone").performClick();
@@ -631,7 +640,8 @@ public class CustomFontSettingsTest {
                 Uri later = Uri.parse("content://fonts/picked/" + name);
                 resolver.registerInputStream(later, new ByteArrayInputStream(rubik));
                 activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(later));
-                awaitToast("Restart Messenger to use " + name);
+                awaitToast("Font picked. Turn the switch on to use it.");
+                int toasts = ShadowToast.shownToastCount();
 
                 release.countDown();
                 stalled.get().join(10_000);
@@ -639,7 +649,9 @@ public class CustomFontSettingsTest {
                 Shadows.shadowOf(Looper.getMainLooper()).idle();
                 assertEquals(stall, name, Settings.preferences.getString(OwnFont.NAME_KEY, null));
                 assertArrayEquals(stall, rubik, Files.readAllBytes(FontFile.file(activity).toPath()));
-                assertEquals(stall, "Restart Messenger to use " + name + ".", ShadowToast.getTextOfLatestToast());
+                // The stopped copy ends without a word, so the later pick's toast is still the last one.
+                assertEquals(stall, toasts, ShadowToast.shownToastCount());
+                assertEquals(stall, "Font picked. Turn the switch on to use it.", ShadowToast.getTextOfLatestToast());
                 assertEquals(name + " is picked. Turn the switch on to use it.", status.getText().toString());
             } finally {
                 release.countDown();
@@ -695,7 +707,7 @@ public class CustomFontSettingsTest {
             Uri rubik = Uri.parse("content://fonts/picked/Rubik-Regular.ttf");
             resolver.registerInputStream(rubik, new ByteArrayInputStream(FontFileTest.font(FontFileTest.STATIC_FONT)));
             activity.onActivityResult(SettingsActivity.PICK_FONT, Activity.RESULT_OK, new Intent().setData(rubik));
-            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
+            awaitToast("Font picked. Turn the switch on to use it.");
         } finally {
             release.countDown();
         }
@@ -721,7 +733,7 @@ public class CustomFontSettingsTest {
             root.findViewWithTag("font_file_stop").performClick();
             assertEquals("Already saving the font. It'll finish in a moment.", ShadowToast.getTextOfLatestToast());
             disk.countDown();
-            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
+            awaitToast("Font picked. Turn the switch on to use it.");
             assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
         } finally {
             disk.countDown();
@@ -755,7 +767,7 @@ public class CustomFontSettingsTest {
             ((Runnable) deadline.get(job)).run();
             assertEquals(toasts, ShadowToast.shownToastCount());
             disk.countDown();
-            awaitToast("Restart Messenger to use Rubik-Regular.ttf");
+            awaitToast("Font picked. Turn the switch on to use it.");
             assertEquals("Rubik-Regular.ttf", prefs.getString(OwnFont.NAME_KEY, null));
         } finally {
             disk.countDown();

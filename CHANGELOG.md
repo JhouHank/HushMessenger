@@ -15,6 +15,7 @@
 - A video picked in a chat whose access ran out before or during the send no longer gets **Fix videos that won't send** marked as failing in settings. It goes out the way Messenger would send it anyway.
 - If the phone's sound encoder won't start while a video's sound is being fixed, it's let go right away instead of staying held until Messenger closes.
 - Android 12 and newer show only two lines of a pop-up message and cut the rest with "...", which hid the useful part of 27 of HushMessenger's. They're shorter now and fit, from the font file and backup messages to the camera, gallery and restart ones.
+- Picking a font file while **Use your own font** is off now says to turn the switch on, instead of telling you to restart Messenger. The file's name stays on the line under the button, where a long one can't push the rest off the message.
 - In the settings cards, the line between switches now sits below a switch's own buttons (Keep the Profile button, the bubble choices, the font file, message log and auto reply buttons) instead of between the switch and them. The last switch in a card no longer draws a second line just above the card's edge.
 
 ### Docs
