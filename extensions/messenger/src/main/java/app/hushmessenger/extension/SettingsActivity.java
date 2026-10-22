@@ -366,6 +366,7 @@ public final class SettingsActivity extends Activity {
     @Override protected void onStop() {
         // Leaving settings makes a Quick setup or a Clear final, one still running included.
         started = false;
+        if (messageLogClearJob != null) messageLogClearJob.undoable = false;
         endUndo();
         Settings.preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener);
         super.onStop();
@@ -2431,7 +2432,7 @@ public final class SettingsActivity extends Activity {
             // Undo gets the only copy of what went, and nothing is offered after a failed or empty clear.
             List<MessageLog.Entry> removed = job.removed;
             job.removed = null;
-            if (started && job.cleared && removed != null && !removed.isEmpty()) {
+            if (started && job.undoable && job.cleared && removed != null && !removed.isEmpty()) {
                 offerUndo(text.format("message_log_clear"), () -> restoreMessageLog(removed));
                 messageLogUndo = true;
             }
@@ -2462,6 +2463,8 @@ public final class SettingsActivity extends Activity {
     private static final class MessageLogClearJob {
         java.lang.ref.WeakReference<SettingsActivity> owner;
         boolean finished, cleared, notified;
+        /** Cleared when settings stop while this runs, so coming back before it ends doesn't bring Undo back. */
+        boolean undoable = true;
         /** What the clear took, until the page hands it to Undo. */
         List<MessageLog.Entry> removed;
 
