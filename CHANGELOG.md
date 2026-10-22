@@ -5,6 +5,7 @@
 ### Reported issues
 
 - [#85](https://github.com/SysAdminDoc/HushMessenger/issues/85) New **Hide the recent photo card** switch under Photos and videos. Take a screenshot or a photo and Messenger puts a card above the message box offering to send it. With this on, the card doesn't show up. Anything you took is still in the gallery button when you want to send it. It starts off.
+- [#64](https://github.com/SysAdminDoc/HushMessenger/issues/64) With two gallery apps on the phone and neither set as the default, **Open your gallery app** sent you to a Samsung Gallery that listed photos only. Videos show up there now too, and Android's list of apps to pick from still holds just your galleries.
 
 ### Changed and fixed
 

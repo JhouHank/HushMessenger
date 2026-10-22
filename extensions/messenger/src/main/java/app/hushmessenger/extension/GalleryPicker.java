@@ -19,7 +19,11 @@ final class GalleryPicker {
 
     private GalleryPicker() {}
 
-    /** A pick for a photo or a video when some app on the phone answers it, otherwise null. */
+    /**
+     * A pick for a photo or a video when some app on the phone answers it, otherwise null. Every app it asks about by name
+     * came back from queryIntentActivities, so Android 11+ already lets Messenger see it.
+     */
+    @android.annotation.SuppressLint("QueryPermissionsNeeded")
     static Intent pickIntent(Context context) {
         if (context == null) return null;
         PackageManager packages = context.getPackageManager();
@@ -29,15 +33,27 @@ final class GalleryPicker {
         // Samsung's Gallery shows only photos for a photo pick and skips the type list, but shows both for any type. Any
         // type also reaches contact pickers, so it goes only to the one gallery app Android opens without asking.
         String app = opens.activityInfo.packageName;
-        boolean gallery = false;
+        java.util.Set<String> galleries = new java.util.LinkedHashSet<>();
         for (ResolveInfo candidate : packages.queryIntentActivities(photos, PackageManager.MATCH_DEFAULT_ONLY)) {
-            if (candidate.activityInfo != null && app.equals(candidate.activityInfo.packageName)) gallery = true;
+            if (candidate.activityInfo != null) galleries.add(candidate.activityInfo.packageName);
         }
-        if (gallery) {
-            Intent media = new Intent(Intent.ACTION_PICK).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, MEDIA).setPackage(app);
-            if (media.resolveActivity(packages) != null) return media;
+        if (galleries.contains(app)) {
+            Intent media = anyType().setPackage(app);
+            return media.resolveActivity(packages) != null ? media : photos;
         }
-        return photos;
+        // Android asks which gallery to use. It finds the apps to list by the selector, so only gallery apps are offered,
+        // Always still sets one, and the gallery picked gets the any-type pick.
+        if (galleries.isEmpty()) return photos;
+        for (String gallery : galleries) {
+            if (anyType().setPackage(gallery).resolveActivity(packages) == null) return photos;
+        }
+        Intent media = anyType();
+        media.setSelector(new Intent(Intent.ACTION_PICK).setType("image/*"));
+        return media;
+    }
+
+    private static Intent anyType() {
+        return new Intent(Intent.ACTION_PICK).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, MEDIA);
     }
 
     /** The pick screen when Android knows it under this package's own name and a gallery app answers a pick, otherwise null. */

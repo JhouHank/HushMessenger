@@ -68,6 +68,50 @@ public class ExternalGalleryTest {
         assertEquals(Arrays.asList("image/*", "video/*"), Arrays.asList(pick.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
     }
 
+    /** A gallery app as Android's own resolver needs to see it before it asks which app to use. */
+    private ResolveInfo gallery(String packageName) {
+        ResolveInfo gallery = new ResolveInfo();
+        gallery.activityInfo = new ActivityInfo();
+        gallery.activityInfo.packageName = packageName;
+        gallery.activityInfo.name = packageName + ".Pick";
+        gallery.activityInfo.applicationInfo = new android.content.pm.ApplicationInfo();
+        gallery.activityInfo.applicationInfo.packageName = packageName;
+        return gallery;
+    }
+
+    /**
+     * #64: with two gallery apps and no default Android asks which one to use. The photo pick kept the contacts app off
+     * that list but left Samsung's Gallery showing photos only, so the any-type pick now asks with the photo pick as the
+     * selector, which Android lists the apps and records Always by.
+     */
+    @Test public void whenAndroidAsksWhichGalleryThePickedOneStillShowsPhotosAndVideos() {
+        var packages = shadowOf(app.getPackageManager());
+        packages.setShouldShowActivityChooser(true);
+        ResolveInfo samsung = gallery("com.example.gallery"), photos = gallery("com.example.photos");
+        Intent photoPick = new Intent(Intent.ACTION_PICK).setType("image/*");
+        packages.addResolveInfoForIntent(photoPick, samsung);
+        packages.addResolveInfoForIntent(photoPick, photos);
+        // No contacts app here: Robolectric matches a registered pick by its action alone, so one would answer the photo
+        // pick too. On a phone the contacts picker answers an any-type pick but not a photo pick, so the selector keeps it out.
+        packages.addResolveInfoForIntent(new Intent(Intent.ACTION_PICK).setType("*/*").setPackage("com.example.gallery"), samsung);
+        String asks = app.getPackageManager().resolveActivity(photoPick, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+            .activityInfo.packageName;
+        assertFalse("Android picked " + asks + " without asking", Arrays.asList("com.example.gallery", "com.example.photos").contains(asks));
+
+        assertEquals("A gallery that can't take an any-type pick keeps the photo pick", "image/*", GalleryPicker.pickIntent(app).getType());
+        packages.addResolveInfoForIntent(new Intent(Intent.ACTION_PICK).setType("*/*").setPackage("com.example.photos"), photos);
+        Intent pick = GalleryPicker.pickIntent(app);
+        assertEquals("*/*", pick.getType());
+        assertNull(pick.getPackage());
+        assertNull(pick.getComponent());
+        assertEquals(Arrays.asList("image/*", "video/*"), Arrays.asList(pick.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
+        Intent selector = pick.getSelector();
+        assertNotNull("Without the selector the contacts app is on the list", selector);
+        assertEquals(Intent.ACTION_PICK, selector.getAction());
+        assertEquals("image/*", selector.getType());
+        assertNull(selector.getPackage());
+    }
+
     /** The chat camera launcher's start: its own extras, then the ones it's handed, on a new intent for its screen. */
     private Intent launch(Bundle handed) {
         Intent intent = new Intent().setClassName(app.getPackageName(), CAMERA_SCREEN).putExtra("trigger2", "thread");
