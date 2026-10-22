@@ -86,15 +86,15 @@ public class QuickSetupsTest {
             root.findViewWithTag("tab_app").performClick();
             assertTrue(root.findViewWithTag("quick_setups").isShown());
             root.findViewWithTag("quick_privacy").performClick();
-            assertEquals("Changed 3 settings", ShadowToast.getTextOfLatestToast());
+            assertEquals("Changed 3 controls", ShadowToast.getTextOfLatestToast());
             for (String key : QuickSetups.PRIVACY) {
                 assertTrue(key, Settings.preferences.getBoolean(key, false));
                 assertTrue(key, ((Switch) root.findViewWithTag(key)).isChecked());
             }
             root.findViewWithTag("quick_privacy").performClick();
-            assertEquals("Nothing to change. Those settings were already set.", ShadowToast.getTextOfLatestToast());
+            assertEquals("Nothing to change. Those controls were already set.", ShadowToast.getTextOfLatestToast());
             root.findViewWithTag("quick_defaults").performClick();
-            assertEquals("Changed 5 settings", ShadowToast.getTextOfLatestToast());
+            assertEquals("Changed 5 controls", ShadowToast.getTextOfLatestToast());
             for (String key : controls()) assertFalse(key, Settings.preferences.getBoolean(key, false));
             // Pause isn't a control, so it stays as it was.
             assertTrue(Settings.preferences.getBoolean("paused", false));
@@ -111,7 +111,7 @@ public class QuickSetupsTest {
             assertEquals(View.GONE, root.findViewWithTag("restart_row").getVisibility());
             root.findViewWithTag("tab_app").performClick();
             root.findViewWithTag("quick_defaults").performClick();
-            assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
+            assertEquals("Changed 1 control", ShadowToast.getTextOfLatestToast());
             assertTrue(root.findViewWithTag("restart_row").isShown());
             assertEquals("1 change waits for a restart", ((TextView) root.findViewWithTag("restart_waiting")).getText().toString());
         }
@@ -190,11 +190,11 @@ public class QuickSetupsTest {
             View root = screen.get().getWindow().getDecorView();
             root.findViewWithTag("tab_app").performClick();
             root.findViewWithTag("quick_privacy").performClick();
-            assertEquals("Those switches aren't installed. Nothing changed.", ShadowToast.getTextOfLatestToast());
+            assertEquals("Those controls aren't installed. Nothing changed.", ShadowToast.getTextOfLatestToast());
             root.findViewWithTag("quick_quiet").performClick();
-            assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
+            assertEquals("Changed 1 control", ShadowToast.getTextOfLatestToast());
             root.findViewWithTag("quick_quiet").performClick();
-            assertEquals("Nothing to change. Those settings were already set.", ShadowToast.getTextOfLatestToast());
+            assertEquals("Nothing to change. Those controls were already set.", ShadowToast.getTextOfLatestToast());
         }
     }
 
@@ -209,7 +209,7 @@ public class QuickSetupsTest {
             View root = screen.get().getWindow().getDecorView();
             root.findViewWithTag("tab_app").performClick();
             root.findViewWithTag("quick_defaults").performClick();
-            assertEquals("Changed 1 setting", ShadowToast.getTextOfLatestToast());
+            assertEquals("Changed 1 control", ShadowToast.getTextOfLatestToast());
             assertFalse(Settings.preferences.getBoolean("bubbles", true));
         }
     }

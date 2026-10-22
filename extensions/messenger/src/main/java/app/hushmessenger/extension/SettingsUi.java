@@ -75,7 +75,8 @@ final class SettingsUi {
     }
 
     TextView heading(String value) {
-        TextView view = text(value.toUpperCase(context.getResources().getConfiguration().getLocales().get(0)), 13, muted, true);
+        // The text is English on every phone, so English capitals: a Turkish phone's own would dot the I.
+        TextView view = text(value.toUpperCase(java.util.Locale.ROOT), 13, muted, true);
         view.setLetterSpacing(0.06f);
         view.setAccessibilityHeading(true);
         return view;

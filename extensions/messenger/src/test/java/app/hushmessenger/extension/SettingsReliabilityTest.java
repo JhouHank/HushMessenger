@@ -365,7 +365,7 @@ public class SettingsReliabilityTest {
             assertFalse(Settings.enableBubbles());
             bubbles.performClick();
             Toast first = ShadowToast.getLatestToast();
-            assertEquals("Allow chat bubbles on", ShadowToast.getTextOfLatestToast());
+            assertEquals("Allow chat bubbles is on", ShadowToast.getTextOfLatestToast());
             assertTrue(Settings.enableBubbles());
             assertEquals("1 control enabled", ((TextView) root.findViewWithTag("enabled_count")).getText().toString());
             root.findViewWithTag("paused").performClick();

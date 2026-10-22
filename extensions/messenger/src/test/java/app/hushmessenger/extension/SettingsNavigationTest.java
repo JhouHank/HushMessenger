@@ -60,6 +60,15 @@ public class SettingsNavigationTest {
         }
     }
 
+    /** The headings are English on every phone, so a Turkish phone's own capitals (a dotted İ) never reach them. */
+    @Test @org.robolectric.annotation.Config(qualifiers = "tr-rTR") public void headingsUseEnglishCapitalsOnATurkishPhone() {
+        try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
+            android.widget.LinearLayout group = screen.get().getWindow().getDecorView().findViewWithTag("links_bubbles");
+            android.widget.LinearLayout heading = (android.widget.LinearLayout) group.getChildAt(0);
+            assertEquals("LINKS AND BUBBLES", ((TextView) heading.getChildAt(0)).getText().toString());
+        }
+    }
+
     private static boolean inside(View view, View group) {
         for (android.view.ViewParent parent = view.getParent(); parent != null; parent = parent.getParent())
             if (parent == group) return true;
@@ -104,11 +113,11 @@ public class SettingsNavigationTest {
         try (var screen = Robolectric.buildActivity(SettingsActivity.class).setup()) {
             ((Switch) screen.get().getWindow().getDecorView().findViewWithTag("light")).performClick();
             Toast themeToast = ShadowToast.getLatestToast();
-            assertEquals("Light theme on", ShadowToast.getTextOfLatestToast());
+            assertEquals("Light theme is on", ShadowToast.getTextOfLatestToast());
             Shadows.shadowOf(Looper.getMainLooper()).idle();
             ((Switch) screen.get().getWindow().getDecorView().findViewWithTag("people")).performClick();
             assertTrue(Shadows.shadowOf(themeToast).isCancelled());
-            assertEquals("Hide People You May Know on", ShadowToast.getTextOfLatestToast());
+            assertEquals("Hide People You May Know is on", ShadowToast.getTextOfLatestToast());
         }
     }
 
