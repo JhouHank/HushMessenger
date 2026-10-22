@@ -22,7 +22,7 @@ public class ToastLengthTest {
         "font_file_no_picker", "font_file_picker_failed", "font_file_busy", "font_file_finishing", "font_file_unreadable",
         "font_file_not_font", "font_file_wont_load", "font_file_not_saved", "font_file_stopped", "font_file_timeout",
         "font_adjust_failed", "bubble_settings_missing", "export_failed", "exported", "choices_file_no_picker",
-        "choices_file_saved", "choices_file_changed", "choices_file_timeout",
+        "choices_file_saved", "choices_file_changed", "choices_file_timeout", "choices_file_timeout_read",
         "restore_failed", "quick_unchanged", "font_file_set", "font_file_set_off",
         "quick_missing", "copied", "copy_failed", "message_log_set_aside_failed", "message_log_cleared",
         "message_log_clear_failed", "auto_reply_saved_none", "import_empty", "import_invalid", "import_no_choices",

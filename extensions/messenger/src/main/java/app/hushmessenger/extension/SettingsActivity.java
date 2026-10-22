@@ -2546,12 +2546,14 @@ public final class SettingsActivity extends Activity {
             this.export = export;
             savedMessage = screen.text.get("choices_file_saved");
             failedMessage = screen.text.get("export_failed");
-            timeoutMessage = screen.text.get("choices_file_timeout");
+            // A read that runs out of time changes nothing. Only a save can leave a cut-off file behind.
+            String timeout = request == READ_CHOICES ? "choices_file_timeout_read" : "choices_file_timeout";
+            timeoutMessage = screen.text.get(timeout);
             generation = screen.documentGeneration;
             before = ChoiceCodec.encode(Settings.preferences, Settings.installed);
             deadline = () -> {
                 SettingsActivity current = owner.get();
-                if (current != null && current.documentJob == this) current.cancelDocumentJob("choices_file_timeout");
+                if (current != null && current.documentJob == this) current.cancelDocumentJob(timeout);
                 else if (!canceled) {
                     cancel();
                     Toast.makeText(context, timeoutMessage, Toast.LENGTH_LONG).show();

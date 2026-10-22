@@ -241,6 +241,7 @@ final class SettingsText {
         ENGLISH.put("choices_file_canceled", "Canceled. A save may leave an incomplete file.");
         ENGLISH.put("choices_file_canceled_read", "Canceled. Your choices didn't change.");
         ENGLISH.put("choices_file_timeout", "Took too long. A saved file may be cut off. Try again.");
+        ENGLISH.put("choices_file_timeout_read", "Took too long. Your choices didn't change. Try again.");
         ENGLISH.put("choices_file_busy", "Earlier file saves or restores are still finishing. Try again in a moment.");
         ENGLISH.put("choices_file_changed", "Your choices changed during the restore. Try again.");
         ENGLISH.put("check_updates", "Check for updates");

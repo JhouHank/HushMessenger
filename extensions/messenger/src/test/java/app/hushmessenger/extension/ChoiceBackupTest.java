@@ -653,7 +653,9 @@ public class ChoiceBackupTest {
             while (opens.get() == 0 && System.nanoTime() < until) Thread.sleep(10);
             assertEquals(1, opens.get());
             Shadows.shadowOf(Looper.getMainLooper()).idleFor(51, TimeUnit.MILLISECONDS);
-            assertTrue(((android.widget.TextView) root.findViewWithTag("choices_file_status")).getText().toString().contains("too long"));
+            // A read that ran out of time left the choices alone. Only a save can leave a cut-off file.
+            assertEquals("Took too long. Your choices didn't change. Try again.",
+                ((android.widget.TextView) root.findViewWithTag("choices_file_status")).getText().toString());
             assertTrue(root.findViewWithTag("read_choices_file").isEnabled());
             startFile(activity, false, uri);
             assertTrue(started.await(5, TimeUnit.SECONDS));
