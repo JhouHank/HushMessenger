@@ -64,6 +64,7 @@ internal val syntheticHooks: Map<String, Set<String>> = mapOf(
     ANALYTICS_UPLOADS to setOf(
         "LX/0c0;->onStartCommand(Landroid/content/Intent;II)I",
         "LX/0c0;->onStartJob(Landroid/app/job/JobParameters;)Z",
+        "LX/2Hd;->A05(LX/3Pq;Ljava/lang/String;)V",
         "LX/T7W;->run()V",
         "LX/Wq1;->run()V",
         "Lcom/facebook/analytics2/logger/GooglePlayUploadService;->onStartCommand(Landroid/content/Intent;II)I",

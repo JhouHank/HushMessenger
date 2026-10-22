@@ -35,6 +35,7 @@ hook allow_screenshot LX/Znv;->run()V
 hook allow_screenshot Lcom/facebook/screenshot/ScreenshotContentObserver;->onChange(ZLandroid/net/Uri;)V
 hook analytics_uploads LX/0aV;->onStartCommand(Landroid/content/Intent;II)I
 hook analytics_uploads LX/0aV;->onStartJob(Landroid/app/job/JobParameters;)Z
+hook analytics_uploads LX/4ek;->A05(LX/5dJ;Ljava/lang/String;)V
 hook analytics_uploads LX/Zos;->run()V
 hook analytics_uploads LX/a1d;->run()V
 hook analytics_uploads Lcom/facebook/analytics2/logger/GooglePlayUploadService;->onStartCommand(Landroid/content/Intent;II)I

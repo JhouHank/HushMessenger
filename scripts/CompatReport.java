@@ -3321,6 +3321,54 @@ public class CompatReport {
         return found.size() == 1 ? found : List.of();
     }
 
+    static final List<String> UPLOAD_ACTIONS = List.of("com.facebook.analytics2.logger.UPLOAD_NOW",
+        "com.facebook.analytics2.logger.USER_LOGOUT", "Unknown action=");
+
+    static String methodId(MethodReference r) {
+        return r.getDefiningClass() + "->" + r.getName() + "(" + String.join("", r.getParameterTypes()) + ")" + r.getReturnType();
+    }
+
+    /** The uploader's (params, callback, action)V dispatcher, which names both upload actions and the unknown one. */
+    static boolean isUploadActionDispatcher(Method m) {
+        if (!"V".equals(m.getReturnType()) || AccessFlags.STATIC.isSet(m.getAccessFlags()) || m.getImplementation() == null ||
+            m.getParameterTypes().size() != 3 || !"Ljava/lang/String;".contentEquals(m.getParameterTypes().get(2))) return false;
+        var strings = new HashSet<String>();
+        for (var i : m.getImplementation().getInstructions())
+            if (i instanceof ReferenceInstruction ri && ri.getReference() instanceof StringReference s) strings.add(s.getString());
+        return strings.containsAll(UPLOAD_ACTIONS);
+    }
+
+    /** (params, action)V that only calls the dispatcher with this, its params, a null callback and its action. */
+    static boolean startsUploadInProcess(Method m, Method dispatcher) {
+        if (!"V".equals(m.getReturnType()) || AccessFlags.STATIC.isSet(m.getAccessFlags()) || m.getImplementation() == null ||
+            m.getParameterTypes().size() != 2 || !"Ljava/lang/String;".contentEquals(m.getParameterTypes().get(1))) return false;
+        var code = new ArrayList<Instruction>();
+        m.getImplementation().getInstructions().forEach(code::add);
+        if (code.size() != 3 || code.get(0).getOpcode() != Opcode.CONST_4 || ((NarrowLiteralInstruction) code.get(0)).getNarrowLiteral() != 0 ||
+            code.get(1).getOpcode() != Opcode.INVOKE_DIRECT || code.get(2).getOpcode() != Opcode.RETURN_VOID) return false;
+        if (!(((ReferenceInstruction) code.get(1)).getReference() instanceof MethodReference target) ||
+            !methodId(target).equals(methodId(dispatcher)) ||
+            !m.getParameterTypes().get(0).toString().equals(target.getParameterTypes().get(0).toString())) return false;
+        var call = (FiveRegisterInstruction) code.get(1);
+        int self = m.getImplementation().getRegisterCount() - 3;
+        int callback = ((OneRegisterInstruction) code.get(0)).getRegisterA();
+        return callback < self && call.getRegisterCount() == 4 && call.getRegisterC() == self && call.getRegisterD() == self + 1 &&
+            call.getRegisterE() == callback && call.getRegisterF() == self + 2;
+    }
+
+    /** The in-process upload start beside the one dispatcher, when there's exactly one. Mirrors AnalyticsUploads.kt. */
+    static List<Method> inProcessUploadStarts(List<ClassDef> classes) {
+        var dispatchers = new ArrayList<Method>();
+        for (var cls : classes) for (var m : cls.getMethods()) if (isUploadActionDispatcher(m)) dispatchers.add(m);
+        if (dispatchers.size() != 1) return List.of();
+        var dispatcher = dispatchers.get(0);
+        var starts = new ArrayList<Method>();
+        for (var cls : classes)
+            if (cls.getType().equals(dispatcher.getDefiningClass()))
+                for (var m : cls.getMethods()) if (startsUploadInProcess(m, dispatcher)) starts.add(m);
+        return starts.size() == 1 ? starts : List.of();
+    }
+
     static List<Method> analyticsUploads(List<ClassDef> classes) {
         var found = new ArrayList<Method>();
         ClassDef uploader = null;
@@ -4795,6 +4843,7 @@ public class CompatReport {
         found.get("analytics_uploads").addAll(analyticsUploads(classes));
         found.get("analytics_uploads").addAll(boundUploadTasks(classes));
         found.get("analytics_uploads").addAll(xanalyticsUploadTimers(classes));
+        found.get("analytics_uploads").addAll(inProcessUploadStarts(classes));
         found.get("attribution_uploads").addAll(attributionUploads(classes));
         found.get("ad_events").addAll(adEvents(classes));
         found.get("mqtt_telemetry").addAll(mqttTelemetry(classes));

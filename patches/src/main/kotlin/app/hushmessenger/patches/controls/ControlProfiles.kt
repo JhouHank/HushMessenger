@@ -64,7 +64,8 @@ internal val PROFILE_346814894 = ControlProfile(
         ),
         "analytics_uploads" to setOf(
             "LX/0aV;->onStartCommand(Landroid/content/Intent;II)I",
-            "LX/0aV;->onStartJob(Landroid/app/job/JobParameters;)Z", "LX/Zos;->run()V", "LX/a1d;->run()V",
+            "LX/0aV;->onStartJob(Landroid/app/job/JobParameters;)Z", "LX/4ek;->A05(LX/5dJ;Ljava/lang/String;)V",
+            "LX/Zos;->run()V", "LX/a1d;->run()V",
             "Lcom/facebook/analytics2/logger/GooglePlayUploadService;->onStartCommand(Landroid/content/Intent;II)I",
             "Lcom/facebook/analytics2/logger/legacy/uploader/AlarmBasedUploadService;->onStartCommand(Landroid/content/Intent;II)I",
             "Lcom/facebook/analytics2/logger/legacy/uploader/HighPriUploadRetryReceiver;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V",
