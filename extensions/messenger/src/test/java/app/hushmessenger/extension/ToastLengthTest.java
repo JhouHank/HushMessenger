@@ -57,20 +57,23 @@ public class ToastLengthTest {
         assertEquals(2, lines("Hidden. Tap Quick setups section under Your choices."));
         // The S22 showed this one as "Quick setups hidden. Tap Quick / setups section under Your choic...".
         assertEquals(4, lines("Quick setups hidden. Tap Quick setups section under Your choices to show it again."));
+        // A word longer than a line breaks inside itself, like a picked font's file name.
+        assertEquals(3, lines("Restart Messenger to use NotoSansJP-VariableFont_wght.ttf."));
+        assertEquals(2, lines("NotoSansJP-VariableFont_wght.ttf"));
     }
 
     private static void check(List<String> cut, String key, String message) {
         if (lines(message) > 2) cut.add(key + ": " + message);
     }
 
-    /** Greedy word wrap, the way a toast's text breaks between words. */
-    private static int lines(String message) {
+    /** Greedy word wrap, the way a toast's text breaks between words, and inside a word too long for a line. */
+    static int lines(String message) {
         int count = 0, used = 0;
         for (String word : message.trim().split("\\s+")) {
             if (used > 0 && used + 1 + word.length() <= LINE) used += 1 + word.length();
             else {
-                count++;
-                used = word.length();
+                count += (word.length() - 1) / LINE + 1;
+                used = (word.length() - 1) % LINE + 1;
             }
         }
         return count;
