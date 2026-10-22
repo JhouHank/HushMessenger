@@ -115,6 +115,8 @@ internal fun Method.hookId() = "$definingClass->$name(${parameterTypes.joinToStr
 
 /** Match semantics first, then require the exact set the build's profile records. */
 internal fun findControls(classes: Iterable<ClassDef>, community: CommunityInboxContract? = findCommunityInbox(classes)): Map<String, List<Method>> {
+    // Every build lists the base profile's controls (ControlProfileTest), so these keys are the active build's too. Only
+    // the hook ids differ by build, and validateControls compares what's found here with the active build's.
     val found = BASE_PROFILE.hooks.keys.associateWith { mutableListOf<Method>() }
     community?.let { found.getValue(COMMUNITY_INBOX).add(it.render) }
     found.getValue("ai_sticker_cell").addAll(findAiStickerCells(classes))
