@@ -46,6 +46,7 @@ public class HostScreensTest {
         Settings.preferences.edit().clear().commit();
         CrashGuard.resetForTests();
         HostScreens.controlsShortcut = null;
+        AndroidShortcutManager.rateLimited = false;
         realShortcutWork = HostScreens.shortcutWork;
         HostScreens.shortcutWork = Runnable::run;
         // A failed start takes the Bold and Italic entries out on this executor, so it runs inline here too.
@@ -364,6 +365,50 @@ public class HostScreensTest {
     }
 
     /**
+     * Android refuses an add that would put more than its limit on one icon, the manifest's shortcuts included, and
+     * Messenger's conversation shortcuts can fill it. Its lowest-ranked ones make room, and only as many as needed.
+     */
+    @Test @Config(shadows = AndroidShortcutManager.class)
+    public void aFullIconStillGetsThePair() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        ComponentName messenger = launcherIcons(app);
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        var shadow = (AndroidShortcutManager) org.robolectric.shadow.api.Shadow.extract(manager);
+        shadow.setMaxShortcutCountPerActivity(6);
+        shadow.setManifestShortcuts(List.of(new ShortcutInfo.Builder(app, "compose").setShortLabel("New message")
+            .setIntent(new Intent(Intent.ACTION_VIEW).setComponent(messenger)).setActivity(messenger).build()));
+        manager.addDynamicShortcuts(conversations(app, messenger, 5));
+        startWithoutProvider(app);
+        String controls = HostScreens.CONTROLS_SHORTCUT, restart = HostScreens.RESTART_SHORTCUT;
+        assertEquals(List.of(controls, restart, "chat0", "chat1", "chat2"), menu(manager, messenger));
+        // Messenger pushed one out. Room for it costs one more of its own, the lowest.
+        manager.removeDynamicShortcuts(List.of(restart));
+        manager.addDynamicShortcuts(List.of(new ShortcutInfo.Builder(app, "chat9").setShortLabel("Chat 9")
+            .setIntent(new Intent(Intent.ACTION_VIEW).setComponent(messenger)).setRank(0).setActivity(messenger).build()));
+        assertEquals(List.of("chat9", controls, "chat0", "chat1", "chat2"), menu(manager, messenger));
+        startWithoutProvider(app);
+        assertEquals(List.of(controls, restart, "chat9", "chat0", "chat1"), menu(manager, messenger));
+    }
+
+    /** While Android turns adds down, a full icon keeps every one of Messenger's shortcuts: no room for an add it won't take. */
+    @Test @Config(shadows = AndroidShortcutManager.class)
+    public void aRateLimitedAddTakesNothingOff() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        ComponentName messenger = launcherIcons(app);
+        ShortcutManager manager = app.getSystemService(ShortcutManager.class);
+        var shadow = (AndroidShortcutManager) org.robolectric.shadow.api.Shadow.extract(manager);
+        shadow.setMaxShortcutCountPerActivity(6);
+        manager.addDynamicShortcuts(conversations(app, messenger, 6));
+        AndroidShortcutManager.rateLimited = true;
+        startWithoutProvider(app);
+        assertEquals(List.of("chat0", "chat1", "chat2", "chat3", "chat4", "chat5"), menu(manager, messenger));
+        AndroidShortcutManager.rateLimited = false;
+        startWithoutProvider(app);
+        assertEquals(List.of(HostScreens.CONTROLS_SHORTCUT, HostScreens.RESTART_SHORTCUT, "chat0", "chat1", "chat2", "chat3"),
+            menu(manager, messenger));
+    }
+
+    /**
      * HushFacebook#146: Hide the icon shortcuts takes the pair off the icon at once and at every start after, and a copy
      * pinned to the home screen turns gray until the switch is off again.
      */
@@ -399,13 +444,22 @@ public class HostScreensTest {
 
     /**
      * Robolectric sets a disabled pinned copy aside but leaves it saying it's enabled, moves a pinned shortcut off the
-     * published list and keeps whatever rank a shortcut asked for. Android does none of that: a shortcut stays published
-     * after it's pinned, and after every add it numbers each icon's shortcuts again from 0 (ShortcutPackage.adjustRanks).
+     * published list, keeps whatever rank a shortcut asked for and takes any number on one icon. Android does none of
+     * that: a shortcut stays published after it's pinned, after every add it numbers each icon's shortcuts again from 0
+     * (ShortcutPackage.adjustRanks), and it refuses an add that puts more than its limit on an icon.
      */
     @org.robolectric.annotation.Implements(ShortcutManager.class)
     public static class AndroidShortcutManager extends org.robolectric.shadows.ShadowShortcutManager {
         /** Each pinned copy that's gray, with what it says when tapped. */
         static final java.util.Map<String, String> grayed = new java.util.HashMap<>();
+
+        /** Android turning adds down for a while (ShortcutPackage.tryApiCall), which it checks after the count. */
+        static boolean rateLimited;
+
+        @Override @org.robolectric.annotation.Implementation
+        protected boolean isRateLimitingActive() {
+            return rateLimited;
+        }
 
         @Override @org.robolectric.annotation.Implementation
         protected boolean requestPinShortcut(ShortcutInfo shortcut, android.content.IntentSender result) {
@@ -417,6 +471,19 @@ public class HostScreensTest {
 
         @Override @org.robolectric.annotation.Implementation
         protected boolean addDynamicShortcuts(List<ShortcutInfo> shortcuts) {
+            // ShortcutPackage.enforceShortcutCountsBeforeOperation: the manifest's and the published ones per icon, a
+            // published one that's added again moving to its new icon, and the whole add refused past the limit.
+            java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+            for (ShortcutInfo shortcut : getManifestShortcuts()) counts.merge(String.valueOf(shortcut.getActivity()), 1, Integer::sum);
+            for (ShortcutInfo shortcut : published().values()) counts.merge(String.valueOf(shortcut.getActivity()), 1, Integer::sum);
+            for (ShortcutInfo shortcut : shortcuts) {
+                ShortcutInfo original = published().get(shortcut.getId());
+                if (original != null) counts.merge(String.valueOf(original.getActivity()), -1, Integer::sum);
+                counts.merge(String.valueOf(shortcut.getActivity()), 1, Integer::sum);
+            }
+            for (int count : counts.values())
+                if (count > getMaxShortcutCountPerActivity()) throw new IllegalArgumentException("Max number of dynamic shortcuts exceeded");
+            if (rateLimited) return false;
             boolean added = super.addDynamicShortcuts(shortcuts);
             for (ShortcutInfo shortcut : shortcuts) published().put(shortcut.getId(), shortcut);
             renumber(shortcuts.stream().map(ShortcutInfo::getId).toList());

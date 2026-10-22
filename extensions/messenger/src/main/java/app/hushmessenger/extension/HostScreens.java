@@ -218,6 +218,9 @@ public final class HostScreens {
                 // added first, in the order they came. Rank 1 would tie with Messenger's own second shortcut and land third,
                 // so both go in at rank 0, together, and come out as the top two.
                 changed = true;
+                // Removing isn't held back while Android turns adds down for a while, so room is made only for an add
+                // it will take.
+                if (launcher != null && !manager.isRateLimitingActive()) makeRoom(manager, launcher, ours);
                 manager.addDynamicShortcuts(List.of(
                     shortcut(context, CONTROLS_SHORTCUT, "Patch controls", SETTINGS, android.R.drawable.ic_menu_preferences, launcher),
                     shortcut(context, RESTART_SHORTCUT, "Restart Messenger", RESTART, android.R.drawable.ic_popup_sync, launcher)));
@@ -229,6 +232,26 @@ public final class HostScreens {
             // The Menu row asks whether Patch controls is there, so a change has to be read again.
             if (changed) controlsShortcut = null;
         }
+    }
+
+    /**
+     * Android turns down the whole add when it would put more than its limit on one icon, counting the manifest's
+     * shortcuts and the published ones, and Messenger's conversation shortcuts can fill that. Its lowest-ranked ones on
+     * the icon make room, the same ones Android drops when Messenger pushes one past the limit itself.
+     */
+    private static void makeRoom(ShortcutManager manager, android.content.ComponentName launcher, List<String> ours) {
+        int count = ours.size();
+        for (ShortcutInfo shortcut : manager.getManifestShortcuts())
+            if (launcher.equals(shortcut.getActivity())) count++;
+        List<ShortcutInfo> theirs = new ArrayList<>();
+        for (ShortcutInfo shortcut : manager.getDynamicShortcuts())
+            if (launcher.equals(shortcut.getActivity()) && !ours.contains(shortcut.getId())) theirs.add(shortcut);
+        int over = count + theirs.size() - manager.getMaxShortcutCountPerActivity();
+        if (over <= 0) return;
+        theirs.sort((a, b) -> Integer.compare(b.getRank(), a.getRank()));
+        List<String> dropped = new ArrayList<>();
+        for (int i = 0; i < over && i < theirs.size(); i++) dropped.add(theirs.get(i).getId());
+        manager.removeDynamicShortcuts(dropped);
     }
 
     /**
