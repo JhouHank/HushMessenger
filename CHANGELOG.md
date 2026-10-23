@@ -5,6 +5,7 @@
 ### Changed and fixed
 
 - **Hide Meta AI** now reaches the search screen too. Tap the search bar and the box at the top used to say "Ask Meta AI or search" even with the switch on. Now it shows the plain search hint, like the bar on the Chats list. Search still finds people and chats the same way.
+- With **Slide chats in and out** on, a chat whose first frames come late no longer jumps partway in. That happened most on the first chat you open after starting Messenger. The chat now waits off screen until Messenger draws on time (a quarter second at most), then slides in from the edge. Going back works the same way.
 
 ## 0.26.0 (2026-10-22)
 
